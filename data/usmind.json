@@ -219,16 +219,20 @@
               "children": [
                 {
                   "data": {
-                    "text": "新主题",
+                    "text": "<div style=\"position:relative;width:300px;height:170px;overflow:hidden;border-radius:12px;background:#000;line-height:0\"><video controls style=\"width:100%;height:100%;object-fit:cover;display:block;background:#000\" src=\"media://m_mugx3prc_z44tfu\"></video></div>",
                     "uid": "1ac9ef6a-4780-4e06-8566-0e56691710e5",
                     "expand": true,
-                    "richText": false,
+                    "richText": true,
                     "isActive": false,
-                    "fillColor": "#fceae6",
+                    "fillColor": "#16181d",
                     "color": "#475569",
-                    "borderColor": "#f6c6ba",
-                    "borderWidth": 1,
-                    "lineColor": "#E8684A"
+                    "borderColor": "#16181d",
+                    "borderWidth": 0,
+                    "lineColor": "#E8684A",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "paddingX": 6,
+                    "paddingY": 6
                   },
                   "children": []
                 }
@@ -245,7 +249,7 @@
           "shear": 0,
           "rotate": 0,
           "translateX": 181.69999999999982,
-          "translateY": 62.26666666666658,
+          "translateY": 61.26666666666658,
           "originX": 0,
           "originY": 0,
           "a": 0.6000000000000001,
@@ -253,12 +257,12 @@
           "c": 0,
           "d": 0.6000000000000001,
           "e": 181.69999999999982,
-          "f": 62.26666666666658
+          "f": 61.26666666666658
         },
         "state": {
           "scale": 0.6000000000000001,
           "x": 181.69999999999982,
-          "y": 62.26666666666658,
+          "y": 61.26666666666658,
           "sx": 181.69999999999982,
           "sy": 62.26666666666658
         }
@@ -270,7 +274,8 @@
         "f75f3915-32e6-464a-af51-e6fac7e423f9",
         "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
         "f26171b9-fcac-45b7-a9b8-f2155281caab",
-        "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0"
+        "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0",
+        "1ac9ef6a-4780-4e06-8566-0e56691710e5"
       ]
     },
     {
