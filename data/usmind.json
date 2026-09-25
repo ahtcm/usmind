@@ -125,7 +125,7 @@
       "manualStyles": []
     },
     {
-      "name": "未命名",
+      "name": "英语",
       "layout": "logicalStructure",
       "theme": "XMind 浅色",
       "data": {
@@ -138,6 +138,45 @@
           },
           "children": [],
           "smmVersion": "0.14.0-fix.3"
+        }
+      },
+      "viewData": {
+        "transform": {
+          "scaleX": 1,
+          "scaleY": 1,
+          "shear": 0,
+          "rotate": 0,
+          "translateX": 0,
+          "translateY": -1,
+          "originX": 0,
+          "originY": 0,
+          "a": 1,
+          "b": 0,
+          "c": 0,
+          "d": 1,
+          "e": 0,
+          "f": -1
+        },
+        "state": {
+          "scale": 1,
+          "x": 0,
+          "y": -1,
+          "sx": 0,
+          "sy": 0
+        }
+      },
+      "manualStyles": []
+    },
+    {
+      "name": "未命名",
+      "layout": "logicalStructure",
+      "theme": "XMind 浅色",
+      "data": {
+        "root": {
+          "data": {
+            "text": "中心主题"
+          },
+          "children": []
         }
       },
       "viewData": {
@@ -164,9 +203,8 @@
           "sx": 0,
           "sy": 0
         }
-      },
-      "manualStyles": []
+      }
     }
   ],
-  "docIndex": 2
+  "docIndex": 3
 }
