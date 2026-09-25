@@ -131,9 +131,13 @@
       "data": {
         "root": {
           "data": {
-            "text": "中心主题"
+            "text": "中心主题",
+            "expand": true,
+            "uid": "1ef28ee8-4f33-4a9f-81a6-9cee6e84660b",
+            "isActive": false
           },
-          "children": []
+          "children": [],
+          "smmVersion": "0.14.0-fix.3"
         }
       },
       "viewData": {
@@ -160,7 +164,8 @@
           "sx": 0,
           "sy": 0
         }
-      }
+      },
+      "manualStyles": []
     }
   ],
   "docIndex": 2
