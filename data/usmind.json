@@ -67,7 +67,7 @@
     },
     {
       "name": "数学",
-      "layout": "logicalStructure",
+      "layout": "mindMap",
       "theme": "XMind 浅色",
       "data": {
         "root": {
@@ -105,6 +105,51 @@
                 "borderColor": "#22A7C9",
                 "borderWidth": 1,
                 "lineColor": "#22A7C9"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "d1e8b57c-bc0c-4ba9-8e79-9df9d897046c",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#F6A609",
+                "color": "#1a1a1a",
+                "borderColor": "#F6A609",
+                "borderWidth": 1,
+                "lineColor": "#F6A609"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "d0fa8084-afae-4396-a285-bfd843b7bacb",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#E8684A",
+                "color": "#ffffff",
+                "borderColor": "#E8684A",
+                "borderWidth": 1,
+                "lineColor": "#E8684A"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "befdf370-e935-40d3-a55f-e9c4aa351e89",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#F08BB4",
+                "color": "#1a1a1a",
+                "borderColor": "#F08BB4",
+                "borderWidth": 1,
+                "lineColor": "#F08BB4"
               },
               "children": []
             }
