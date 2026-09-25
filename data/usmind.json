@@ -15,7 +15,7 @@
           "children": [
             {
               "data": {
-                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"blob:http://127.0.0.1:8899/159f93a5-b5cd-4d71-91a6-75ff005a4a38\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
+                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugu48z0_jxcao8\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
                 "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
                 "expand": true,
                 "richText": true,
@@ -31,6 +31,21 @@
                 "paddingY": 0
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
@@ -43,7 +58,7 @@
           "shear": 0,
           "rotate": 0,
           "translateX": 0,
-          "translateY": 0,
+          "translateY": -1,
           "originX": 0,
           "originY": 0,
           "a": 1,
@@ -51,12 +66,12 @@
           "c": 0,
           "d": 1,
           "e": 0,
-          "f": 0
+          "f": -1
         },
         "state": {
           "scale": 1,
           "x": 0,
-          "y": 0,
+          "y": -1,
           "sx": 0,
           "sy": 0
         }
