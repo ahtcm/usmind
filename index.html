@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>USMIND 思维导图</title>
-  <script type="module" crossorigin src="./assets/index-BZRniTsE.js"></script>
+  <script type="module" crossorigin src="./assets/index-t-TDzJBV.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-nI9YQoYH.css">
 </head>
 <body>
@@ -42,9 +42,14 @@
       </div>
       <div class="view-bar">
         <select id="view-layout" title="布局类型">
-          <option value="side">思维导图</option>
-          <option value="l">逻辑结构图(左)</option>
-          <option value="r">逻辑结构图(右)</option>
+          <option value="side">思维导图（两侧）</option>
+          <option value="r">逻辑结构图（右）</option>
+          <option value="l">逻辑结构图（左）</option>
+          <option value="org">组织结构图</option>
+          <option value="catalog">目录组织图</option>
+          <option value="tl">时间轴</option>
+          <option value="vtl">竖向时间轴</option>
+          <option value="fish">鱼骨头图</option>
         </select>
         <span class="view-zoom">
           <button id="zoom-out" title="缩小">−</button>
@@ -104,40 +109,60 @@
           </div>
           <button id="st-mix" class="sp-btn">一键搭配</button>
         </div>
-        <!-- 布局页 -->
+                <!-- 布局页 -->
         <div class="sp-page hidden" id="sp-page-layout">
           <div class="sp-section">选择布局</div>
-          <div class="layout-list">
+          <div class="layout-grid">
             <div class="layout-item active" data-layout="side">
               <span class="layout-icon"><svg viewBox="0 0 44 26"><circle cx="22" cy="13" r="3.5" fill="currentColor"/><line x1="22" y1="13" x2="5" y2="13" stroke="currentColor" stroke-width="2"/><line x1="5" y1="13" x2="5" y2="4" stroke="currentColor" stroke-width="2"/><line x1="5" y1="13" x2="5" y2="22" stroke="currentColor" stroke-width="2"/><line x1="22" y1="13" x2="39" y2="13" stroke="currentColor" stroke-width="2"/><line x1="39" y1="13" x2="39" y2="4" stroke="currentColor" stroke-width="2"/><line x1="39" y1="13" x2="39" y2="22" stroke="currentColor" stroke-width="2"/></svg></span>
-              <span>两侧</span>
-            </div>
-            <div class="layout-item" data-layout="l">
-              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="6" y1="13" x2="28" y2="13" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="4" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="36" cy="13" r="3.5" fill="currentColor"/></svg></span>
-              <span>单侧（左）</span>
+              <span>思维导图（两侧）</span>
             </div>
             <div class="layout-item" data-layout="r">
               <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="38" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2"/><line x1="16" y1="13" x2="16" y2="4" stroke="currentColor" stroke-width="2"/><line x1="16" y1="13" x2="16" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="13" r="3.5" fill="currentColor"/></svg></span>
-              <span>单侧（右）</span>
+              <span>逻辑结构图（右）</span>
+            </div>
+            <div class="layout-item" data-layout="l">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="6" y1="13" x2="28" y2="13" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="4" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="36" cy="13" r="3.5" fill="currentColor"/></svg></span>
+              <span>逻辑结构图（左）</span>
+            </div>
+            <div class="layout-item" data-layout="org">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><circle cx="22" cy="4" r="3.5" fill="currentColor"/><line x1="22" y1="7.5" x2="22" y2="11" stroke="currentColor" stroke-width="2"/><line x1="22" y1="11" x2="8" y2="11" stroke="currentColor" stroke-width="2"/><line x1="22" y1="11" x2="36" y2="11" stroke="currentColor" stroke-width="2"/><line x1="8" y1="11" x2="8" y2="15" stroke="currentColor" stroke-width="2"/><line x1="36" y1="11" x2="36" y2="15" stroke="currentColor" stroke-width="2"/><line x1="22" y1="11" x2="22" y2="15" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="19" r="3" fill="currentColor"/><circle cx="36" cy="19" r="3" fill="currentColor"/><circle cx="22" cy="19" r="3" fill="currentColor"/></svg></span>
+              <span>组织结构图</span>
+            </div>
+            <div class="layout-item" data-layout="catalog">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><circle cx="5" cy="13" r="3.5" fill="currentColor"/><line x1="8.5" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="2"/><line x1="15" y1="13" x2="15" y2="5" stroke="currentColor" stroke-width="2"/><line x1="15" y1="13" x2="15" y2="21" stroke="currentColor" stroke-width="2"/><line x1="15" y1="5" x2="22" y2="5" stroke="currentColor" stroke-width="2"/><line x1="15" y1="21" x2="22" y2="21" stroke="currentColor" stroke-width="2"/><circle cx="26" cy="5" r="2.5" fill="currentColor"/><circle cx="26" cy="21" r="2.5" fill="currentColor"/><line x1="15" y1="13" x2="30" y2="13" stroke="currentColor" stroke-width="2"/><line x1="30" y1="13" x2="30" y2="9" stroke="currentColor" stroke-width="2"/><circle cx="34" cy="9" r="2" fill="currentColor"/></svg></span>
+              <span>目录组织图</span>
+            </div>
+            <div class="layout-item" data-layout="tl">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="4" y1="13" x2="40" y2="13" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="13" r="3" fill="currentColor"/><circle cx="22" cy="13" r="3" fill="currentColor"/><circle cx="34" cy="13" r="3" fill="currentColor"/><line x1="10" y1="16" x2="10" y2="21" stroke="currentColor" stroke-width="2"/><line x1="34" y1="16" x2="34" y2="21" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="23" r="2" fill="currentColor"/><circle cx="34" cy="23" r="2" fill="currentColor"/></svg></span>
+              <span>时间轴</span>
+            </div>
+            <div class="layout-item" data-layout="vtl">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="22" y1="3" x2="22" y2="23" stroke="currentColor" stroke-width="2"/><circle cx="22" cy="7" r="3" fill="currentColor"/><circle cx="22" cy="16" r="3" fill="currentColor"/><line x1="19" y1="7" x2="10" y2="7" stroke="currentColor" stroke-width="2"/><line x1="25" y1="16" x2="34" y2="16" stroke="currentColor" stroke-width="2"/><circle cx="7" cy="7" r="2" fill="currentColor"/><circle cx="37" cy="16" r="2" fill="currentColor"/></svg></span>
+              <span>竖向时间轴</span>
+            </div>
+            <div class="layout-item" data-layout="fish">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="3" y1="20" x2="41" y2="6" stroke="currentColor" stroke-width="2"/><line x1="9" y1="18.6" x2="9" y2="24" stroke="currentColor" stroke-width="1.6"/><line x1="15" y1="15.6" x2="15" y2="21" stroke="currentColor" stroke-width="1.6"/><line x1="23" y1="12" x2="23" y2="17.4" stroke="currentColor" stroke-width="1.6"/><line x1="29" y1="9.4" x2="29" y2="14.8" stroke="currentColor" stroke-width="1.6"/><line x1="15" y1="15.6" x2="19.5" y2="12.3" stroke="currentColor" stroke-width="1.6"/><line x1="23" y1="12" x2="27.5" y2="8.7" stroke="currentColor" stroke-width="1.6"/><circle cx="41" cy="6" r="2.2" fill="currentColor"/></svg></span>
+              <span>鱼骨头图</span>
             </div>
           </div>
         </div>
         <!-- 图标页 -->
         <div class="sp-page hidden" id="sp-page-icon">
-          <div class="sp-section">优先级</div>
+                    <div class="sp-section">优先级</div>
           <div class="icon-grid" id="icon-priority">
-            <button data-icon="emoji_priority_1">priority_1</button>P0</button>
-            <button data-icon="emoji_priority_2">priority_2</button>P1</button>
-            <button data-icon="emoji_priority_3">priority_3</button>P2</button>
-            <button data-icon="emoji_priority_4">priority_4</button>P3</button>
+            <button data-icon="priority_1">P0</button>
+            <button data-icon="priority_2">P1</button>
+            <button data-icon="priority_3">P2</button>
+            <button data-icon="priority_4">P3</button>
           </div>
           <div class="sp-section">序号</div>
           <div class="icon-grid" id="icon-number">
-            <button data-icon="emoji_number_1">number_1</button>01</button><button data-icon="emoji_number_2">number_2</button>02</button>
-            <button data-icon="emoji_number_3">number_3</button>03</button><button data-icon="emoji_number_4">number_4</button>04</button>
-            <button data-icon="emoji_number_5">number_5</button>05</button><button data-icon="emoji_number_6">number_6</button>06</button>
-            <button data-icon="emoji_number_7">number_7</button>07</button><button data-icon="emoji_number_8">number_8</button>08</button>
-            <button data-icon="emoji_number_9">number_9</button>09</button><button data-icon="emoji_number_10">number_10</button>10</button>
+            <button data-icon="number_1">01</button><button data-icon="number_2">02</button>
+            <button data-icon="number_3">03</button><button data-icon="number_4">04</button>
+            <button data-icon="number_5">05</button><button data-icon="number_6">06</button>
+            <button data-icon="number_7">07</button><button data-icon="number_8">08</button>
+            <button data-icon="number_9">09</button><button data-icon="number_10">10</button>
           </div>
           <div class="sp-section">表情包</div>
           <div class="icon-grid" id="icon-emoji">
