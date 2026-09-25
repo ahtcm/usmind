@@ -97,6 +97,25 @@
                 "paddingY": 6
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "<div style=\"position:relative;width:210px;height:114px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugx0ves_odne2d\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:134px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">桌面</span></div>",
+                "uid": "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
+                "expand": true,
+                "richText": true,
+                "isActive": false,
+                "fillColor": "#16181d",
+                "color": "#ffffff",
+                "borderColor": "#16181d",
+                "borderWidth": 0,
+                "lineColor": "#2FB36B",
+                "shape": "roundedRectangle",
+                "borderRadius": 12,
+                "paddingX": 6,
+                "paddingY": 6
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
@@ -108,30 +127,31 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": -288,
-          "translateY": -116,
+          "translateX": -287,
+          "translateY": -117,
           "originX": 0,
           "originY": 0,
           "a": 1,
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": -288,
-          "f": -116
+          "e": -287,
+          "f": -117
         },
         "state": {
           "scale": 1,
-          "x": -288,
-          "y": -116,
-          "sx": -288,
-          "sy": -116
+          "x": -287,
+          "y": -117,
+          "sx": -287,
+          "sy": -117
         }
       },
       "manualStyles": [
         "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
         "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
         "4484030b-ea60-463c-a665-94693ee60fc0",
-        "f75f3915-32e6-464a-af51-e6fac7e423f9"
+        "f75f3915-32e6-464a-af51-e6fac7e423f9",
+        "70e7136b-86a8-477e-b618-ec5ec4d59d0e"
       ]
     },
     {
