@@ -13,36 +13,7 @@
             "uid": "e856d0fe-eec8-4f98-9236-dc4204d903d7",
             "isActive": false
           },
-          "children": [
-            {
-              "data": {
-                "text": "资源落盘仓库",
-                "uid": "9caf3d3b-ffe9-4a96-8034-9a3a828cdc9f",
-                "fillColor": "#2FB36B",
-                "color": "#ffffff",
-                "borderColor": "#2FB36B",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B",
-                "expand": true,
-                "isActive": false
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "线上URL改写",
-                "uid": "f61e73f9-f81a-4b3b-8ca3-ced02a77d6e1",
-                "fillColor": "#22A7C9",
-                "color": "#ffffff",
-                "borderColor": "#22A7C9",
-                "borderWidth": 1,
-                "lineColor": "#22A7C9",
-                "expand": true,
-                "isActive": false
-              },
-              "children": []
-            }
-          ],
+          "children": [],
           "smmVersion": "0.14.0-fix.3"
         }
       },
@@ -67,8 +38,8 @@
           "scale": 0.9936962750716333,
           "x": 3.0478510028653125,
           "y": 2.694842406876776,
-          "sx": 0,
-          "sy": 0
+          "sx": 3.0478510028653125,
+          "sy": 2.694842406876776
         }
       },
       "manualStyles": []
