@@ -1,7 +1,7 @@
 {
   "tabs": [
     {
-      "name": "未命名",
+      "name": "语文",
       "layout": "logicalStructure",
       "theme": "XMind 浅色",
       "data": {
@@ -15,7 +15,7 @@
           "children": [
             {
               "data": {
-                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"blob:http://127.0.0.1:8899/159f93a5-b5cd-4d71-91a6-75ff005a4a38\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
+                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugu48z0_jxcao8\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
                 "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
                 "expand": true,
                 "richText": true,
@@ -125,5 +125,5 @@
       "manualStyles": []
     }
   ],
-  "docIndex": 0
+  "docIndex": 1
 }
