@@ -34,6 +34,21 @@
             },
             {
               "data": {
+                "text": "新主题",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "uid": "d6b8dfba-1782-44ea-a3b0-ba84cec4cf2b",
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
+            },
+            {
+              "data": {
                 "text": "这是一个doc文档",
                 "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
                 "expand": true,
@@ -124,11 +139,11 @@
                 "richText": false,
                 "isActive": false,
                 "uid": "ca43e254-6fa7-47fa-8660-25115dd7f2bb",
-                "fillColor": "#2FB36B",
+                "fillColor": "#22A7C9",
                 "color": "#ffffff",
-                "borderColor": "#2FB36B",
+                "borderColor": "#22A7C9",
                 "borderWidth": 1,
-                "lineColor": "#2FB36B"
+                "lineColor": "#22A7C9"
               },
               "children": [
                 {
@@ -177,27 +192,27 @@
       },
       "viewData": {
         "transform": {
-          "scaleX": 1.2,
-          "scaleY": 1.2,
+          "scaleX": 0.6000000000000001,
+          "scaleY": 0.6000000000000001,
           "shear": 0,
           "rotate": 0,
-          "translateX": -559.5999999999999,
-          "translateY": -201.79999999999998,
+          "translateX": 163.69999999999982,
+          "translateY": 37.26666666666658,
           "originX": 0,
           "originY": 0,
-          "a": 1.2,
+          "a": 0.6000000000000001,
           "b": 0,
           "c": 0,
-          "d": 1.2,
-          "e": -559.5999999999999,
-          "f": -201.79999999999998
+          "d": 0.6000000000000001,
+          "e": 163.69999999999982,
+          "f": 37.26666666666658
         },
         "state": {
-          "scale": 1.2,
-          "x": -559.5999999999999,
-          "y": -201.79999999999998,
-          "sx": -287,
-          "sy": -115
+          "scale": 0.6000000000000001,
+          "x": 163.69999999999982,
+          "y": 37.26666666666658,
+          "sx": 254.69999999999982,
+          "sy": 55.26666666666658
         }
       },
       "manualStyles": [
