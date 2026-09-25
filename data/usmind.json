@@ -2,351 +2,58 @@
   "tabs": [
     {
       "name": "未命名",
-      "layout": "logicalStructure",
-      "theme": "XMind 浅色",
-      "data": {
-        "root": {
-          "data": {
-            "text": "语文知识点",
-            "expand": true,
-            "uid": "0b30c776-91f2-404b-a325-4ead47d75961",
-            "isActive": false
-          },
-          "children": [
-            {
-              "data": {
-                "text": "文档",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "uid": "d6b8dfba-1782-44ea-a3b0-ba84cec4cf2b",
-                "fillColor": "#2FB36B",
-                "color": "#ffffff",
-                "borderColor": "#2FB36B",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B"
-              },
-              "children": [
-                {
-                  "data": {
-                    "text": "这是一个doc文档",
-                    "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
-                    "expand": true,
-                    "richText": false,
-                    "isActive": false,
-                    "fillColor": "#F4F5F7",
-                    "color": "#e60505",
-                    "borderColor": "#C9CDD6",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B",
-                    "attachmentUrl": "media://m_mugwuuwc_9ukubk",
-                    "attachmentName": "作文.docx",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "borderDasharray": "2 4",
-                    "paddingX": 6,
-                    "paddingY": 6
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "这是一个txt文档",
-                    "uid": "4484030b-ea60-463c-a665-94693ee60fc0",
-                    "expand": true,
-                    "richText": false,
-                    "isActive": false,
-                    "fillColor": "#F4F5F7",
-                    "color": "#118ad4",
-                    "borderColor": "#C9CDD6",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B",
-                    "attachmentUrl": "media://m_mugwwkav_22q800",
-                    "attachmentName": "新建文本文档.txt",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "borderDasharray": "2 4",
-                    "paddingX": 6,
-                    "paddingY": 6
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "这是一个json文档",
-                    "expand": true,
-                    "richText": false,
-                    "isActive": false,
-                    "uid": "f75f3915-32e6-464a-af51-e6fac7e423f9",
-                    "fillColor": "#F4F5F7",
-                    "color": "#e60f0f",
-                    "borderColor": "#C9CDD6",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B",
-                    "attachmentUrl": "media://m_mugx055f_wew9b2",
-                    "attachmentName": "未命名.json",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "borderDasharray": "2 4",
-                    "paddingX": 6,
-                    "paddingY": 6
-                  },
-                  "children": []
-                }
-              ]
-            },
-            {
-              "data": {
-                "text": "图片",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "uid": "a10427bf-155c-4137-8742-2f15acb1224f",
-                "fillColor": "#22A7C9",
-                "color": "#ffffff",
-                "borderColor": "#22A7C9",
-                "borderWidth": 1,
-                "lineColor": "#22A7C9"
-              },
-              "children": [
-                {
-                  "data": {
-                    "text": "<div style=\"position:relative;width:210px;height:114px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugx0ves_odne2d\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:134px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">桌面</span></div>",
-                    "uid": "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
-                    "expand": true,
-                    "richText": true,
-                    "isActive": false,
-                    "fillColor": "#16181d",
-                    "color": "#ffffff",
-                    "borderColor": "#16181d",
-                    "borderWidth": 0,
-                    "lineColor": "#2FB36B",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "paddingX": 0,
-                    "paddingY": 0
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugu48z0_jxcao8\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
-                    "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
-                    "expand": true,
-                    "richText": true,
-                    "isActive": false,
-                    "fillColor": "#16181d",
-                    "color": "#ffffff",
-                    "borderColor": "#16181d",
-                    "borderWidth": 0,
-                    "lineColor": "#2FB36B",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "paddingX": 0,
-                    "paddingY": 0
-                  },
-                  "children": []
-                }
-              ]
-            },
-            {
-              "data": {
-                "text": "音频",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "uid": "ca43e254-6fa7-47fa-8660-25115dd7f2bb",
-                "fillColor": "#F6A609",
-                "color": "#1a1a1a",
-                "borderColor": "#F6A609",
-                "borderWidth": 1,
-                "lineColor": "#F6A609"
-              },
-              "children": [
-                {
-                  "data": {
-                    "text": "<div style=\"position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000\"><audio controls style=\"width:100%;height:100%;display:block\" src=\"media://m_mugx1q0u_x4hixw\"></audio></div>",
-                    "uid": "f26171b9-fcac-45b7-a9b8-f2155281caab",
-                    "expand": true,
-                    "richText": true,
-                    "isActive": false,
-                    "fillColor": "#16181d",
-                    "color": "#475569",
-                    "borderColor": "#16181d",
-                    "borderWidth": 0,
-                    "lineColor": "#2FB36B",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "paddingX": 0,
-                    "paddingY": 0
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "<div style=\"position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000\"><audio controls style=\"width:100%;height:100%;display:block\" src=\"media://m_mugx23fv_59gu7w\"></audio></div>",
-                    "expand": true,
-                    "richText": true,
-                    "isActive": false,
-                    "uid": "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0",
-                    "fillColor": "#16181d",
-                    "color": "#475569",
-                    "borderColor": "#16181d",
-                    "borderWidth": 0,
-                    "lineColor": "#2FB36B",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "paddingX": 0,
-                    "paddingY": 0
-                  },
-                  "children": []
-                }
-              ]
-            },
-            {
-              "data": {
-                "text": "视频",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "uid": "650b0130-3b9d-47bd-bff1-a07c44dae5d5",
-                "fillColor": "#E8684A",
-                "color": "#ffffff",
-                "borderColor": "#E8684A",
-                "borderWidth": 1,
-                "lineColor": "#E8684A"
-              },
-              "children": [
-                {
-                  "data": {
-                    "text": "<div style=\"position:relative;width:300px;height:170px;overflow:hidden;border-radius:12px;background:#000;line-height:0\"><video controls style=\"width:100%;height:100%;object-fit:cover;display:block;background:#000\" src=\"media://m_mugx3prc_z44tfu\"></video></div>",
-                    "uid": "1ac9ef6a-4780-4e06-8566-0e56691710e5",
-                    "expand": true,
-                    "richText": true,
-                    "isActive": false,
-                    "fillColor": "#16181d",
-                    "color": "#475569",
-                    "borderColor": "#16181d",
-                    "borderWidth": 0,
-                    "lineColor": "#E8684A",
-                    "shape": "roundedRectangle",
-                    "borderRadius": 12,
-                    "paddingX": 0,
-                    "paddingY": 0
-                  },
-                  "children": []
-                }
-              ]
-            }
-          ],
-          "smmVersion": "0.14.0-fix.3"
-        }
-      },
-      "viewData": {
-        "transform": {
-          "scaleX": 0.8709141475840799,
-          "scaleY": 0.8709141475840799,
-          "shear": 0,
-          "rotate": 0,
-          "translateX": -138.59392509038042,
-          "translateY": 0.9999993799732465,
-          "originX": 0,
-          "originY": 0,
-          "a": 0.8709141475840799,
-          "b": 0,
-          "c": 0,
-          "d": 0.8709141475840799,
-          "e": -138.59392509038042,
-          "f": 0.9999993799732465
-        },
-        "state": {
-          "scale": 0.8709141475840799,
-          "x": -138.59392509038042,
-          "y": 0.9999993799732465,
-          "sx": 123.40607490961959,
-          "sy": 49.99999937997325
-        }
-      },
-      "manualStyles": [
-        "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
-        "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
-        "4484030b-ea60-463c-a665-94693ee60fc0",
-        "f75f3915-32e6-464a-af51-e6fac7e423f9",
-        "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
-        "f26171b9-fcac-45b7-a9b8-f2155281caab",
-        "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0",
-        "1ac9ef6a-4780-4e06-8566-0e56691710e5"
-      ]
-    },
-    {
-      "name": "数学",
       "layout": "mindMap",
-      "theme": "XMind 浅色",
+      "theme": "深空黑",
       "data": {
         "root": {
           "data": {
-            "text": "数学知识点",
+            "text": "中心主题",
             "expand": true,
-            "uid": "59c94c54-c8b8-4fc8-8eb0-290755b3d5e0",
+            "uid": "05e176e9-165a-41ff-b0df-ecd49af4c3cb",
             "isActive": false
           },
           "children": [
             {
               "data": {
                 "text": "新主题",
-                "uid": "615cc974-92b1-4820-9ef0-9d71226ad93e",
+                "uid": "7a6b3ad1-cab7-41f4-ab52-3e7a8e9e1e94",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "fillColor": "#2FB36B",
-                "color": "#ffffff",
-                "borderColor": "#2FB36B",
+                "fillColor": "#4ADE80",
+                "color": "#1a1a1a",
+                "borderColor": "#4ADE80",
                 "borderWidth": 1,
-                "lineColor": "#2FB36B"
+                "lineColor": "#4ADE80"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "4e604946-841b-4abb-9d61-235c960eca4b",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#22D3EE",
+                "color": "#1a1a1a",
+                "borderColor": "#22D3EE",
+                "borderWidth": 1,
+                "lineColor": "#22D3EE"
               },
               "children": [
                 {
                   "data": {
                     "text": "新主题",
-                    "uid": "cd8bbc90-eaf8-4db3-b72c-c82787f64c4d",
+                    "uid": "46f1c048-9774-4c70-b1c8-e312af3b3205",
                     "expand": true,
                     "richText": false,
                     "isActive": false,
-                    "fillColor": "#e2f4ea",
-                    "color": "#475569",
-                    "borderColor": "#b0e2c7",
+                    "fillColor": "#e0f9fd",
+                    "color": "#334155",
+                    "borderColor": "#abeef9",
                     "borderWidth": 1,
-                    "lineColor": "#2FB36B"
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "新主题",
-                    "uid": "d019553d-b644-4e14-8a8a-480581b471ee",
-                    "expand": true,
-                    "richText": false,
-                    "isActive": false,
-                    "fillColor": "#e2f4ea",
-                    "color": "#475569",
-                    "borderColor": "#b0e2c7",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B"
-                  },
-                  "children": []
-                },
-                {
-                  "data": {
-                    "text": "新主题",
-                    "uid": "32139c84-5871-4532-9143-fc2fcae6023f",
-                    "expand": true,
-                    "richText": false,
-                    "isActive": false,
-                    "fillColor": "#e2f4ea",
-                    "color": "#475569",
-                    "borderColor": "#b0e2c7",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B"
+                    "lineColor": "#22D3EE"
                   },
                   "children": []
                 }
@@ -355,29 +62,29 @@
             {
               "data": {
                 "text": "新主题",
+                "uid": "89197052-dc0b-41a4-97ea-04239ce1ae69",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "uid": "c681ab5a-fa68-42e9-85ad-aa702d5b4edf",
-                "fillColor": "#22A7C9",
-                "color": "#ffffff",
-                "borderColor": "#22A7C9",
+                "fillColor": "#FACC15",
+                "color": "#1a1a1a",
+                "borderColor": "#FACC15",
                 "borderWidth": 1,
-                "lineColor": "#22A7C9"
+                "lineColor": "#FACC15"
               },
               "children": [
                 {
                   "data": {
                     "text": "新主题",
-                    "uid": "5d58f8e6-dbc9-4d88-8d30-e862cbc432ad",
+                    "uid": "aac70899-8281-4bda-a1a3-6f5782c8347b",
                     "expand": true,
                     "richText": false,
                     "isActive": false,
-                    "fillColor": "#e0f3f7",
-                    "color": "#475569",
-                    "borderColor": "#abdeea",
+                    "fillColor": "#fef8de",
+                    "color": "#334155",
+                    "borderColor": "#fdeca6",
                     "borderWidth": 1,
-                    "lineColor": "#22A7C9"
+                    "lineColor": "#FACC15"
                   },
                   "children": []
                 }
@@ -386,60 +93,75 @@
             {
               "data": {
                 "text": "新主题",
-                "uid": "d1e8b57c-bc0c-4ba9-8e79-9df9d897046c",
+                "uid": "b11e25aa-706e-4ef1-92a8-8ecb76664183",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "fillColor": "#F6A609",
+                "fillColor": "#FB7185",
                 "color": "#1a1a1a",
-                "borderColor": "#F6A609",
+                "borderColor": "#FB7185",
                 "borderWidth": 1,
-                "lineColor": "#F6A609"
+                "lineColor": "#FB7185"
               },
               "children": []
             },
             {
               "data": {
                 "text": "新主题",
-                "uid": "d0fa8084-afae-4396-a285-bfd843b7bacb",
+                "uid": "9d674382-739a-4f54-bbb1-b3e6367e4abd",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "fillColor": "#E8684A",
-                "color": "#ffffff",
-                "borderColor": "#E8684A",
-                "borderWidth": 1,
-                "lineColor": "#E8684A"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "befdf370-e935-40d3-a55f-e9c4aa351e89",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#F08BB4",
+                "fillColor": "#C084FC",
                 "color": "#1a1a1a",
-                "borderColor": "#F08BB4",
+                "borderColor": "#C084FC",
                 "borderWidth": 1,
-                "lineColor": "#F08BB4"
+                "lineColor": "#C084FC"
               },
               "children": []
             },
             {
               "data": {
                 "text": "新主题",
-                "uid": "e325101d-4f3a-4b1b-afc3-ae05b05b7ac5",
+                "uid": "9a23bd02-3dad-4eb7-9d1d-5204c7bea190",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "fillColor": "#9270CA",
+                "fillColor": "#818CF8",
                 "color": "#ffffff",
-                "borderColor": "#9270CA",
+                "borderColor": "#818CF8",
                 "borderWidth": 1,
-                "lineColor": "#9270CA"
+                "lineColor": "#818CF8"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "ac21df3c-f761-4970-b86f-3ccd036be188",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#F97316",
+                "color": "#ffffff",
+                "borderColor": "#F97316",
+                "borderWidth": 1,
+                "lineColor": "#F97316"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "127e3cc5-ba69-44ca-b203-c6e29e9ea15f",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#2DD4BF",
+                "color": "#1a1a1a",
+                "borderColor": "#2DD4BF",
+                "borderWidth": 1,
+                "lineColor": "#2DD4BF"
               },
               "children": []
             }
@@ -449,152 +171,33 @@
       },
       "viewData": {
         "transform": {
-          "scaleX": 1,
-          "scaleY": 1,
+          "scaleX": 0.8495835374816266,
+          "scaleY": 0.8495835374816266,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
+          "translateX": 66.99166870117188,
+          "translateY": 64.30303772660461,
           "originX": 0,
           "originY": 0,
-          "a": 1,
+          "a": 0.8495835374816266,
           "b": 0,
           "c": 0,
-          "d": 1,
-          "e": 0,
-          "f": 0
+          "d": 0.8495835374816266,
+          "e": 66.99166870117188,
+          "f": 64.30303772660461
         },
         "state": {
-          "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": -215,
-          "sy": -12
+          "scale": 0.8495835374816266,
+          "x": 66.99166870117188,
+          "y": 64.30303772660461,
+          "sx": -118,
+          "sy": -37
         }
       },
       "manualStyles": []
     },
     {
-      "name": "英语",
-      "layout": "organizationStructure",
-      "theme": "XMind 浅色",
-      "data": {
-        "root": {
-          "data": {
-            "text": "英语知识点",
-            "expand": true,
-            "uid": "1ef28ee8-4f33-4a9f-81a6-9cee6e84660b",
-            "isActive": false
-          },
-          "children": [
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "6e8e78b1-264e-409e-8ce2-09b849b791fb",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#2FB36B",
-                "color": "#ffffff",
-                "borderColor": "#2FB36B",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "735f9002-e9fe-48ae-baa9-67c4ca17c780",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#22A7C9",
-                "color": "#ffffff",
-                "borderColor": "#22A7C9",
-                "borderWidth": 1,
-                "lineColor": "#22A7C9"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "28a1a35a-925b-4362-b1e9-a68b6667a357",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#F6A609",
-                "color": "#1a1a1a",
-                "borderColor": "#F6A609",
-                "borderWidth": 1,
-                "lineColor": "#F6A609"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "89f81859-7da7-4100-a6fe-e863d384f956",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#E8684A",
-                "color": "#ffffff",
-                "borderColor": "#E8684A",
-                "borderWidth": 1,
-                "lineColor": "#E8684A"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "新主题",
-                "uid": "7df0da11-d1ca-49de-a477-7f61d33e9a6b",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#F08BB4",
-                "color": "#1a1a1a",
-                "borderColor": "#F08BB4",
-                "borderWidth": 1,
-                "lineColor": "#F08BB4"
-              },
-              "children": []
-            }
-          ],
-          "smmVersion": "0.14.0-fix.3"
-        }
-      },
-      "viewData": {
-        "transform": {
-          "scaleX": 1,
-          "scaleY": 1,
-          "shear": 0,
-          "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
-          "originX": 0,
-          "originY": 0,
-          "a": 1,
-          "b": 0,
-          "c": 0,
-          "d": 1,
-          "e": 0,
-          "f": 0
-        },
-        "state": {
-          "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": 0,
-          "sy": 0
-        }
-      },
-      "manualStyles": []
-    },
-    {
-      "name": "物理",
+      "name": "未命名",
       "layout": "logicalStructure",
       "theme": "XMind 浅色",
       "data": {
@@ -602,7 +205,7 @@
           "data": {
             "text": "中心主题",
             "expand": true,
-            "uid": "36881cac-0185-4480-b1d1-cd8b3ed4f5b7",
+            "uid": "b13b085b-1072-4a9f-b4d0-2d3047866b29",
             "isActive": false
           },
           "children": [],
@@ -615,109 +218,23 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
+          "translateX": -99,
+          "translateY": -99,
           "originX": 0,
           "originY": 0,
           "a": 1,
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": 0,
-          "f": 0
+          "e": -99,
+          "f": -99
         },
         "state": {
           "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": 0,
-          "sy": 0
-        }
-      },
-      "manualStyles": []
-    },
-    {
-      "name": "化学",
-      "layout": "logicalStructure",
-      "theme": "XMind 浅色",
-      "data": {
-        "root": {
-          "data": {
-            "text": "中心主题",
-            "expand": true,
-            "uid": "bac1cff9-782d-4a2e-b922-9571036ddb64",
-            "isActive": false
-          },
-          "children": [],
-          "smmVersion": "0.14.0-fix.3"
-        }
-      },
-      "viewData": {
-        "transform": {
-          "scaleX": 1,
-          "scaleY": 1,
-          "shear": 0,
-          "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
-          "originX": 0,
-          "originY": 0,
-          "a": 1,
-          "b": 0,
-          "c": 0,
-          "d": 1,
-          "e": 0,
-          "f": 0
-        },
-        "state": {
-          "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": 0,
-          "sy": 0
-        }
-      },
-      "manualStyles": []
-    },
-    {
-      "name": "生物",
-      "layout": "logicalStructure",
-      "theme": "XMind 浅色",
-      "data": {
-        "root": {
-          "data": {
-            "text": "中心主题",
-            "expand": true,
-            "uid": "ca593754-464c-43ed-8c71-cbfa3614fdae",
-            "isActive": false
-          },
-          "children": [],
-          "smmVersion": "0.14.0-fix.3"
-        }
-      },
-      "viewData": {
-        "transform": {
-          "scaleX": 1,
-          "scaleY": 1,
-          "shear": 0,
-          "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
-          "originX": 0,
-          "originY": 0,
-          "a": 1,
-          "b": 0,
-          "c": 0,
-          "d": 1,
-          "e": 0,
-          "f": 0
-        },
-        "state": {
-          "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": 0,
-          "sy": 0
+          "x": -99,
+          "y": -99,
+          "sx": -146,
+          "sy": -63
         }
       },
       "manualStyles": []
