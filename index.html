@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USMIND 思维导图</title>
+  <script type="module" crossorigin src="./assets/index-D3uMuesa.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-nI9YQoYH.css">
+</head>
+<body>
+  <div id="app">
+    <div id="toolbar" class="toolbar">
+      <div class="toolbar-left">
+        <input id="doc-name" class="doc-name" value="未命名" title="双击重命名" spellcheck="false" />
+        <span id="doc-status" class="status">已保存</span>
+      </div>
+      <div class="toolbar-center">
+        <button id="btn-new" title="新建导图"><svg viewBox="0 0 24 24"><path d="M5 4h9l5 5v11H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 4v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 13h6M12 10v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-open" title="打开导图"><svg viewBox="0 0 24 24"><path d="M4 7h5l2-2h9v14H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 11h16" stroke="currentColor" stroke-width="1.8"/></svg></button>
+        <button id="btn-save" title="保存 (Ctrl+S)"><svg viewBox="0 0 24 24"><path d="M5 4h13l2 2v14H4V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 4v6h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button id="btn-export" title="导出 JSON"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-undo" title="撤销 (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a7 7 0 0 1 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-redo" title="重做 (Ctrl+Y)"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12h-9a7 7 0 0 0-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-style" title="样式设置"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h6M14 12h6M4 18h12M20 18h0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="6" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="18" r="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+        <button id="btn-ai" title="AI 助手"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8z" fill="currentColor"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="currentColor"/></svg></button>
+      </div>
+      <div class="toolbar-right">
+        <span id="doc-saved-time" class="saved-time"></span>
+        <button id="btn-share" title="加密分享"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="18" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.7 10.8l6.6-3.6M8.7 13.2l6.6 3.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-collapse-all" title="全部折叠"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 12h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+        <button id="btn-expand-all" title="全部展开"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+
+    <div id="map" class="map"></div>
+
+    <!-- 底部栏: 左下画布标签 + 右下视图控制 -->
+    <div id="bottom-bar" class="bottom-bar">
+      <div id="canvas-bar" class="canvas-bar">
+        <span class="canvas-tab active" data-canvas="0">画布1</span>
+        <button id="canvas-add" title="新建画布">+</button>
+      </div>
+      <div class="view-bar">
+        <select id="view-layout" title="布局类型">
+          <option value="side">思维导图</option>
+          <option value="l">逻辑结构图(左)</option>
+          <option value="r">逻辑结构图(右)</option>
+        </select>
+        <span class="view-zoom">
+          <button id="zoom-out" title="缩小">−</button>
+          <span id="zoom-val">100%</span>
+          <button id="zoom-in" title="放大">+</button>
+        </span>
+        <button id="view-fit" title="居中">⤢</button>
+      </div>
+    </div>
+
+    <!-- 综合样式侧栏(样式/主题/布局/图标) -->
+    <div id="style-panel" class="style-panel hidden">
+      <div class="sp-header">
+        <div class="sp-tabs">
+          <button class="sp-tab active" data-tab="style">样式</button>
+          <button class="sp-tab" data-tab="theme">主题</button>
+          <button class="sp-tab" data-tab="layout">布局</button>
+          <button class="sp-tab" data-tab="icon">图标</button>
+        </div>
+        <button id="sp-close" class="ai-close">×</button>
+      </div>
+      <div class="sp-body">
+        <!-- 样式页 -->
+        <div class="sp-page" id="sp-page-style">
+          <div class="sp-section">节点</div>
+          <div class="sp-row">
+            <label>圆角</label>
+            <input type="range" id="st-radius" min="0" max="30" value="14">
+            <span class="sp-val" id="st-radius-val">14px</span>
+          </div>
+          <div class="sp-row">
+            <label>字号</label>
+            <input type="range" id="st-font" min="12" max="24" value="15">
+            <span class="sp-val" id="st-font-val">15px</span>
+          </div>
+          <div class="sp-section">连接线</div>
+          <div class="sp-row">
+            <label>粗细</label>
+            <input type="range" id="st-link" min="1" max="6" value="2">
+            <span class="sp-val" id="st-link-val">2px</span>
+          </div>
+          <div class="sp-section">边框</div>
+          <div class="sp-row">
+            <label>边框粗细</label>
+            <input type="range" id="st-border" min="0" max="4" value="0">
+            <span class="sp-val" id="st-border-val">0px</span>
+          </div>
+        </div>
+        <!-- 主题页 -->
+        <div class="sp-page hidden" id="sp-page-theme">
+          <div class="sp-section">主题模板</div>
+          <div id="theme-list" class="theme-grid"></div>
+          <div class="sp-section">画布背景</div>
+          <div class="sp-row">
+            <label>自定义背景</label>
+            <input type="color" id="st-bgcolor" value="#16181d">
+          </div>
+          <button id="st-mix" class="sp-btn">一键搭配</button>
+        </div>
+        <!-- 布局页 -->
+        <div class="sp-page hidden" id="sp-page-layout">
+          <div class="sp-section">选择布局</div>
+          <div class="layout-list">
+            <div class="layout-item active" data-layout="side">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><circle cx="22" cy="13" r="3.5" fill="currentColor"/><line x1="22" y1="13" x2="5" y2="13" stroke="currentColor" stroke-width="2"/><line x1="5" y1="13" x2="5" y2="4" stroke="currentColor" stroke-width="2"/><line x1="5" y1="13" x2="5" y2="22" stroke="currentColor" stroke-width="2"/><line x1="22" y1="13" x2="39" y2="13" stroke="currentColor" stroke-width="2"/><line x1="39" y1="13" x2="39" y2="4" stroke="currentColor" stroke-width="2"/><line x1="39" y1="13" x2="39" y2="22" stroke="currentColor" stroke-width="2"/></svg></span>
+              <span>两侧</span>
+            </div>
+            <div class="layout-item" data-layout="l">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="6" y1="13" x2="28" y2="13" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="4" stroke="currentColor" stroke-width="2"/><line x1="28" y1="13" x2="28" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="36" cy="13" r="3.5" fill="currentColor"/></svg></span>
+              <span>单侧（左）</span>
+            </div>
+            <div class="layout-item" data-layout="r">
+              <span class="layout-icon"><svg viewBox="0 0 44 26"><line x1="38" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="2"/><line x1="16" y1="13" x2="16" y2="4" stroke="currentColor" stroke-width="2"/><line x1="16" y1="13" x2="16" y2="22" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="13" r="3.5" fill="currentColor"/></svg></span>
+              <span>单侧（右）</span>
+            </div>
+          </div>
+        </div>
+        <!-- 图标页 -->
+        <div class="sp-page hidden" id="sp-page-icon">
+          <div class="sp-section">优先级</div>
+          <div class="icon-grid" id="icon-priority">
+            <button data-icon="emoji_priority_1">priority_1</button>P0</button>
+            <button data-icon="emoji_priority_2">priority_2</button>P1</button>
+            <button data-icon="emoji_priority_3">priority_3</button>P2</button>
+            <button data-icon="emoji_priority_4">priority_4</button>P3</button>
+          </div>
+          <div class="sp-section">序号</div>
+          <div class="icon-grid" id="icon-number">
+            <button data-icon="emoji_number_1">number_1</button>01</button><button data-icon="emoji_number_2">number_2</button>02</button>
+            <button data-icon="emoji_number_3">number_3</button>03</button><button data-icon="emoji_number_4">number_4</button>04</button>
+            <button data-icon="emoji_number_5">number_5</button>05</button><button data-icon="emoji_number_6">number_6</button>06</button>
+            <button data-icon="emoji_number_7">number_7</button>07</button><button data-icon="emoji_number_8">number_8</button>08</button>
+            <button data-icon="emoji_number_9">number_9</button>09</button><button data-icon="emoji_number_10">number_10</button>10</button>
+          </div>
+          <div class="sp-section">表情包</div>
+          <div class="icon-grid" id="icon-emoji">
+            <button data-icon="emoji_😀">😀</button><button data-icon="emoji_😄">😄</button>
+            <button data-icon="emoji_😂">😂</button><button data-icon="emoji_😍">😍</button>
+            <button data-icon="emoji_🤔">🤔</button><button data-icon="emoji_😎">😎</button>
+            <button data-icon="emoji_🤩">🤩</button><button data-icon="emoji_😭">😭</button>
+            <button data-icon="emoji_😡">😡</button><button data-icon="emoji_🤗">🤗</button>
+            <button data-icon="emoji_👍">👍</button><button data-icon="emoji_👏">👏</button>
+            <button data-icon="emoji_🔥">🔥</button><button data-icon="emoji_⭐">⭐</button>
+            <button data-icon="emoji_❤️">❤️</button><button data-icon="emoji_💡">💡</button>
+            <button data-icon="emoji_🚀">🚀</button><button data-icon="emoji_🎯">🎯</button>
+            <button data-icon="emoji_🎉">🎉</button><button data-icon="emoji_✅">✅</button>
+            <button data-icon="emoji_⚠️">⚠️</button><button data-icon="emoji_📌">📌</button>
+            <button data-icon="emoji_💰">💰</button><button data-icon="emoji_📚">📚</button>
+            <button data-icon="emoji_☕">☕</button><button data-icon="emoji_🎵">🎵</button>
+            <button data-icon="emoji_🏆">🏆</button><button data-icon="emoji_💪">💪</button>
+          </div>
+          <div class="sp-hint">先选中节点，再点击图标添加标记；再次点击同一图标可移除</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 助手面板 -->
+    <div id="ai-panel" class="ai-panel hidden">
+      <div class="ai-header">
+        <span>AI 助手</span>
+        <button id="ai-close" class="ai-close">×</button>
+      </div>
+      <div class="ai-body">
+        <div class="ai-mode">
+          <button data-mode="create" class="ai-mode-btn active">创作</button>
+          <button data-mode="summary" class="ai-mode-btn">总结</button>
+          <button data-mode="chat" class="ai-mode-btn">交互</button>
+        </div>
+        <textarea id="ai-input" placeholder="输入指令，例如：为「项目规划」生成思维导图框架..."></textarea>
+        <button id="ai-run" class="ai-run">生成</button>
+        <div id="ai-output" class="ai-output">
+          <div class="ai-output-empty">AI 输出将显示在这里</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自定义右键菜单(XMind 风格) -->
+    <div id="ctx-menu" class="ctx-menu hidden">
+      <button data-act="insert-child"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8M8 12h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>插入子主题</button>
+      <button data-act="insert-sibling"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>插入同级主题</button>
+      <button data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20l1-4L17 4l3 3L8 19l-4 1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>编辑节点</button>
+      <div class="ctx-sep"></div>
+      <button data-act="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 0 1 2-2h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>复制</button>
+      <button data-act="cut"><svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 1 1-4 4 3 3 0 0 1 4-4zM15 15a3 3 0 1 1-4 4 3 3 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 18L18 6M14 10l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>剪切</button>
+      <button data-act="paste" id="ctx-paste" disabled><svg viewBox="0 0 24 24"><path d="M8 5h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3h6v4H9z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>粘贴</button>
+      <div class="ctx-sep"></div>
+      <button data-act="collapse"><svg viewBox="0 0 24 24"><path d="M7 4v16M7 12l10-8M7 12l10 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>折叠</button>
+      <button data-act="expand"><svg viewBox="0 0 24 24"><path d="M4 7h16M12 3v16M12 12l8-8M12 12l-8-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>展开</button>
+      <div class="ctx-sep"></div>
+      <button data-act="del" class="ctx-danger"><svg viewBox="0 0 24 24"><path d="M5 6h14M9 6V4h6v2M7 6l1 14h8l1-14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>删除节点</button>
+    </div>
+
+  </div>
+
+</body>
+</html>
