@@ -15,16 +15,20 @@
           "children": [
             {
               "data": {
-                "text": "新主题",
+                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugu48z0_jxcao8\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
                 "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
                 "expand": true,
-                "richText": false,
+                "richText": true,
                 "isActive": false,
-                "fillColor": "#2FB36B",
+                "fillColor": "#16181d",
                 "color": "#ffffff",
-                "borderColor": "#2FB36B",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B"
+                "borderColor": "#16181d",
+                "borderWidth": 0,
+                "lineColor": "#2FB36B",
+                "shape": "roundedRectangle",
+                "borderRadius": 12,
+                "paddingX": 6,
+                "paddingY": 6
               },
               "children": []
             }
@@ -57,7 +61,9 @@
           "sy": 0
         }
       },
-      "manualStyles": []
+      "manualStyles": [
+        "a765e29d-747b-4f78-a9f8-5aaf19c4cabd"
+      ]
     }
   ],
   "docIndex": 0
