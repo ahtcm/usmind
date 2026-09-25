@@ -453,23 +453,23 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
+          "translateX": -213,
+          "translateY": -12,
           "originX": 0,
           "originY": 0,
           "a": 1,
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": 0,
-          "f": 0
+          "e": -213,
+          "f": -12
         },
         "state": {
           "scale": 1,
-          "x": 0,
-          "y": 0,
-          "sx": -2,
-          "sy": 0
+          "x": -213,
+          "y": -12,
+          "sx": -215,
+          "sy": -12
         }
       },
       "manualStyles": []
