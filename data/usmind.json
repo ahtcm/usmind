@@ -116,7 +116,7 @@
             },
             {
               "data": {
-                "text": "新主题",
+                "text": "图片",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
@@ -127,26 +127,27 @@
                 "borderWidth": 1,
                 "lineColor": "#22A7C9"
               },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "<div style=\"position:relative;width:210px;height:114px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugx0ves_odne2d\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:134px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">桌面</span></div>",
-                "uid": "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
-                "expand": true,
-                "richText": true,
-                "isActive": false,
-                "fillColor": "#16181d",
-                "color": "#ffffff",
-                "borderColor": "#16181d",
-                "borderWidth": 0,
-                "lineColor": "#2FB36B",
-                "shape": "roundedRectangle",
-                "borderRadius": 12,
-                "paddingX": 6,
-                "paddingY": 6
-              },
-              "children": []
+              "children": [
+                {
+                  "data": {
+                    "text": "<div style=\"position:relative;width:210px;height:114px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugx0ves_odne2d\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:134px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">桌面</span></div>",
+                    "uid": "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
+                    "expand": true,
+                    "richText": true,
+                    "isActive": false,
+                    "fillColor": "#16181d",
+                    "color": "#ffffff",
+                    "borderColor": "#16181d",
+                    "borderWidth": 0,
+                    "lineColor": "#2FB36B",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "paddingX": 6,
+                    "paddingY": 6
+                  },
+                  "children": []
+                }
+              ]
             },
             {
               "data": {
