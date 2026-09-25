@@ -152,16 +152,20 @@
                 },
                 {
                   "data": {
-                    "text": "新主题",
+                    "text": "<div style=\"position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000\"><audio controls style=\"width:100%;height:100%;display:block\" src=\"media://m_mugx23fv_59gu7w\"></audio></div>",
                     "expand": true,
-                    "richText": false,
+                    "richText": true,
                     "isActive": false,
                     "uid": "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0",
-                    "fillColor": "#e2f4ea",
+                    "fillColor": "#16181d",
                     "color": "#475569",
-                    "borderColor": "#b0e2c7",
-                    "borderWidth": 1,
-                    "lineColor": "#2FB36B"
+                    "borderColor": "#16181d",
+                    "borderWidth": 0,
+                    "lineColor": "#2FB36B",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "paddingX": 6,
+                    "paddingY": 6
                   },
                   "children": []
                 }
@@ -202,7 +206,8 @@
         "4484030b-ea60-463c-a665-94693ee60fc0",
         "f75f3915-32e6-464a-af51-e6fac7e423f9",
         "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
-        "f26171b9-fcac-45b7-a9b8-f2155281caab"
+        "f26171b9-fcac-45b7-a9b8-f2155281caab",
+        "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0"
       ]
     },
     {
