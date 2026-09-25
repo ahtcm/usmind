@@ -1,29 +1,15 @@
 {
   "tabs": [
     {
-      "name": "媒体同步测试",
+      "name": "线上保存测试",
       "layout": "logicalStructure",
       "theme": "彩虹",
       "data": {
         "root": {
           "data": {
-            "text": "媒体同步测试",
-            "richText": "<div><img src=\"source/u_20260925222044_44648.png\"></div>"
+            "text": "线上保存测试"
           },
-          "children": [
-            {
-              "data": {
-                "text": "资源落盘仓库"
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "线上URL改写"
-              },
-              "children": []
-            }
-          ]
+          "children": []
         }
       }
     }
