@@ -75,6 +75,21 @@
                 "paddingY": 6
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "uid": "f75f3915-32e6-464a-af51-e6fac7e423f9",
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
