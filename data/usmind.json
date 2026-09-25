@@ -34,16 +34,23 @@
             },
             {
               "data": {
-                "text": "新主题",
+                "text": "这是一个doc文档",
                 "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
-                "fillColor": "#2FB36B",
+                "fillColor": "#F4F5F7",
                 "color": "#ffffff",
-                "borderColor": "#2FB36B",
+                "borderColor": "#C9CDD6",
                 "borderWidth": 1,
-                "lineColor": "#2FB36B"
+                "lineColor": "#2FB36B",
+                "attachmentUrl": "media://m_mugwuuwc_9ukubk",
+                "attachmentName": "作文.docx",
+                "shape": "roundedRectangle",
+                "borderRadius": 12,
+                "borderDasharray": "2 4",
+                "paddingX": 6,
+                "paddingY": 6
               },
               "children": []
             }
@@ -73,11 +80,12 @@
           "x": 0,
           "y": -1,
           "sx": 0,
-          "sy": 0
+          "sy": -1
         }
       },
       "manualStyles": [
-        "a765e29d-747b-4f78-a9f8-5aaf19c4cabd"
+        "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
+        "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8"
       ]
     },
     {
