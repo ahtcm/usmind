@@ -116,6 +116,21 @@
             },
             {
               "data": {
+                "text": "新主题",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "uid": "a10427bf-155c-4137-8742-2f15acb1224f",
+                "fillColor": "#22A7C9",
+                "color": "#ffffff",
+                "borderColor": "#22A7C9",
+                "borderWidth": 1,
+                "lineColor": "#22A7C9"
+              },
+              "children": []
+            },
+            {
+              "data": {
                 "text": "<div style=\"position:relative;width:210px;height:114px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugx0ves_odne2d\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:134px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">桌面</span></div>",
                 "uid": "70e7136b-86a8-477e-b618-ec5ec4d59d0e",
                 "expand": true,
@@ -140,11 +155,11 @@
                 "richText": false,
                 "isActive": false,
                 "uid": "ca43e254-6fa7-47fa-8660-25115dd7f2bb",
-                "fillColor": "#22A7C9",
-                "color": "#ffffff",
-                "borderColor": "#22A7C9",
+                "fillColor": "#F6A609",
+                "color": "#1a1a1a",
+                "borderColor": "#F6A609",
                 "borderWidth": 1,
-                "lineColor": "#22A7C9"
+                "lineColor": "#F6A609"
               },
               "children": [
                 {
