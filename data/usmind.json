@@ -34,7 +34,7 @@
             },
             {
               "data": {
-                "text": "新主题",
+                "text": "文档",
                 "expand": true,
                 "richText": false,
                 "isActive": false,
@@ -45,73 +45,74 @@
                 "borderWidth": 1,
                 "lineColor": "#2FB36B"
               },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "这是一个doc文档",
-                "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#F4F5F7",
-                "color": "#e60505",
-                "borderColor": "#C9CDD6",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B",
-                "attachmentUrl": "media://m_mugwuuwc_9ukubk",
-                "attachmentName": "作文.docx",
-                "shape": "roundedRectangle",
-                "borderRadius": 12,
-                "borderDasharray": "2 4",
-                "paddingX": 6,
-                "paddingY": 6
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "这是一个txt文档",
-                "uid": "4484030b-ea60-463c-a665-94693ee60fc0",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "fillColor": "#F4F5F7",
-                "color": "#118ad4",
-                "borderColor": "#C9CDD6",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B",
-                "attachmentUrl": "media://m_mugwwkav_22q800",
-                "attachmentName": "新建文本文档.txt",
-                "shape": "roundedRectangle",
-                "borderRadius": 12,
-                "borderDasharray": "2 4",
-                "paddingX": 6,
-                "paddingY": 6
-              },
-              "children": []
-            },
-            {
-              "data": {
-                "text": "这是一个json文档",
-                "expand": true,
-                "richText": false,
-                "isActive": false,
-                "uid": "f75f3915-32e6-464a-af51-e6fac7e423f9",
-                "fillColor": "#F4F5F7",
-                "color": "#e60f0f",
-                "borderColor": "#C9CDD6",
-                "borderWidth": 1,
-                "lineColor": "#2FB36B",
-                "attachmentUrl": "media://m_mugx055f_wew9b2",
-                "attachmentName": "未命名.json",
-                "shape": "roundedRectangle",
-                "borderRadius": 12,
-                "borderDasharray": "2 4",
-                "paddingX": 6,
-                "paddingY": 6
-              },
-              "children": []
+              "children": [
+                {
+                  "data": {
+                    "text": "这是一个doc文档",
+                    "uid": "4e21dd5f-bc33-4be7-92eb-fd29aeab4fd8",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#F4F5F7",
+                    "color": "#e60505",
+                    "borderColor": "#C9CDD6",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B",
+                    "attachmentUrl": "media://m_mugwuuwc_9ukubk",
+                    "attachmentName": "作文.docx",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "borderDasharray": "2 4",
+                    "paddingX": 6,
+                    "paddingY": 6
+                  },
+                  "children": []
+                },
+                {
+                  "data": {
+                    "text": "这是一个txt文档",
+                    "uid": "4484030b-ea60-463c-a665-94693ee60fc0",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#F4F5F7",
+                    "color": "#118ad4",
+                    "borderColor": "#C9CDD6",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B",
+                    "attachmentUrl": "media://m_mugwwkav_22q800",
+                    "attachmentName": "新建文本文档.txt",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "borderDasharray": "2 4",
+                    "paddingX": 6,
+                    "paddingY": 6
+                  },
+                  "children": []
+                },
+                {
+                  "data": {
+                    "text": "这是一个json文档",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "uid": "f75f3915-32e6-464a-af51-e6fac7e423f9",
+                    "fillColor": "#F4F5F7",
+                    "color": "#e60f0f",
+                    "borderColor": "#C9CDD6",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B",
+                    "attachmentUrl": "media://m_mugx055f_wew9b2",
+                    "attachmentName": "未命名.json",
+                    "shape": "roundedRectangle",
+                    "borderRadius": 12,
+                    "borderDasharray": "2 4",
+                    "paddingX": 6,
+                    "paddingY": 6
+                  },
+                  "children": []
+                }
+              ]
             },
             {
               "data": {
@@ -196,23 +197,23 @@
           "scaleY": 0.6000000000000001,
           "shear": 0,
           "rotate": 0,
-          "translateX": 163.69999999999982,
-          "translateY": 37.26666666666658,
+          "translateX": 179.69999999999982,
+          "translateY": 56.26666666666658,
           "originX": 0,
           "originY": 0,
           "a": 0.6000000000000001,
           "b": 0,
           "c": 0,
           "d": 0.6000000000000001,
-          "e": 163.69999999999982,
-          "f": 37.26666666666658
+          "e": 179.69999999999982,
+          "f": 56.26666666666658
         },
         "state": {
           "scale": 0.6000000000000001,
-          "x": 163.69999999999982,
-          "y": 37.26666666666658,
-          "sx": 254.69999999999982,
-          "sy": 55.26666666666658
+          "x": 179.69999999999982,
+          "y": 56.26666666666658,
+          "sx": 179.69999999999982,
+          "sy": 56.26666666666658
         }
       },
       "manualStyles": [
