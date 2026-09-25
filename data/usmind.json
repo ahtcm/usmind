@@ -92,6 +92,21 @@
                 "lineColor": "#2FB36B"
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "uid": "c681ab5a-fa68-42e9-85ad-aa702d5b4edf",
+                "fillColor": "#22A7C9",
+                "color": "#ffffff",
+                "borderColor": "#22A7C9",
+                "borderWidth": 1,
+                "lineColor": "#22A7C9"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
