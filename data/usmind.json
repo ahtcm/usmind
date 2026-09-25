@@ -91,7 +91,53 @@
                 "borderWidth": 1,
                 "lineColor": "#2FB36B"
               },
-              "children": []
+              "children": [
+                {
+                  "data": {
+                    "text": "新主题",
+                    "uid": "cd8bbc90-eaf8-4db3-b72c-c82787f64c4d",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#e2f4ea",
+                    "color": "#475569",
+                    "borderColor": "#b0e2c7",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B"
+                  },
+                  "children": []
+                },
+                {
+                  "data": {
+                    "text": "新主题",
+                    "uid": "d019553d-b644-4e14-8a8a-480581b471ee",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#e2f4ea",
+                    "color": "#475569",
+                    "borderColor": "#b0e2c7",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B"
+                  },
+                  "children": []
+                },
+                {
+                  "data": {
+                    "text": "新主题",
+                    "uid": "32139c84-5871-4532-9143-fc2fcae6023f",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#e2f4ea",
+                    "color": "#475569",
+                    "borderColor": "#b0e2c7",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B"
+                  },
+                  "children": []
+                }
+              ]
             },
             {
               "data": {
@@ -106,7 +152,23 @@
                 "borderWidth": 1,
                 "lineColor": "#22A7C9"
               },
-              "children": []
+              "children": [
+                {
+                  "data": {
+                    "text": "新主题",
+                    "uid": "5d58f8e6-dbc9-4d88-8d30-e862cbc432ad",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "fillColor": "#e0f3f7",
+                    "color": "#475569",
+                    "borderColor": "#abdeea",
+                    "borderWidth": 1,
+                    "lineColor": "#22A7C9"
+                  },
+                  "children": []
+                }
+              ]
             },
             {
               "data": {
@@ -152,6 +214,21 @@
                 "lineColor": "#F08BB4"
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "e325101d-4f3a-4b1b-afc3-ae05b05b7ac5",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#9270CA",
+                "color": "#ffffff",
+                "borderColor": "#9270CA",
+                "borderWidth": 1,
+                "lineColor": "#9270CA"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
@@ -163,7 +240,7 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
+          "translateX": -2,
           "translateY": 0,
           "originX": 0,
           "originY": 0,
@@ -171,14 +248,14 @@
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": 0,
+          "e": -2,
           "f": 0
         },
         "state": {
           "scale": 1,
-          "x": 0,
+          "x": -2,
           "y": 0,
-          "sx": 0,
+          "sx": -2,
           "sy": 0
         }
       },
