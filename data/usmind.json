@@ -202,6 +202,21 @@
                   "children": []
                 }
               ]
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "uid": "650b0130-3b9d-47bd-bff1-a07c44dae5d5",
+                "fillColor": "#E8684A",
+                "color": "#ffffff",
+                "borderColor": "#E8684A",
+                "borderWidth": 1,
+                "lineColor": "#E8684A"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
