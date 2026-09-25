@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>USMIND 思维导图</title>
-  <script type="module" crossorigin src="./assets/index-sbUW1DBb.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CtfMPsR9.css">
+  <script type="module" crossorigin src="./assets/index-jJg0rlIO.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BueIi9EV.css">
 </head>
 <body>
   <div id="app">
@@ -211,6 +211,34 @@
       <button data-act="insert-child"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v8M8 12h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>插入子主题</button>
       <button data-act="insert-sibling"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>插入同级主题</button>
       <button data-act="edit"><svg viewBox="0 0 24 24"><path d="M4 20l1-4L17 4l3 3L8 19l-4 1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>编辑节点</button>
+      <div class="ctx-sep"></div>
+      <div class="ctx-subwrap">
+        <button data-act="font-family"><svg viewBox="0 0 24 24"><path d="M5 19L10 5h4l5 14M7.5 14h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>字体<svg class="ctx-arrow" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="ctx-sub">
+          <button data-sub="fontFamily" data-value="inherit">默认</button>
+          <button data-sub="fontFamily" data-value="Microsoft YaHei">微软雅黑</button>
+          <button data-sub="fontFamily" data-value="SimSun">宋体</button>
+          <button data-sub="fontFamily" data-value="SimHei">黑体</button>
+          <button data-sub="fontFamily" data-value="KaiTi">楷体</button>
+          <button data-sub="fontFamily" data-value="DengXian">等线</button>
+        </div>
+      </div>
+      <div class="ctx-subwrap">
+        <button data-act="font-size"><svg viewBox="0 0 24 24"><path d="M4 6h7M7.5 6v14M15 6h5M17.5 6v14M15 13h5M17.5 13v7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>字号<svg class="ctx-arrow" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="ctx-sub">
+          <button data-sub="fontSize" data-value="12">12</button>
+          <button data-sub="fontSize" data-value="14">14</button>
+          <button data-sub="fontSize" data-value="16">16</button>
+          <button data-sub="fontSize" data-value="18">18</button>
+          <button data-sub="fontSize" data-value="20">20</button>
+          <button data-sub="fontSize" data-value="24">24</button>
+          <button data-sub="fontSize" data-value="28">28</button>
+          <button data-sub="fontSize" data-value="32">32</button>
+          <button data-sub="fontSize" data-value="36">36</button>
+        </div>
+      </div>
+      <button data-act="font-color"><svg viewBox="0 0 24 24"><path d="M5 19l2-5h10l2 5M8.2 10l3.8-9 3.8 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>字体颜色</button>
+      <button data-act="bg-color"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="7" y="7" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>背景颜色</button>
       <div class="ctx-sep"></div>
       <button data-act="copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 15V5a2 2 0 0 1 2-2h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>复制</button>
       <button data-act="cut"><svg viewBox="0 0 24 24"><path d="M9 9a3 3 0 1 1-4 4 3 3 0 0 1 4-4zM15 15a3 3 0 1 1-4 4 3 3 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 18L18 6M14 10l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>剪切</button>
