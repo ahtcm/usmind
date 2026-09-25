@@ -15,7 +15,7 @@
           "children": [
             {
               "data": {
-                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"media://m_mugu48z0_jxcao8\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
+                "text": "<div style=\"position:relative;width:210px;height:120px;overflow:hidden;border-radius:12px;line-height:0\"><img src=\"blob:http://127.0.0.1:8899/159f93a5-b5cd-4d71-91a6-75ff005a4a38\" style=\"position:absolute;top:-10px;left:-10px;width:230px;height:140px;object-fit:cover;display:block;margin:0\"><span style=\"position:absolute;left:8px;bottom:6px;color:#fff;font-size:12px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.85);z-index:2\">新主题</span></div>",
                 "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
                 "expand": true,
                 "richText": true,
@@ -263,17 +263,93 @@
     },
     {
       "name": "英语",
-      "layout": "logicalStructure",
+      "layout": "organizationStructure",
       "theme": "XMind 浅色",
       "data": {
         "root": {
           "data": {
-            "text": "中心主题",
+            "text": "英语知识点",
             "expand": true,
             "uid": "1ef28ee8-4f33-4a9f-81a6-9cee6e84660b",
             "isActive": false
           },
-          "children": [],
+          "children": [
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "6e8e78b1-264e-409e-8ce2-09b849b791fb",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "735f9002-e9fe-48ae-baa9-67c4ca17c780",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#22A7C9",
+                "color": "#ffffff",
+                "borderColor": "#22A7C9",
+                "borderWidth": 1,
+                "lineColor": "#22A7C9"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "28a1a35a-925b-4362-b1e9-a68b6667a357",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#F6A609",
+                "color": "#1a1a1a",
+                "borderColor": "#F6A609",
+                "borderWidth": 1,
+                "lineColor": "#F6A609"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "89f81859-7da7-4100-a6fe-e863d384f956",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#E8684A",
+                "color": "#ffffff",
+                "borderColor": "#E8684A",
+                "borderWidth": 1,
+                "lineColor": "#E8684A"
+              },
+              "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "7df0da11-d1ca-49de-a477-7f61d33e9a6b",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#F08BB4",
+                "color": "#1a1a1a",
+                "borderColor": "#F08BB4",
+                "borderWidth": 1,
+                "lineColor": "#F08BB4"
+              },
+              "children": []
+            }
+          ],
           "smmVersion": "0.14.0-fix.3"
         }
       },
@@ -283,21 +359,21 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
-          "translateY": 0,
+          "translateX": -35,
+          "translateY": -161,
           "originX": 0,
           "originY": 0,
           "a": 1,
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": 0,
-          "f": 0
+          "e": -35,
+          "f": -161
         },
         "state": {
           "scale": 1,
-          "x": 0,
-          "y": 0,
+          "x": -35,
+          "y": -161,
           "sx": 0,
           "sy": 0
         }
@@ -434,5 +510,5 @@
       "manualStyles": []
     }
   ],
-  "docIndex": 2
+  "docIndex": 0
 }
