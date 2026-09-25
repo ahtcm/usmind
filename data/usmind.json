@@ -12,7 +12,23 @@
             "uid": "0b30c776-91f2-404b-a325-4ead47d75961",
             "isActive": false
           },
-          "children": [],
+          "children": [
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "a765e29d-747b-4f78-a9f8-5aaf19c4cabd",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
+            }
+          ],
           "smmVersion": "0.14.0-fix.3"
         }
       },
