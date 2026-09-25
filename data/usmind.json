@@ -149,6 +149,21 @@
                     "paddingY": 6
                   },
                   "children": []
+                },
+                {
+                  "data": {
+                    "text": "新主题",
+                    "expand": true,
+                    "richText": false,
+                    "isActive": false,
+                    "uid": "1ede95e4-2293-4299-9a6f-dd5b65bf3bc0",
+                    "fillColor": "#e2f4ea",
+                    "color": "#475569",
+                    "borderColor": "#b0e2c7",
+                    "borderWidth": 1,
+                    "lineColor": "#2FB36B"
+                  },
+                  "children": []
                 }
               ]
             }
@@ -177,8 +192,8 @@
           "scale": 1,
           "x": -287,
           "y": -115,
-          "sx": -288,
-          "sy": -117
+          "sx": -287,
+          "sy": -115
         }
       },
       "manualStyles": [
