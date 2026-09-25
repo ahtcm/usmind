@@ -1,0 +1,26 @@
+{
+  "tabs": [
+    {
+      "name": "EXE测试",
+      "layout": "logicalStructure",
+      "theme": "dark2",
+      "data": {
+        "root": {
+          "data": {
+            "text": "中心主题"
+          },
+          "children": [
+            {
+              "data": {
+                "text": "子主题A"
+              },
+              "children": []
+            }
+          ]
+        }
+      },
+      "viewData": null
+    }
+  ],
+  "docIndex": 0
+}
