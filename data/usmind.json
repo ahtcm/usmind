@@ -40,7 +40,7 @@
                 "richText": false,
                 "isActive": false,
                 "fillColor": "#F4F5F7",
-                "color": "#ffffff",
+                "color": "#e60505",
                 "borderColor": "#C9CDD6",
                 "borderWidth": 1,
                 "lineColor": "#2FB36B",
@@ -65,7 +65,7 @@
           "shear": 0,
           "rotate": 0,
           "translateX": 0,
-          "translateY": -1,
+          "translateY": -2,
           "originX": 0,
           "originY": 0,
           "a": 1,
@@ -73,14 +73,14 @@
           "c": 0,
           "d": 1,
           "e": 0,
-          "f": -1
+          "f": -2
         },
         "state": {
           "scale": 1,
           "x": 0,
-          "y": -1,
+          "y": -2,
           "sx": 0,
-          "sy": -1
+          "sy": -2
         }
       },
       "manualStyles": [
