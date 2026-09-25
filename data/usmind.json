@@ -53,6 +53,21 @@
                 "paddingY": 6
               },
               "children": []
+            },
+            {
+              "data": {
+                "text": "新主题",
+                "uid": "4484030b-ea60-463c-a665-94693ee60fc0",
+                "expand": true,
+                "richText": false,
+                "isActive": false,
+                "fillColor": "#2FB36B",
+                "color": "#ffffff",
+                "borderColor": "#2FB36B",
+                "borderWidth": 1,
+                "lineColor": "#2FB36B"
+              },
+              "children": []
             }
           ],
           "smmVersion": "0.14.0-fix.3"
@@ -64,23 +79,23 @@
           "scaleY": 1,
           "shear": 0,
           "rotate": 0,
-          "translateX": 0,
-          "translateY": -2,
+          "translateX": -288,
+          "translateY": -116,
           "originX": 0,
           "originY": 0,
           "a": 1,
           "b": 0,
           "c": 0,
           "d": 1,
-          "e": 0,
-          "f": -2
+          "e": -288,
+          "f": -116
         },
         "state": {
           "scale": 1,
-          "x": 0,
-          "y": -2,
-          "sx": 0,
-          "sy": -2
+          "x": -288,
+          "y": -116,
+          "sx": -288,
+          "sy": -116
         }
       },
       "manualStyles": [
