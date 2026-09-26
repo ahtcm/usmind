@@ -95,4 +95,12 @@ public class IconTemplateServiceImpl implements IconTemplateService {
         if (exist == null) throw new BusinessException(404, "图标不存在");
         iconTemplateMapper.deleteById(id);
     }
+
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            delete(id);
+        }
+    }
 }

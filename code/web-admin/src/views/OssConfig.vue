@@ -4,9 +4,11 @@
       <div class="toolbar">
         <span style="color: #606266">共 {{ list.length }} 个存储配置</span>
         <el-button type="primary" :icon="Plus" @click="openCreate">新增配置</el-button>
+        <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" border :row-class-name="rowClass">
+      <el-table v-loading="loading" :data="list" border :row-class-name="rowClass" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="42" :selectable="row => !row.isActive" />
         <el-table-column prop="name" label="名称" width="140">
           <template #default="{ row }">
             <el-tag v-if="row.isActive" type="success" size="small" effect="dark">使用中</el-tag>
@@ -85,11 +87,12 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getOssConfigs, createOssConfig, updateOssConfig, deleteOssConfig,
-  activateOssConfig, testOssConfig
+  activateOssConfig, testOssConfig, batchDeleteOssConfigs
 } from '@/api/oss'
 
 const loading = ref(false)
 const list = ref([])
+const selectedIds = ref([])
 
 const dialog = reactive({ visible: false, mode: 'create', loading: false })
 const formRef = ref(null)
@@ -192,6 +195,18 @@ async function handleDelete(row) {
   await ElMessageBox.confirm(`确定删除配置「${row.name}」吗？`, '删除确认', { type: 'warning' })
   await deleteOssConfig(row.id)
   ElMessage.success('删除成功')
+  loadData()
+}
+
+function handleSelectionChange(rows) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handleBatchDelete() {
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个配置吗？（使用中的配置已自动排除）`, '批量删除', { type: 'warning' })
+  await batchDeleteOssConfigs(selectedIds.value)
+  ElMessage.success('批量删除成功')
+  selectedIds.value = []
   loadData()
 }
 

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -98,6 +99,15 @@ public class MindMapServiceImpl implements MindMapService {
             throw new BusinessException(404, "导图不存在");
         }
         mindMapMapper.deleteById(id);
+    }
+
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            MindMap m = mindMapMapper.selectById(id);
+            if (m != null) mindMapMapper.deleteById(id);
+        }
     }
 
     @Override

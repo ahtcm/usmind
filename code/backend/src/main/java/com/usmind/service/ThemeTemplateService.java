@@ -19,4 +19,6 @@ public interface ThemeTemplateService {
     void update(Long id, ThemeTemplate t);
 
     void delete(Long id);
+
+    void deleteBatch(List<Long> ids);
 }

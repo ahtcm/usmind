@@ -7,3 +7,7 @@ export function getFileList(params) {
 export function deleteFile(id) {
   return request.delete(`/admin/files/${id}`)
 }
+
+export function batchDeleteFiles(ids) {
+  return request.post('/admin/files/batch-delete', ids)
+}

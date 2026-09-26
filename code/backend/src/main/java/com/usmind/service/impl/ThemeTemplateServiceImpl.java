@@ -88,6 +88,14 @@ public class ThemeTemplateServiceImpl implements ThemeTemplateService {
         themeTemplateMapper.deleteById(id);
     }
 
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            delete(id);
+        }
+    }
+
     private Map<String, Object> toMap(ThemeTemplate t) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", t.getId());

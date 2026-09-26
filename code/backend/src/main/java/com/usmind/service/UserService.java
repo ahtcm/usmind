@@ -5,10 +5,13 @@ import com.usmind.dto.UserCreateRequest;
 import com.usmind.dto.UserUpdateRequest;
 import com.usmind.entity.SysUser;
 
+import java.util.List;
+
 public interface UserService {
     IPage<SysUser> page(long page, long size, String keyword);
     Long create(UserCreateRequest req);
     void update(Long id, UserUpdateRequest req);
     void delete(Long id);
+    void deleteBatch(List<Long> ids);
     void resetPassword(Long id, String password);
 }

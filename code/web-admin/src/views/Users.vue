@@ -1,3 +1,4 @@
+<!-- batch-delete-ui-v2 -->
 <template>
   <div class="page-container">
     <el-card shadow="never">
@@ -15,9 +16,11 @@
           </template>
         </el-input>
         <el-button type="primary" :icon="Plus" @click="openCreate">新增用户</el-button>
+        <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="tableData" border>
+      <el-table v-loading="loading" :data="tableData" border @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="42" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="username" label="用户名" width="120" />
         <el-table-column prop="nickname" label="昵称" width="120" />
@@ -112,13 +115,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getUserList, createUser, updateUser, deleteUser, resetUserPassword
+  getUserList, createUser, updateUser, deleteUser, resetUserPassword, batchDeleteUsers
 } from '@/api/users'
 
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const query = reactive({ page: 1, size: 10, keyword: '' })
+const selectedIds = ref([])
 
 const dialog = reactive({ visible: false, mode: 'create', loading: false })
 const formRef = ref(null)
@@ -222,6 +226,18 @@ async function handleDelete(row) {
   await ElMessageBox.confirm(`确定删除用户「${row.username}」吗？该操作不可恢复。`, '删除确认', { type: 'warning' })
   await deleteUser(row.id)
   ElMessage.success('删除成功')
+  loadData()
+}
+
+function handleSelectionChange(rows) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handleBatchDelete() {
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个用户吗？该操作不可恢复。`, '批量删除', { type: 'warning' })
+  await batchDeleteUsers(selectedIds.value)
+  ElMessage.success('批量删除成功')
+  selectedIds.value = []
   loadData()
 }
 

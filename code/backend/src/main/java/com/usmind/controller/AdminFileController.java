@@ -4,6 +4,7 @@ import com.usmind.common.Result;
 import com.usmind.service.FileService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,5 +31,11 @@ public class AdminFileController {
     public Result<Void> deleteFile(@PathVariable Long id) {
         fileService.deleteFile(id);
         return Result.ok();
+    }
+
+    @PostMapping("/files/batch-delete")
+    public Result<Integer> batchDeleteFiles(@RequestBody List<Long> ids) {
+        fileService.deleteBatch(ids);
+        return Result.ok(ids == null ? 0 : ids.size());
     }
 }

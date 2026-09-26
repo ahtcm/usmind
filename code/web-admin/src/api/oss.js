@@ -16,6 +16,10 @@ export function deleteOssConfig(id) {
   return request.delete(`/admin/oss/configs/${id}`)
 }
 
+export function batchDeleteOssConfigs(ids) {
+  return request.post('/admin/oss/configs/batch-delete', ids)
+}
+
 export function activateOssConfig(id) {
   return request.put(`/admin/oss/configs/${id}/activate`)
 }

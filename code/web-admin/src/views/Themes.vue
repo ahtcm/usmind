@@ -4,9 +4,11 @@
       <div class="toolbar">
         <span style="color: #606266">共 {{ list.length }} 个主题模板</span>
         <el-button type="primary" :icon="Plus" @click="openCreate">新增主题</el-button>
+        <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" border>
+      <el-table v-loading="loading" :data="list" border @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="42" :selectable="row => row.builtin !== 1" />
         <el-table-column prop="name" label="名称" width="140">
           <template #default="{ row }">
             <el-tag v-if="row.builtin === 1" size="small" type="info" effect="plain" style="margin-right:6px">内置</el-tag>
@@ -220,6 +222,7 @@ async function uploadBgImage(opt) {
 
 const list = ref([])
 const loading = ref(false)
+const selectedIds = ref([])
 
 function parseColors(text) {
   if (!text) return []
@@ -398,6 +401,18 @@ async function handleDelete(row) {
     ElMessage.success('已删除')
     await load()
   } catch (e) { /* 取消 */ }
+}
+
+function handleSelectionChange(rows) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handleBatchDelete() {
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个主题吗？（内置主题已自动排除）`, '批量删除', { type: 'warning' })
+  await themeApi.batchRemove(selectedIds.value)
+  ElMessage.success('批量删除成功')
+  selectedIds.value = []
+  await load()
 }
 
 onMounted(load)

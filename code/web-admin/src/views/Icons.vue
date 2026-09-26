@@ -1,3 +1,4 @@
+<!-- icons-batch-delete-v2 -->
 <template>
   <div class="page-container">
     <el-card shadow="never">
@@ -9,6 +10,7 @@
         <div class="spacer" />
         <el-button type="primary" @click="openAdd">新增</el-button>
         <el-button type="success" plain @click="openBatch">批量导入</el-button>
+        <el-button v-if="selected.size" type="danger" @click="handleBatchDelete">批量删除 ({{ selected.size }})</el-button>
       </div>
 
       <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
@@ -16,10 +18,11 @@
       </el-alert>
 
       <div v-loading="loading" class="icon-grid">
-        <div v-for="item in paged" :key="item.id" class="icon-cell" :title="item.name">
+        <div v-for="item in paged" :key="item.id" class="icon-cell" :title="item.name" :class="{ checked: selected.has(item.id) }" @click="toggleSelect(item.id)">
+          <el-checkbox :model-value="selected.has(item.id)" size="large" class="icon-check" @click.stop="toggleSelect(item.id)" />
           <span class="icon-emoji">{{ item.name }}</span>
           <span class="icon-cat">{{ item.category }}</span>
-          <span class="icon-del" @click="handleDelete(item)">×</span>
+          <span class="icon-del" @click.stop="handleDelete(item)">×</span>
         </div>
         <el-empty v-if="!loading && paged.length === 0" description="暂无图标" :image-size="70" />
       </div>
@@ -73,13 +76,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getIconList, createIcon, batchImport, deleteIcon } from '../api/icons'
+import { getIconList, createIcon, batchImport, deleteIcon, batchDeleteIcons } from '../api/icons'
 
 const list = ref([])
 const loading = ref(false)
 const page = ref(1)
 const pageSize = 96
 const query = ref({ keyword: '', category: '' })
+const selected = ref(new Set())
 const addDialog = ref(false)
 const batchDialog = ref(false)
 const saving = ref(false)
@@ -141,9 +145,25 @@ async function handleDelete(item) {
   } catch (e) { return }
   try {
     await deleteIcon(item.id)
+    selected.value.delete(item.id)
     ElMessage.success('已删除')
     load()
   } catch (e) { ElMessage.error(e.message || '删除失败') }
+}
+
+function toggleSelect(id) {
+  const s = new Set(selected.value)
+  if (s.has(id)) s.delete(id); else s.add(id)
+  selected.value = s
+}
+
+async function handleBatchDelete() {
+  const ids = [...selected.value]
+  await ElMessageBox.confirm(`确定删除选中的 ${ids.length} 个图标吗？`, '批量删除', { type: 'warning' })
+  await batchDeleteIcons(ids)
+  ElMessage.success('批量删除成功')
+  selected.value = new Set()
+  load()
 }
 
 onMounted(load)
@@ -153,8 +173,11 @@ onMounted(load)
 .toolbar { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; }
 .spacer { flex: 1; }
 .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; min-height: 160px; }
-.icon-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border: 1px solid rgba(0,0,0,.07); border-radius: 10px; background: #fff; transition: box-shadow .2s; }
+.icon-cell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border: 1px solid rgba(0,0,0,.07); border-radius: 10px; background: #fff; transition: box-shadow .2s; cursor: pointer; }
 .icon-cell:hover { box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+.icon-cell.checked { border-color: #0e7c86; box-shadow: 0 0 0 1px #0e7c86; }
+.icon-check { position: absolute; top: 2px; left: 4px; opacity: 0; transition: opacity .15s; }
+.icon-cell:hover .icon-check, .icon-cell.checked .icon-check { opacity: 1; }
 .icon-emoji { font-size: 26px; line-height: 1.2; }
 .icon-cat { font-size: 11px; color: #909399; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon-del { position: absolute; top: 2px; right: 4px; width: 16px; height: 16px; line-height: 14px; text-align: center; background: rgba(0,0,0,.45); color: #fff; border-radius: 50%; cursor: pointer; font-size: 11px; opacity: 0; transition: opacity .2s; }

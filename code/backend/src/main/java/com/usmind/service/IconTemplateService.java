@@ -20,4 +20,7 @@ public interface IconTemplateService {
 
     /** 删除 */
     void delete(Long id);
+
+    /** 批量删除 */
+    void deleteBatch(List<Long> ids);
 }

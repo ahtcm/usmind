@@ -16,6 +16,10 @@ export function deleteUser(id) {
   return request.delete(`/admin/users/${id}`)
 }
 
+export function batchDeleteUsers(ids) {
+  return request.post('/admin/users/batch-delete', ids)
+}
+
 export function resetUserPassword(id, data) {
   return request.put(`/admin/users/${id}/password`, data)
 }

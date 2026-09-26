@@ -45,4 +45,10 @@ public class IconController {
         iconTemplateService.delete(id);
         return Result.ok(null);
     }
+
+    @PostMapping("/api/admin/icons/batch-delete")
+    public Result<Integer> batchDelete(@RequestBody List<Long> ids) {
+        iconTemplateService.deleteBatch(ids);
+        return Result.ok(ids == null ? 0 : ids.size());
+    }
 }

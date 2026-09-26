@@ -46,6 +46,12 @@ public class OssController {
         return Result.ok();
     }
 
+    @PostMapping("/configs/batch-delete")
+    public Result<Integer> batchDelete(@RequestBody List<Long> ids) {
+        ossConfigService.deleteBatch(ids);
+        return Result.ok(ids == null ? 0 : ids.size());
+    }
+
     @PutMapping("/configs/{id}/activate")
     public Result<Void> activate(@PathVariable Long id) {
         ossConfigService.activate(id);

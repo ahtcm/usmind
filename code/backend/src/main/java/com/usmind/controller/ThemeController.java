@@ -50,4 +50,10 @@ public class ThemeController {
         themeTemplateService.delete(id);
         return Result.ok(null);
     }
+
+    @PostMapping("/api/admin/themes/batch-delete")
+    public Result<Integer> batchDelete(@RequestBody List<Long> ids) {
+        themeTemplateService.deleteBatch(ids);
+        return Result.ok(ids == null ? 0 : ids.size());
+    }
 }

@@ -6,5 +6,6 @@ export const themeApi = {
   get(id) { return request.get(`/admin/themes/${id}`) },
   create(data) { return request.post('/admin/themes', data) },
   update(id, data) { return request.put(`/admin/themes/${id}`, data) },
-  remove(id) { return request.delete(`/admin/themes/${id}`) }
+  remove(id) { return request.delete(`/admin/themes/${id}`) },
+  batchRemove(ids) { return request.post('/admin/themes/batch-delete', ids) }
 }

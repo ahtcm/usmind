@@ -10,6 +10,7 @@ import com.usmind.service.UserService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -51,6 +52,12 @@ public class UserController {
     public Result<Void> delete(@PathVariable Long id) {
         userService.delete(id);
         return Result.ok();
+    }
+
+    @PostMapping("/batch-delete")
+    public Result<Integer> batchDelete(@RequestBody List<Long> ids) {
+        userService.deleteBatch(ids);
+        return Result.ok(ids == null ? 0 : ids.size());
     }
 
     @PutMapping("/{id}/password")

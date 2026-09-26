@@ -11,6 +11,7 @@ public interface OssConfigService {
     Long create(OssConfigRequest req);
     void update(Long id, OssConfigRequest req);
     void delete(Long id);
+    void deleteBatch(List<Long> ids);
     void activate(Long id);
     Map<String, Object> test(Long id);
 }

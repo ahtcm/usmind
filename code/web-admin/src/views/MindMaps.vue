@@ -14,9 +14,11 @@
             <el-button @click="handleSearch">搜索</el-button>
           </template>
         </el-input>
+        <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="tableData" border>
+      <el-table v-loading="loading" :data="tableData" border @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="42" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="userId" label="所属用户" width="100">
           <template #default="{ row }">{{ row.userId ?? '—' }}</template>
@@ -84,12 +86,13 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getMindmapList, getMindmapDetail, deleteMindmap, cancelShareMindmap } from '@/api/mindmaps'
+import { getMindmapList, getMindmapDetail, deleteMindmap, cancelShareMindmap, batchDeleteMindmaps } from '@/api/mindmaps'
 
 const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const query = reactive({ page: 1, size: 10, keyword: '' })
+const selectedIds = ref([])
 
 const detail = reactive({ visible: false, data: null, json: '' })
 
@@ -134,6 +137,18 @@ async function handleDelete(row) {
   await ElMessageBox.confirm(`确定删除导图「${row.name}」吗？该操作不可恢复。`, '删除确认', { type: 'warning' })
   await deleteMindmap(row.id)
   ElMessage.success('删除成功')
+  loadData()
+}
+
+function handleSelectionChange(rows) {
+  selectedIds.value = rows.map(r => r.id)
+}
+
+async function handleBatchDelete() {
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 张导图吗？该操作不可恢复。`, '批量删除', { type: 'warning' })
+  await batchDeleteMindmaps(selectedIds.value)
+  ElMessage.success('批量删除成功')
+  selectedIds.value = []
   loadData()
 }
 

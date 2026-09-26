@@ -13,6 +13,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -76,6 +78,14 @@ public class UserServiceImpl implements UserService {
         if (u == null) throw new BusinessException(404, "用户不存在");
         if ("ADMIN".equals(u.getRole())) throw new BusinessException(400, "不能删除管理员账号");
         userMapper.deleteById(id);
+    }
+
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            delete(id);
+        }
     }
 
     @Override

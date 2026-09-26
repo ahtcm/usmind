@@ -94,6 +94,14 @@ public class OssConfigServiceImpl implements OssConfigService {
     }
 
     @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            delete(id);
+        }
+    }
+
+    @Override
     public void activate(Long id) {
         OssConfig c = ossConfigMapper.selectById(id);
         if (c == null) throw new BusinessException(404, "配置不存在");

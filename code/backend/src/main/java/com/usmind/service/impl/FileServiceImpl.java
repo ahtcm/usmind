@@ -194,4 +194,12 @@ public class FileServiceImpl implements FileService {
         fileResourceMapper.deleteById(id);
         log.info("删除文件记录 id={} name={}", id, r.getOriginalName());
     }
+
+    @Override
+    public void deleteBatch(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
+        for (Long id : ids) {
+            deleteFile(id);
+        }
+    }
 }
