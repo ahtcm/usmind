@@ -1,0 +1,18 @@
+{
+  "name": "usmind-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "USMIND 思维导图编辑器前端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "mind-elixir": "^2.1.0",
+    "simple-mind-map": "^0.14.0-fix.3"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,35 @@
+server:
+  port: 8899
+
+spring:
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: null
+
+jwt:
+  secret: usmind-jwt-secret-key-2024-very-long-and-secure-enough-for-hs256
+  expire: 86400000
+
+file:
+  upload-dir: C:/Users/25750/Desktop/usmind/uploads
+
+oss:
+  secret-cipher-key: usmind-oss-secret-key-2024
+
+preview:
+  office-server:
+
+ai:
+  api-url:
+  api-key:

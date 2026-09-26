@@ -1,0 +1,26 @@
+@echo off
+chcp 65001 >nul
+title USMIND - 初始化数据库
+echo ========================================
+echo   初始化 USMIND 数据库
+echo ========================================
+
+set MYSQL_DIR=C:\Users\25750\Desktop\usmind\tools\mysql-8.0.36-winx64
+set SQL_FILE=C:\Users\25750\Desktop\usmind\sql\init.sql
+
+REM 先尝试用空密码设置 root 密码为 root（首次初始化时）
+"%MYSQL_DIR%\bin\mysql.exe" -u root --skip-password -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root';" 2>nul
+
+echo [执行] 导入 init.sql ...
+"%MYSQL_DIR%\bin\mysql.exe" -u root -proot < "%SQL_FILE%"
+
+if %errorlevel% equ 0 (
+    echo [完成] 数据库 usmind_db 初始化成功
+    echo   - 数据库账号: root / root
+    echo   - 默认管理员: admin / admin123
+    echo   - 默认存储: 本地存储
+) else (
+    echo [错误] 数据库初始化失败，请检查 MySQL 是否已启动
+)
+echo.
+pause
