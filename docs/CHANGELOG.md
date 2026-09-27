@@ -1,5 +1,23 @@
 # USMIND 变更记录
 
+## 2026-09-28 · v1 正式发布（三种发布形态 + 一键构建 + CDN 在线分发）
+
+- **新增 `build-all.bat`**：一键重建三种发布形态，全部相对路径（`%~dp0` 定位项目根，csc 用 `%WINDIR%`）。
+- **① 便携绿色版** `release\usmind-portable\`：jlink 精简 JRE + jpackage 启动器 + 全组件；双击即用，首次自动初始化 MySQL。
+- **② 单文件自解压版** `release\USMIND-setup.exe`：C# stub + Optimal zip 拼接，解压到 `%LOCALAPPDATA%\USMIND` 后启动。
+- **③ 在线安装版** `release\USMIND-online.exe`：WinForms 下载器 + 内嵌分片清单，从 jsDelivr CDN（GitHub `@v1` 标签，国内加速）下载 22 片 371MB → 拼接解压组装 → 启动；可视化进度条 + 可取消；`USMIND_BASE_URL` 可覆盖下载源。
+- **分片体系**：`release\online-dist\`（6 组件 zip 按 20MB 切分 + manifest.json），`build_online.ps1` 生成；分片已入库并推 GitHub `@v1`。
+- **git**：构建源码 `release\launcher-src\` 入库（`-f` 强加，release 在 .gitignore）；`v1` 标签创建并同步 github + gitee；develop 双远程同步至 `cc24fb1`。
+- **验证**：在线版真实 CDN 端到端通过（jsDelivr 下载 → 组装 1GB → 8866 200 → 登录 200）；自解压版 `--extract-only` 与完整流程通过。
+
+## 2026-09-27 · 全栈重构：Vue3 用户端 + 管理后台 + Spring Boot 后端
+
+- **后端**：Java 17 + Spring Boot 3 + MyBatis-Plus + JWT（`code/backend`），接口分层 controller/service/entity/mapper；7 张表（sys_user / mind_map / file_resource / oss_config / sys_config / sys_theme / sys_icon）；存储策略模式（本地 / 阿里云 / 腾讯 / 七牛 / MinIO 热插拔）。
+- **用户端重构**：原脑图用 Vue3 + Vite + simple-mind-map 重构（`code/web-user`），样式与功能保持；新增登录、公式节点（MathJax SVG）、Emoji 图标面板（分类折叠/懒加载/光标插入）、附件/媒体节点（图片视频平铺、单击预览、双击编辑）、画布背景图/视频、视口滑动条、标签页拖拽、移动端适配、导入导出（JSON/PNG/JPG/SVG/PDF/Markdown）与 `.usmind` 资源包迁移。
+- **管理后台**：Vue3 + Element Plus（`code/web-admin`，`/admin/`），用户 / 导图 / 资源 / OSS / 主题模板 / 图标 / 项目配置 / 数据备份 / 登录页配置；移动端适配；至少保留一个管理员。
+- **部署形态变化**：由"EXE + git 双推 + Netlify"（早期 usmind_server.py 方案，`tools/` 旧脚本已删）改为**标准前后端分离**：nginx（80/8866/8867）+ Spring Boot 8899 + MySQL/Redis；一键脚本 `script/start-all.bat` 等（相对路径）。
+
+
 ## 2026-09-25 · 渲染底层整体替换为 simple-mind-map（wanglin2/mind-map）
 
 ### 背景
