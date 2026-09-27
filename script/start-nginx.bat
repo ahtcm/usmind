@@ -5,7 +5,10 @@ echo   Start Nginx
 echo ========================================
 echo.
 
-set NGINX_DIR=C:\Users\25750\Desktop\usmind\tools\nginx-1.30.5
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%"
+set "NGINX_DIR=%ROOT%\tools\nginx-1.30.5"
 
 cd /d "%NGINX_DIR%"
 if not exist "logs" mkdir "logs"
@@ -19,7 +22,7 @@ if %errorlevel% equ 0 (
     start nginx.exe
 )
 
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 echo [Done] Nginx started
 echo   - User site:  http://127.0.0.1:8866
 echo   - Admin site: http://127.0.0.1:8867

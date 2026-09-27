@@ -5,18 +5,23 @@ echo ========================================
 echo   启动 USMIND 用户端开发服务器
 echo ========================================
 
-set NPM=C:\Users\25750\Desktop\usmind\tools\nodejs\npm.cmd
-set PROJECT_DIR=C:\Users\25750\Desktop\usmind\code\web-user
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%"
+
+set "NPM=%ROOT%\tools\nodejs\npm.cmd"
+set "PROJECT_DIR=%ROOT%\code\web-user"
+set "PATH=%ROOT%\tools\nodejs;%PATH%"
 
 cd /d "%PROJECT_DIR%"
 
 if not exist "node_modules" (
     echo [安装] 依赖安装中...
-    call %NPM% install
+    call "%NPM%" install
 )
 
 echo [启动] Vite 开发服务器 (端口 5173)...
-call %NPM% run dev
+call "%NPM%" run dev
 
 echo.
 pause

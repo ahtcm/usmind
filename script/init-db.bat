@@ -5,8 +5,11 @@ echo ========================================
 echo   初始化 USMIND 数据库
 echo ========================================
 
-set MYSQL_DIR=C:\Users\25750\Desktop\usmind\tools\mysql-8.0.36-winx64
-set SQL_FILE=C:\Users\25750\Desktop\usmind\sql\init.sql
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%"
+set "MYSQL_DIR=%ROOT%\tools\mysql-8.0.36-winx64"
+set "SQL_FILE=%ROOT%\sql\init.sql"
 
 REM 先尝试用空密码设置 root 密码为 root（首次初始化时）
 "%MYSQL_DIR%\bin\mysql.exe" -u root --skip-password -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root';" 2>nul

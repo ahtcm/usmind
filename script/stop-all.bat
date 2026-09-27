@@ -5,7 +5,10 @@ echo   Stop USMIND All Services
 echo ========================================
 echo.
 
-set MYSQL_DIR=C:\Users\25750\Desktop\usmind\tools\mysql-8.0.36-winx64
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%"
+set "MYSQL_DIR=%ROOT%\tools\mysql-8.0.36-winx64"
 
 echo [1/5] Stopping Nginx (8866/8867/8766)...
 taskkill /f /im nginx.exe 2>nul

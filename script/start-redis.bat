@@ -5,11 +5,15 @@ echo   Start Redis 5.0
 echo ========================================
 echo.
 
-set REDIS_DIR=C:\Users\25750\Desktop\usmind\tools\Redis-x64-5.0.14.1
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%"
+set "REDIS_DIR=%ROOT%\tools\Redis-x64-5.0.14.1"
 
+cd /d "%REDIS_DIR%"
 echo [Start] Redis...
-start "USMIND-Redis" "%REDIS_DIR%\redis-server.exe" "%REDIS_DIR%\redis.windows.conf"
+start "USMIND-Redis" "redis-server.exe" "redis.windows.conf"
 
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 echo [Done] Redis started (port 6379)
 echo.

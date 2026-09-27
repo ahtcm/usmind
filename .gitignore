@@ -1,6 +1,7 @@
 # ============================================================
 # USMIND 思维导图系统 - Git 忽略规则
 # 适用仓库根：C:\Users\25750\Desktop\usmind
+# 说明：项目可整体搬移；本文件不含任何绝对路径。
 # ============================================================
 
 # ---------- 系统 / 编辑器临时文件 ----------
@@ -11,6 +12,7 @@ desktop.ini
 *~
 *.tmp
 *.bak
+*.log
 
 # ---------- IDE ----------
 .idea/
@@ -22,8 +24,9 @@ desktop.ini
 .project
 .classpath
 .factorypath
+.history/
 
-# ---------- Node 前端（web-user / web-admin / 历史 web）----------
+# ---------- Node 前端（web-user / web-admin）----------
 **/node_modules/
 **/dist/
 **/.vite/
@@ -33,6 +36,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tsbuildinfo
+.eslintcache
+.prettiercache
 
 # ---------- Java / Spring Boot 后端 ----------
 **/target/
@@ -43,6 +48,15 @@ pnpm-debug.log*
 *.ear
 hs_err_pid*.log
 replay_pid*.log
+*.hprof
+.flattened-pom.xml
+dependency-reduced-pom.xml
+
+# ---------- Python（历史辅助脚本，如有）----------
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
 
 # ---------- 敏感配置（本地专属，绝不提交）----------
 # 本地环境配置 / 密钥 / OSS / AI 接口鉴权
@@ -63,19 +77,25 @@ replay_pid*.log
 # ---------- 运行时数据 ----------
 /uploads/
 /logs/
+/script/logs/
 /_test/
 *.log
 
 # ---------- 本地工具 / 依赖环境（体积巨大，勿提交）----------
 /tools/
 
-# ---------- 构建产物（源码可重建，建议不入库）----------
+# ---------- 构建产物（源码可重建，不入库）----------
 /release/
 **/release/
 
-# ---------- 数据库本地备份 ----------
+# ---------- 数据库备份的中间产物（完整备份文件按需显式提交）----------
 *.sql.bak
 *.sql.old
+*.sql.gz
+*.dump
+*.sqlite
+*.sqlite3
+*.sql.bak.1
 
 # ---------- 打包 / 压缩产物 ----------
 *.zip
@@ -83,13 +103,7 @@ replay_pid*.log
 *.7z
 *.rar
 
-# ---------- 安装包 / 数据库备份 / 临时大文件（预防性）----------
+# ---------- 安装包（预防性）----------
 *.msi
 *.dmg
 *.pkg
-*.sql.gz
-*.dump
-*.db
-*.sqlite
-*.sqlite3
-*.sql.bak.1

@@ -22,7 +22,7 @@ jwt:
   expire: 86400000
 
 file:
-  upload-dir: C:/Users/25750/Desktop/usmind/uploads
+  upload-dir: ./uploads
 
 oss:
   secret-cipher-key: usmind-oss-secret-key-2024
