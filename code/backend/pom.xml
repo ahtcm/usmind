@@ -83,6 +83,13 @@
             <groupId>com.aliyun.oss</groupId>
             <artifactId>aliyun-sdk-oss</artifactId>
             <version>${aliyun-oss.version}</version>
+            <exclusions>
+                <!-- 排除阿里云 SDK 误带入的 jacoco 覆盖率探针（EPL-2.0 测试组件，不应进入生产包） -->
+                <exclusion>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>org.jacoco.agent</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.minio</groupId>

@@ -1,0 +1,528 @@
+================================================================
+USMIND 第三方组件许可证声明（THIRD-PARTY-LICENSES）
+================================================================
+项目：USMIND 思维导图（Java/Spring Boot + Vue 3）
+生成日期：2026-09-28
+本文件列出发行物中包含的第三方组件及其许可证，用于满足各开源许可证的
+“保留版权与许可声明”义务。详细合规分析与风险说明见 LICENSE-COMPLIANCE.md。
+
+================================================================
+一、后端 Java 依赖（fat jar 实际打包，共 118 个）
+================================================================
+组件 | 版本 | 许可证
+--- | --- | ---
+HikariCP | 5.0.1 | Apache-2.0
+aliyun-java-sdk-core | 4.5.10 | Apache-2.0
+aliyun-java-sdk-kms | 2.11.0 | Apache-2.0
+aliyun-java-sdk-ram | 3.1.0 | Apache-2.0
+aliyun-sdk-oss | 3.17.4 | Apache-2.0
+annotations | 13.0 | Apache-2.0
+bcprov-jdk15on | 1.67 | Bouncy Castle Licence（宽松）
+bcprov-jdk18on | 1.76 | Bouncy Castle Licence（宽松）
+checker-qual | 3.37.0 | MIT
+classmate | 1.6.0 | Apache-2.0
+commons-codec | 1.16.1 | Apache-2.0
+commons-compress | 1.24.0 | Apache-2.0
+commons-logging | 1.2 | Apache-2.0
+cos_api | 5.6.227 | MIT（腾讯云官方仓库 LICENSE）
+error_prone_annotations | 2.21.1 | Apache-2.0
+failureaccess | 1.0.1 | Apache-2.0
+gson | 2.10.1 | Apache-2.0
+guava | 32.1.3-jre | Apache-2.0
+hibernate-validator | 8.0.1.Final | Apache-2.0
+httpclient | 4.5.13 | Apache-2.0
+httpcore | 4.4.16 | Apache-2.0
+ini4j | 0.5.4 | Apache-2.0
+j2objc-annotations | 2.8 | Apache-2.0
+jackson-annotations | 2.15.4 | Apache-2.0
+jackson-core | 2.15.4 | Apache-2.0
+jackson-databind | 2.15.4 | Apache-2.0
+jackson-datatype-jdk8 | 2.15.4 | Apache-2.0
+jackson-datatype-jsr310 | 2.15.4 | Apache-2.0
+jackson-module-parameter-names | 2.15.4 | Apache-2.0
+jakarta.annotation-api | 2.1.1 | EPL-2.0 OR GPL-2.0 w/ Classpath Exception
+jakarta.validation-api | 3.0.2 | Apache-2.0
+java-jwt | 4.4.0 | MIT
+javax.activation-api | 1.2.0 | CDDL-1.1 OR GPL-2.0 w/ Classpath Exception
+jaxb-api | 2.3.1 | CDDL-1.1 OR GPL-2.0 w/ Classpath Exception
+jboss-logging | 3.5.3.Final | Apache-2.0
+jdom2 | 2.0.6.1 | Apache 类似（去 acknowledgment 条款）
+jettison | 1.5.4 | Apache-2.0
+jjwt-api | 0.12.5 | Apache-2.0
+jjwt-impl | 0.12.5 | Apache-2.0
+jjwt-jackson | 0.12.5 | Apache-2.0
+joda-time | 2.9.9 | Apache-2.0
+jsqlparser | 4.9 | LGPL-2.1 OR Apache-2.0（选用 Apache-2.0）
+jsr305 | 3.0.2 | Apache-2.0
+jul-to-slf4j | 2.0.13 | MIT
+kotlin-stdlib | 1.9.23 | Apache-2.0
+kotlin-stdlib-common | 1.9.23 | Apache-2.0
+kotlin-stdlib-jdk7 | 1.9.23 | Apache-2.0
+kotlin-stdlib-jdk8 | 1.9.23 | Apache-2.0
+lettuce-core | 6.3.2.RELEASE | Apache-2.0
+listenablefuture | 9999.0-empty-to-avoid-conflict-with-guava | Apache-2.0
+log4j-api | 2.21.1 | Apache-2.0
+log4j-to-slf4j | 2.21.1 | Apache-2.0
+logback-classic | 1.4.14 | EPL-1.0 OR LGPL-2.1
+logback-core | 1.4.14 | EPL-1.0 OR LGPL-2.1
+logging-interceptor | 2.7.5 | Apache-2.0
+micrometer-commons | 1.12.5 | Apache-2.0
+micrometer-observation | 1.12.5 | Apache-2.0
+minio | 8.5.7 | Apache-2.0
+mxparser | 1.2.2 | Apache-2.0
+mybatis | 3.5.16 | Apache-2.0
+mybatis-plus | 3.5.7 | Apache-2.0
+mybatis-plus-annotation | 3.5.7 | Apache-2.0
+mybatis-plus-core | 3.5.7 | Apache-2.0
+mybatis-plus-extension | 3.5.7 | Apache-2.0
+mybatis-plus-spring-boot-autoconfigure | 3.5.7 | Apache-2.0
+mybatis-plus-spring-boot3-starter | 3.5.7 | Apache-2.0
+mybatis-spring | 3.0.3 | Apache-2.0
+mysql-connector-j | 8.3.0 | GPL-2.0 + Universal FOSS Exception 1.0
+netty-buffer | 4.1.109.Final | Apache-2.0
+netty-codec | 4.1.109.Final | Apache-2.0
+netty-common | 4.1.109.Final | Apache-2.0
+netty-handler | 4.1.109.Final | Apache-2.0
+netty-resolver | 4.1.109.Final | Apache-2.0
+netty-transport | 4.1.109.Final | Apache-2.0
+netty-transport-native-unix-common | 4.1.109.Final | Apache-2.0
+okhttp | 2.7.5 | Apache-2.0
+okhttp | 4.12.0 | Apache-2.0
+okio | 3.6.0 | Apache-2.0
+okio-jvm | 3.6.0 | Apache-2.0
+opentracing-api | 0.33.0 | Apache-2.0
+opentracing-noop | 0.33.0 | Apache-2.0
+opentracing-util | 0.33.0 | Apache-2.0
+qiniu-java-sdk | 7.15.0 | MIT
+reactive-streams | 1.0.4 | Apache-2.0
+reactor-core | 3.6.5 | Apache-2.0
+simple-xml-safe | 2.7.1 | Apache-2.0
+slf4j-api | 2.0.13 | MIT
+snakeyaml | 2.2 | Apache-2.0
+snappy-java | 1.1.10.5 | Apache-2.0
+spring-aop | 6.1.6 | Apache-2.0
+spring-beans | 6.1.6 | Apache-2.0
+spring-boot | 3.2.5 | Apache-2.0
+spring-boot-autoconfigure | 3.2.5 | Apache-2.0
+spring-boot-jarmode-layertools | 3.2.5 | Apache-2.0
+spring-context | 6.1.6 | Apache-2.0
+spring-context-support | 6.1.6 | Apache-2.0
+spring-core | 6.1.6 | Apache-2.0
+spring-data-commons | 3.2.5 | Apache-2.0
+spring-data-keyvalue | 3.2.5 | Apache-2.0
+spring-data-redis | 3.2.5 | Apache-2.0
+spring-expression | 6.1.6 | Apache-2.0
+spring-jcl | 6.1.6 | Apache-2.0
+spring-jdbc | 6.1.6 | Apache-2.0
+spring-oxm | 6.1.6 | Apache-2.0
+spring-security-config | 6.2.4 | Apache-2.0
+spring-security-core | 6.2.4 | Apache-2.0
+spring-security-crypto | 6.2.4 | Apache-2.0
+spring-security-web | 6.2.4 | Apache-2.0
+spring-tx | 6.1.6 | Apache-2.0
+spring-web | 6.1.6 | Apache-2.0
+spring-webmvc | 6.1.6 | Apache-2.0
+tencentcloud-sdk-java-common | 3.1.213 | Apache-2.0
+tencentcloud-sdk-java-kms | 3.1.213 | Apache-2.0
+tomcat-embed-core | 10.1.20 | Apache-2.0
+tomcat-embed-el | 10.1.20 | Apache-2.0
+tomcat-embed-websocket | 10.1.20 | Apache-2.0
+xmlpull | 1.1.3.1 | BSD 类（近似 BSD-3-Clause）
+xstream | 1.4.20 | BSD-3-Clause
+
+================================================================
+二、用户端前端（web-user，含传递依赖）（221 个包）
+================================================================
+组件 | 版本 | 许可证
+--- | --- | ---
+@babel/helper-string-parser | 7.29.7 | MIT
+@babel/helper-validator-identifier | 7.29.7 | MIT
+@babel/parser | 7.29.9 | MIT
+@babel/types | 7.29.8 | MIT
+@esbuild/aix-ppc64 | 0.21.5 | MIT
+@esbuild/android-arm | 0.21.5 | MIT
+@esbuild/android-arm64 | 0.21.5 | MIT
+@esbuild/android-x64 | 0.21.5 | MIT
+@esbuild/darwin-arm64 | 0.21.5 | MIT
+@esbuild/darwin-x64 | 0.21.5 | MIT
+@esbuild/freebsd-arm64 | 0.21.5 | MIT
+@esbuild/freebsd-x64 | 0.21.5 | MIT
+@esbuild/linux-arm | 0.21.5 | MIT
+@esbuild/linux-arm64 | 0.21.5 | MIT
+@esbuild/linux-ia32 | 0.21.5 | MIT
+@esbuild/linux-loong64 | 0.21.5 | MIT
+@esbuild/linux-mips64el | 0.21.5 | MIT
+@esbuild/linux-ppc64 | 0.21.5 | MIT
+@esbuild/linux-riscv64 | 0.21.5 | MIT
+@esbuild/linux-s390x | 0.21.5 | MIT
+@esbuild/linux-x64 | 0.21.5 | MIT
+@esbuild/netbsd-x64 | 0.21.5 | MIT
+@esbuild/openbsd-x64 | 0.21.5 | MIT
+@esbuild/sunos-x64 | 0.21.5 | MIT
+@esbuild/win32-arm64 | 0.21.5 | MIT
+@esbuild/win32-ia32 | 0.21.5 | MIT
+@esbuild/win32-x64 | 0.21.5 | MIT
+@jridgewell/sourcemap-codec | 1.6.0 | MIT
+@napi-rs/lzma-linux-x64-gnu | 1.5.1 | MIT
+@pdf-lib/standard-fonts | 1.0.0 | MIT
+@pdf-lib/upng | 1.0.1 | MIT
+@rollup/rollup-android-arm-eabi | 4.63.5 | MIT
+@rollup/rollup-android-arm64 | 4.63.5 | MIT
+@rollup/rollup-darwin-arm64 | 4.63.5 | MIT
+@rollup/rollup-darwin-x64 | 4.63.5 | MIT
+@rollup/rollup-freebsd-arm64 | 4.63.5 | MIT
+@rollup/rollup-freebsd-x64 | 4.63.5 | MIT
+@rollup/rollup-linux-arm-gnueabihf | 4.63.5 | MIT
+@rollup/rollup-linux-arm-musleabihf | 4.63.5 | MIT
+@rollup/rollup-linux-arm64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-arm64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-loong64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-loong64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-ppc64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-ppc64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-riscv64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-riscv64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-s390x-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-x64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-x64-musl | 4.63.5 | MIT
+@rollup/rollup-openbsd-x64 | 4.63.5 | MIT
+@rollup/rollup-openharmony-arm64 | 4.63.5 | MIT
+@rollup/rollup-win32-arm64-msvc | 4.63.5 | MIT
+@rollup/rollup-win32-ia32-msvc | 4.63.5 | MIT
+@rollup/rollup-win32-x64-gnu | 4.63.5 | MIT
+@rollup/rollup-win32-x64-msvc | 4.63.5 | MIT
+@svgdotjs/svg.js | 3.2.0 | MIT
+@types/debug | 4.1.13 | MIT
+@types/estree | 1.0.9 | MIT
+@types/mdast | 3.0.15 | MIT
+@types/ms | 2.1.0 | MIT
+@types/unist | 2.0.11 | MIT
+@vitejs/plugin-vue | 5.2.4 | MIT
+@vue/compiler-core | 3.5.43 | MIT
+@vue/compiler-dom | 3.5.43 | MIT
+@vue/compiler-sfc | 3.5.43 | MIT
+@vue/compiler-ssr | 3.5.43 | MIT
+@vue/devtools-api | 6.6.4 | MIT
+@vue/reactivity | 3.5.43 | MIT
+@vue/runtime-core | 3.5.43 | MIT
+@vue/runtime-dom | 3.5.43 | MIT
+@vue/server-renderer | 3.5.43 | MIT
+@vue/shared | 3.5.43 | MIT
+acorn | 6.4.2 | MIT
+acorn-loose | 6.1.0 | MIT
+acorn-walk | 6.2.0 | MIT
+agent-base | 6.0.2 | MIT
+asynckit | 0.4.0 | MIT
+axios | 1.20.0 | MIT
+balanced-match | 1.0.2 | MIT
+base64-js | 1.5.1 | MIT
+brace-expansion | 1.1.21 | MIT
+buffer | 6.0.3 | MIT
+call-bind-apply-helpers | 1.0.2 | MIT
+character-entities | 2.0.2 | MIT
+codemirror | 5.65.16 | MIT
+combined-stream | 1.0.8 | MIT
+commander | 15.0.0 | MIT
+commander | 8.3.0 | MIT
+concat-map | 0.0.1 | MIT
+core-util-is | 1.0.3 | MIT
+csstype | 3.2.3 | MIT
+debug | 4.4.3 | MIT
+decode-named-character-reference | 1.3.0 | MIT
+deepmerge | 1.5.2 | MIT
+delayed-stream | 1.0.0 | MIT
+dequal | 2.0.3 | MIT
+diff | 5.2.2 | BSD-3-Clause
+dunder-proto | 1.0.1 | MIT
+enhanced-resolve | 2.3.0 | UNKNOWN
+entities | 7.0.1 | BSD-2-Clause
+err-code | 3.0.1 | MIT
+errno | 0.1.8 | MIT
+es-define-property | 1.0.1 | MIT
+es-errors | 1.3.0 | MIT
+es-object-atoms | 1.1.2 | MIT
+es-set-tostringtag | 2.1.0 | MIT
+esbuild | 0.21.5 | MIT
+estree-walker | 2.0.2 | MIT
+eventemitter3 | 4.0.7 | MIT
+eventemitter3 | 5.0.4 | MIT
+fast-diff | 1.3.0 | Apache-2.0
+follow-redirects | 1.16.0 | MIT
+form-data | 4.0.6 | MIT
+fs.realpath | 1.0.0 | ISC
+fsevents | 2.3.3 | MIT
+function-bind | 1.1.2 | MIT
+get-browser-rtc | 1.1.0 | MIT
+get-intrinsic | 1.3.0 | MIT
+get-proto | 1.0.1 | MIT
+glob | 7.2.3 | ISC
+gopd | 1.2.0 | MIT
+graceful-fs | 4.2.11 | ISC
+has-symbols | 1.1.0 | MIT
+has-tostringtag | 1.0.2 | MIT
+hasown | 2.0.4 | MIT
+https-proxy-agent | 5.0.1 | MIT
+ieee754 | 1.2.1 | BSD-3-Clause
+immediate | 3.0.6 | MIT
+inflight | 1.0.6 | ISC
+inherits | 2.0.4 | ISC
+isarray | 1.0.0 | MIT
+isomorphic.js | 0.2.5 | MIT
+jszip | 3.10.2 | (MIT OR GPL-3.0-or-later)
+katex | 0.18.9 | MIT
+katex | 0.16.47 | MIT
+kleur | 4.1.5 | MIT
+lib0 | 0.2.118 | MIT
+lie | 3.3.0 | MIT
+lodash-es | 4.18.1 | MIT
+lodash.clonedeep | 4.5.0 | MIT
+lodash.isequal | 4.5.0 | MIT
+magic-string | 0.30.21 | MIT
+math-intrinsics | 1.1.0 | MIT
+mathjax | 3.2.2 | Apache-2.0
+mdast-util-from-markdown | 1.3.1 | MIT
+mdast-util-to-string | 3.2.0 | MIT
+memory-fs | 0.3.0 | MIT
+micromark | 3.2.0 | MIT
+micromark-core-commonmark | 1.1.0 | MIT
+micromark-factory-destination | 1.1.0 | MIT
+micromark-factory-label | 1.1.0 | MIT
+micromark-factory-space | 1.1.0 | MIT
+micromark-factory-title | 1.1.0 | MIT
+micromark-factory-whitespace | 1.1.0 | MIT
+micromark-util-character | 1.2.0 | MIT
+micromark-util-chunked | 1.1.0 | MIT
+micromark-util-classify-character | 1.1.0 | MIT
+micromark-util-combine-extensions | 1.1.0 | MIT
+micromark-util-decode-numeric-character-reference | 1.1.0 | MIT
+micromark-util-decode-string | 1.1.0 | MIT
+micromark-util-encode | 1.1.0 | MIT
+micromark-util-html-tag-name | 1.2.0 | MIT
+micromark-util-normalize-identifier | 1.1.0 | MIT
+micromark-util-resolve-all | 1.1.0 | MIT
+micromark-util-sanitize-uri | 1.2.0 | MIT
+micromark-util-subtokenize | 1.1.0 | MIT
+micromark-util-symbol | 1.1.0 | MIT
+micromark-util-types | 1.1.0 | MIT
+mime-db | 1.52.0 | MIT
+mime-types | 2.1.35 | MIT
+minimatch | 3.1.5 | ISC
+mri | 1.2.0 | MIT
+ms | 2.1.3 | MIT
+nanoid | 3.3.19 | MIT
+object-assign | 4.1.1 | MIT
+once | 1.4.0 | ISC
+pako | 1.0.11 | (MIT AND Zlib)
+parchment | 3.0.0 | BSD-3-Clause
+path-is-absolute | 1.0.1 | MIT
+pdf-lib | 1.17.1 | MIT
+picocolors | 1.1.1 | ISC
+pinia | 2.3.1 | MIT
+postcss | 8.5.28 | MIT
+process-nextick-args | 2.0.1 | MIT
+proxy-from-env | 2.1.0 | MIT
+prr | 1.0.1 | MIT
+queue-microtask | 1.2.3 | MIT
+quill | 2.0.3 | BSD-3-Clause
+quill-delta | 5.1.0 | MIT
+randombytes | 2.1.0 | MIT
+readable-stream | 2.3.8 | MIT
+readable-stream | 3.6.2 | MIT
+resolve-from | 2.0.0 | MIT
+rollup | 4.63.5 | MIT
+sade | 1.8.1 | MIT
+safe-buffer | 5.1.2 | MIT
+sax | 1.6.1 | BlueOak-1.0.0
+setimmediate | 1.0.5 | MIT
+simple-mind-map | 0.14.0-fix.3 | MIT
+simple-peer | 9.11.1 | MIT
+source-map-js | 1.2.1 | BSD-3-Clause
+string_decoder | 1.1.1 | MIT
+tapable | 0.2.9 | MIT
+tern | 0.24.3 | MIT
+tslib | 1.14.1 | 0BSD
+unist-util-stringify-position | 3.0.3 | MIT
+util-deprecate | 1.0.2 | MIT
+uuid | 9.0.1 | MIT
+uvu | 0.5.6 | MIT
+vite | 5.4.21 | MIT
+vue | 3.5.43 | MIT
+vue-demi | 0.14.10 | MIT
+vue-router | 4.6.4 | MIT
+wrappy | 1.0.2 | ISC
+ws | 7.5.13 | MIT
+ws | 8.21.3 | MIT
+xml-js | 1.6.11 | MIT
+y-protocols | 1.0.7 | MIT
+y-webrtc | 10.3.0 | MIT
+yjs | 13.6.33 | MIT
+
+================================================================
+三、管理后台前端（web-admin，含传递依赖）（136 个包）
+================================================================
+组件 | 版本 | 许可证
+--- | --- | ---
+@babel/helper-string-parser | 7.29.7 | MIT
+@babel/helper-validator-identifier | 7.29.7 | MIT
+@babel/parser | 7.29.9 | MIT
+@babel/types | 7.29.8 | MIT
+@ctrl/tinycolor | 4.2.1 | MIT
+@element-plus/icons-vue | 2.3.2 | MIT
+@esbuild/aix-ppc64 | 0.25.12 | MIT
+@esbuild/android-arm | 0.25.12 | MIT
+@esbuild/android-arm64 | 0.25.12 | MIT
+@esbuild/android-x64 | 0.25.12 | MIT
+@esbuild/darwin-arm64 | 0.25.12 | MIT
+@esbuild/darwin-x64 | 0.25.12 | MIT
+@esbuild/freebsd-arm64 | 0.25.12 | MIT
+@esbuild/freebsd-x64 | 0.25.12 | MIT
+@esbuild/linux-arm | 0.25.12 | MIT
+@esbuild/linux-arm64 | 0.25.12 | MIT
+@esbuild/linux-ia32 | 0.25.12 | MIT
+@esbuild/linux-loong64 | 0.25.12 | MIT
+@esbuild/linux-mips64el | 0.25.12 | MIT
+@esbuild/linux-ppc64 | 0.25.12 | MIT
+@esbuild/linux-riscv64 | 0.25.12 | MIT
+@esbuild/linux-s390x | 0.25.12 | MIT
+@esbuild/linux-x64 | 0.25.12 | MIT
+@esbuild/netbsd-arm64 | 0.25.12 | MIT
+@esbuild/netbsd-x64 | 0.25.12 | MIT
+@esbuild/openbsd-arm64 | 0.25.12 | MIT
+@esbuild/openbsd-x64 | 0.25.12 | MIT
+@esbuild/openharmony-arm64 | 0.25.12 | MIT
+@esbuild/sunos-x64 | 0.25.12 | MIT
+@esbuild/win32-arm64 | 0.25.12 | MIT
+@esbuild/win32-ia32 | 0.25.12 | MIT
+@esbuild/win32-x64 | 0.25.12 | MIT
+@floating-ui/core | 1.8.0 | MIT
+@floating-ui/dom | 1.8.0 | MIT
+@floating-ui/utils | 0.2.12 | MIT
+@jridgewell/sourcemap-codec | 1.6.0 | MIT
+@napi-rs/lzma-linux-x64-gnu | 1.5.1 | MIT
+@popperjs/core | 2.11.8 | MIT
+@rollup/rollup-android-arm-eabi | 4.63.5 | MIT
+@rollup/rollup-android-arm64 | 4.63.5 | MIT
+@rollup/rollup-darwin-arm64 | 4.63.5 | MIT
+@rollup/rollup-darwin-x64 | 4.63.5 | MIT
+@rollup/rollup-freebsd-arm64 | 4.63.5 | MIT
+@rollup/rollup-freebsd-x64 | 4.63.5 | MIT
+@rollup/rollup-linux-arm-gnueabihf | 4.63.5 | MIT
+@rollup/rollup-linux-arm-musleabihf | 4.63.5 | MIT
+@rollup/rollup-linux-arm64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-arm64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-loong64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-loong64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-ppc64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-ppc64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-riscv64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-riscv64-musl | 4.63.5 | MIT
+@rollup/rollup-linux-s390x-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-x64-gnu | 4.63.5 | MIT
+@rollup/rollup-linux-x64-musl | 4.63.5 | MIT
+@rollup/rollup-openbsd-x64 | 4.63.5 | MIT
+@rollup/rollup-openharmony-arm64 | 4.63.5 | MIT
+@rollup/rollup-win32-arm64-msvc | 4.63.5 | MIT
+@rollup/rollup-win32-ia32-msvc | 4.63.5 | MIT
+@rollup/rollup-win32-x64-gnu | 4.63.5 | MIT
+@rollup/rollup-win32-x64-msvc | 4.63.5 | MIT
+@types/estree | 1.0.9 | MIT
+@types/lodash | 4.17.25 | MIT
+@types/lodash-es | 4.17.12 | MIT
+@types/web-bluetooth | 0.0.21 | MIT
+@vitejs/plugin-vue | 5.2.4 | MIT
+@vue/compiler-core | 3.5.43 | MIT
+@vue/compiler-dom | 3.5.43 | MIT
+@vue/compiler-sfc | 3.5.43 | MIT
+@vue/compiler-ssr | 3.5.43 | MIT
+@vue/devtools-api | 6.6.4 | MIT
+@vue/reactivity | 3.5.43 | MIT
+@vue/runtime-core | 3.5.43 | MIT
+@vue/runtime-dom | 3.5.43 | MIT
+@vue/server-renderer | 3.5.43 | MIT
+@vue/shared | 3.5.43 | MIT
+@vueuse/core | 15.0.0 | MIT
+@vueuse/metadata | 15.0.0 | MIT
+@vueuse/shared | 15.0.0 | MIT
+agent-base | 6.0.2 | MIT
+async-validator | 4.2.5 | MIT
+asynckit | 0.4.0 | MIT
+axios | 1.20.0 | MIT
+call-bind-apply-helpers | 1.0.2 | MIT
+combined-stream | 1.0.8 | MIT
+csstype | 3.2.3 | MIT
+dayjs | 1.11.23 | MIT
+debug | 4.4.3 | MIT
+delayed-stream | 1.0.0 | MIT
+dunder-proto | 1.0.1 | MIT
+element-plus | 2.14.6 | MIT
+entities | 7.0.1 | BSD-2-Clause
+es-define-property | 1.0.1 | MIT
+es-errors | 1.3.0 | MIT
+es-object-atoms | 1.1.2 | MIT
+es-set-tostringtag | 2.1.0 | MIT
+esbuild | 0.25.12 | MIT
+estree-walker | 2.0.2 | MIT
+fdir | 6.5.0 | MIT
+follow-redirects | 1.16.0 | MIT
+form-data | 4.0.6 | MIT
+fsevents | 2.3.3 | MIT
+function-bind | 1.1.2 | MIT
+get-intrinsic | 1.3.0 | MIT
+get-proto | 1.0.1 | MIT
+gopd | 1.2.0 | MIT
+has-symbols | 1.1.0 | MIT
+has-tostringtag | 1.0.2 | MIT
+hasown | 2.0.4 | MIT
+https-proxy-agent | 5.0.1 | MIT
+lodash | 4.18.1 | MIT
+lodash-es | 4.18.1 | MIT
+lodash-unified | 1.0.3 | MIT
+magic-string | 0.30.21 | MIT
+math-intrinsics | 1.1.0 | MIT
+memoize-one | 6.0.0 | MIT
+mime-db | 1.52.0 | MIT
+mime-types | 2.1.35 | MIT
+ms | 2.1.3 | MIT
+nanoid | 3.3.19 | MIT
+normalize-wheel-es | 1.2.0 | BSD-3-Clause
+picocolors | 1.1.1 | ISC
+picomatch | 4.0.7 | MIT
+pinia | 2.3.1 | MIT
+postcss | 8.5.28 | MIT
+proxy-from-env | 2.1.0 | MIT
+rollup | 4.63.5 | MIT
+source-map-js | 1.2.1 | BSD-3-Clause
+tinyglobby | 0.2.17 | MIT
+vite | 6.4.3 | MIT
+vue | 3.5.43 | MIT
+vue-component-type-helpers | 3.3.11 | MIT
+vue-demi | 0.14.10 | MIT
+vue-router | 4.6.4 | MIT
+
+================================================================
+四、基础设施（便携版内置运行时）
+================================================================
+组件 | 版本 | 许可证
+--- | --- | ---
+OpenJDK 17（jlink runtime） | 17.0.2 | GPL-2.0 WITH Classpath Exception
+MySQL Community Server | 8.x | GPL-2.0（独立进程，见 LICENSE-COMPLIANCE.md 第六节）
+Redis | 7.x | RSALv2 + SSPLv1（非 OSI 开源许可，禁止对外提供托管服务）
+nginx | 1.2x | BSD-2-Clause
+
+================================================================
+五、许可与链接
+================================================================
+Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
+MIT: https://opensource.org/licenses/MIT
+BSD-2-Clause: https://opensource.org/licenses/BSD-2-Clause
+BSD-3-Clause: https://opensource.org/licenses/BSD-3-Clause
+ISC: https://opensource.org/licenses/ISC
+EPL-1.0: https://www.eclipse.org/legal/epl-v10.html
+EPL-2.0: https://www.eclipse.org/legal/epl-2.0/
+LGPL-2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+CDDL-1.1: https://opensource.org/licenses/CDDL-1.1
+GPL-2.0: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+Bouncy Castle Licence: https://www.bouncycastle.org/licence.html
+0BSD: https://opensource.org/licenses/0BSD
+BlueOak-1.0.0: https://blueoakcouncil.org/license/1.0.0
+RSALv2: https://redis.io/legal/rsalv2/ ｜ SSPLv1: https://www.mongodb.com/licensing/server-side-public-license
