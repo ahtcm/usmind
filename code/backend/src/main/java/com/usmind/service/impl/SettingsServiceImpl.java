@@ -71,6 +71,8 @@ public class SettingsServiceImpl implements SettingsService {
         putDefaultIfAbsent("aiApiKey", "");
         putDefaultIfAbsent("aiModel", "gpt-3.5-turbo");
         putDefaultIfAbsent("aiEndpoint", "");
+        // 附件节点文件名默认文字色（后台主题/项目配置可改）
+        putDefaultIfAbsent("attachTextColor", "#e53935");
     }
 
     private void putDefaultIfAbsent(String key, String value) {
@@ -128,6 +130,7 @@ public class SettingsServiceImpl implements SettingsService {
         m.put("aiApiKey", mask(aiKey));
         m.put("aiModel", get("aiModel", ""));
         m.put("aiEndpoint", get("aiEndpoint", ""));
+        m.put("attachTextColor", get("attachTextColor", "#e53935"));
         return m;
     }
 
@@ -165,6 +168,9 @@ public class SettingsServiceImpl implements SettingsService {
         }
         if (body.containsKey("aiEndpoint") && body.get("aiEndpoint") != null) {
             set("aiEndpoint", String.valueOf(body.get("aiEndpoint")));
+        }
+        if (body.containsKey("attachTextColor") && body.get("attachTextColor") != null) {
+            set("attachTextColor", String.valueOf(body.get("attachTextColor")));
         }
     }
 

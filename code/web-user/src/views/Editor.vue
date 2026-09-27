@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="editor-root">
     <!-- 顶部工具栏 -->
     <div id="toolbar" class="toolbar">
@@ -105,7 +105,7 @@
         </div>
         <button class="ai-close" @click="stylePanelHidden = true">×</button>
       </div>
-      <div class="sp-body">
+      <div class="sp-body" ref="spBodyRef" @scroll.passive="onIconScroll">
         <!-- 样式页 -->
         <div v-show="activeTab === 'style'">
           <div class="sp-section">节点</div>
@@ -170,9 +170,11 @@
             <div class="sp-section sp-fold-head" :class="{ open: iconOpen[grp.category] }" @click="toggleIconGroup(grp.category)">
               <span class="sp-fold-arrow">{{ iconOpen[grp.category] ? '▾' : '▸' }}</span>
               <span>{{ grp.category }}</span>
+              <span v-if="iconOpen[grp.category] && grp.emojis.length > ICON_STEP" class="sp-fold-count">{{ iconShown(grp) }}/{{ grp.emojis.length }}</span>
             </div>
             <div v-show="iconOpen[grp.category]" class="icon-grid">
-              <button v-for="e in grp.emojis" :key="e" @click="insertEmoji(e)" :title="e">{{ e }}</button>
+              <button v-for="e in grp.emojis.slice(0, iconShown(grp))" :key="e" @click="insertEmoji(e)" :title="e">{{ e }}</button>
+              <button v-if="iconShown(grp) < grp.emojis.length" class="sp-load-more" @click="loadMoreIcons(grp.category)">加载更多…</button>
             </div>
           </template>
           <div class="sp-section">标记</div>
@@ -348,11 +350,39 @@ const FALLBACK_EMOJI = ['😀','😄','😂','😍','🤔','😎','🤩','😭',
 const emojiGroups = ref([{ category: '表情包', emojis: FALLBACK_EMOJI }])
 // emoji 分类折叠状态（默认收起，点击分类名展开）
 const iconOpen = reactive({})
-function toggleIconGroup(cat) { iconOpen[cat] = !iconOpen[cat] }
+// 懒加载：每分类分批发渲染，滚动到底/点击"加载更多"再追加（避免一次渲染上千 emoji）
+const ICON_STEP = 40
+const iconVisible = reactive({})
+function iconShown(grp) {
+  const total = (grp && Array.isArray(grp.emojis)) ? grp.emojis.length : 0
+  return Math.min(iconVisible[grp.category] || ICON_STEP, total)
+}
+function toggleIconGroup(cat) {
+  iconOpen[cat] = !iconOpen[cat]
+  if (iconOpen[cat] && !iconVisible[cat]) iconVisible[cat] = ICON_STEP
+}
+function loadMoreIcons(cat) {
+  iconVisible[cat] = (iconVisible[cat] || ICON_STEP) + ICON_STEP
+}
+function onIconScroll() {
+  const el = spBodyRef.value
+  if (!el) return
+  // 距底不足 400 时，为所有展开分类追加一批（滚动接近底部持续加载）
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 400) {
+    emojiGroups.value.forEach(g => {
+      if (iconOpen[g.category] && iconShown(g) < g.emojis.length) {
+        iconVisible[g.category] = (iconVisible[g.category] || ICON_STEP) + ICON_STEP
+      }
+    })
+  }
+}
 const allIconOpen = computed(() => emojiGroups.value.length > 0 && emojiGroups.value.every(g => iconOpen[g.category]))
 function toggleAllIcons() {
   const allOpen = allIconOpen.value
-  emojiGroups.value.forEach(g => { iconOpen[g.category] = !allOpen })
+  emojiGroups.value.forEach(g => {
+    iconOpen[g.category] = !allOpen
+    if (iconOpen[g.category] && !iconVisible[g.category]) iconVisible[g.category] = ICON_STEP
+  })
 }
 
 const LAYOUT_MAP = {
@@ -365,11 +395,13 @@ Object.keys(LAYOUT_MAP).forEach((k) => { LAYOUT_REV[LAYOUT_MAP[k]] = k })
 
 const mapEl = ref(null)
 const canvasBarEl = ref(null)
+const spBodyRef = ref(null)
 const mind = ref(null)
 // 预览/高亮类型配置：后台 sys_config 可配，内置默认兜底（离线也可用）
 const CODE_MODE_DEFAULT = { js:'text/javascript', mjs:'text/javascript', cjs:'text/javascript', ts:'text/javascript', jsx:'text/javascript', tsx:'text/javascript', json:'application/json', map:'application/json', html:'text/html', htm:'text/html', vue:'text/html', xml:'application/xml', svg:'application/xml', css:'text/css', scss:'text/x-scss', less:'text/x-less', md:'text/x-markdown', markdown:'text/x-markdown', py:'text/x-python', python:'text/x-python', java:'text/x-java', kt:'text/x-kotlin', c:'text/x-csrc', h:'text/x-csrc', cpp:'text/x-c++src', cc:'text/x-c++src', cxx:'text/x-c++src', hpp:'text/x-c++src', hh:'text/x-c++src', cs:'text/x-csharp', go:'text/x-go', rs:'text/x-rust', php:'text/x-php', sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh', sql:'text/x-sql', rb:'text/x-ruby', yml:'text/x-yaml', yaml:'text/x-yaml', swift:'text/x-swift' }
 const TEXT_EXT_DEFAULT = ['txt','log','ini','conf','cfg','csv','env','properties','tsv','gitignore','dockerfile','sass','plist']
 const previewModes = ref({ ...CODE_MODE_DEFAULT })
+const attachTextColor = ref('#e53935')
 const textPreviewExts = ref([...TEXT_EXT_DEFAULT])
 const mindMapId = ref(route.params.id || null)
 
@@ -663,8 +695,55 @@ function bindMindEvents() {
       }
     }
   }
+  // 删除键兼容兜底：部分 Chromium 变体（Edge / 微信内置浏览器）在节点编辑框里
+  // Backspace/Delete 点击没反应（浏览器未执行删除）。这里在 keydown 后检查内容，
+  // 若浏览器未删除则手动删除光标位置字符；Chrome 等正常处理时内容已变，兜底自动跳过，不影响。
+  const onEditKeydownCompat = (e) => {
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return
+    const w = e.target
+    if (!w || !w.classList || !w.classList.contains('smm-node-edit-wrap')) return
+    const before = w.innerText || ''
+    setTimeout(() => {
+      if (!document.body.contains(w)) return
+      if ((w.innerText || '') !== before) return
+      try {
+        const sel = window.getSelection()
+        if (!sel || !sel.rangeCount) return
+        const r = sel.getRangeAt(0)
+        if (!r.collapsed) {
+          r.deleteContents()
+          w.dispatchEvent(new Event('input', { bubbles: true }))
+          return
+        }
+        const el = r.startContainer
+        if (el.nodeType !== 3) return
+        const txt = el.textContent || ''
+        let off = r.startOffset
+        if (e.key === 'Backspace') {
+          if (off <= 0) return
+          off--
+          if (off > 0) {
+            const c = txt.charCodeAt(off)
+            if (c >= 0xDC00 && c <= 0xDFFF) off--
+          }
+          r.setStart(el, off)
+        } else {
+          if (off >= txt.length) return
+          let end = off + 1
+          if (end < txt.length) {
+            const c = txt.charCodeAt(end)
+            if (c >= 0xDC00 && c <= 0xDFFF) end++
+          }
+          r.setEnd(el, end)
+        }
+        r.deleteContents()
+        w.dispatchEvent(new Event('input', { bubbles: true }))
+      } catch (err) {}
+    }, 0)
+  }
   document.addEventListener('keydown', onCtrlEnterKeydown, true)
-  onBeforeUnmount(() => { document.removeEventListener('keydown', onCtrlEnterKeydown, true); window.removeEventListener('resize', updateCanvasBgSize) })
+  document.addEventListener('keydown', onEditKeydownCompat, true)
+  onBeforeUnmount(() => { document.removeEventListener('keydown', onCtrlEnterKeydown, true); document.removeEventListener('keydown', onEditKeydownCompat, true); document.removeEventListener('keydown', onNodeShortcutKeydown, true); window.removeEventListener('resize', updateCanvasBgSize) })
   onBeforeUnmount(() => { document.removeEventListener('mousemove', sbMove); document.removeEventListener('mouseup', sbUp); document.removeEventListener('touchmove', sbMove); document.removeEventListener('touchend', sbUp); document.removeEventListener('mousemove', rootPanMove); document.removeEventListener('mouseup', rootPanEnd); if (mapEl.value) { mapEl.value.removeEventListener('touchstart', onMapTouchStart); mapEl.value.removeEventListener('touchmove', onMapTouchMove); mapEl.value.removeEventListener('touchend', onMapTouchEnd); mapEl.value.removeEventListener('touchcancel', onMapTouchEnd) } })
 
   // KaTeX 字体异步加载：字体就绪后重渲染，修复公式行高按 fallback 字体测量导致的塌陷
@@ -674,16 +753,32 @@ function bindMindEvents() {
     })
   }
 
-  // 双击：附件节点 → 打开附件编辑与浏览（统一双击规则）；公式节点 → 公式编辑弹窗
+  // 双击：图片节点 → 全屏浏览图片；附件节点 → 打开附件编辑与浏览（统一双击规则）；公式节点 → 公式编辑弹窗
   mind.value.on('node_dblclick', (node, e) => {
     try {
       if (node.getData('attachmentUrl')) {
         try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
+        const nm = node.getData('attachmentName') || ''
+        const ex = (nm.match(/\.([a-zA-Z0-9]+)$/) || [,''])[1].toLowerCase()
+        const isImg = ['png','jpg','jpeg','gif','webp','bmp','ico','avif','svg'].includes(ex)
+        if (isImg) { openImageLightbox(node.getData('attachmentUrl'), nm); return }
         openAttachmentPreview(node)
         return
       }
       const text = node.getData('text') || ''
       const rich = node.getData('richText') === true
+      // 图片节点：内容只有一个 <img>（允许 div 包裹、无其它文字）→ 全屏浏览
+      if (rich) {
+        const tmp = document.createElement('div')
+        tmp.innerHTML = text
+        const imgs = tmp.querySelectorAll('img')
+        const txt = (tmp.textContent || '').trim()
+        if (imgs.length === 1 && !txt) {
+          try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
+          openImageLightbox(imgs[0].src || imgs[0].getAttribute('src'), '')
+          return
+        }
+      }
       if (rich && (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0)) {
         try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
         openMathEdit(node)
@@ -1106,13 +1201,38 @@ function onMapMouseDown(e) {
   document.addEventListener('mouseup', rootPanEnd)
 }
 let touchPan = null
+let pinch = null
 function onMapTouchStart(e) {
+  if (e.touches.length >= 2) {
+    // 双指：开始捏合缩放（只缩放脑图画布，不缩放背景/工具条）
+    if (!mind.value) return
+    const t1 = e.touches[0], t2 = e.touches[1]
+    pinch = { dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY), scale: mind.value.view.scale }
+    touchPan = null
+    return
+  }
   if (e.touches.length !== 1) return
   const t = e.target
   if (t && t.closest && (t.closest('.sb-h') || t.closest('.sb-v') || t.closest('.toolbar') || t.closest('.style-panel') || t.closest('.ai-panel') || t.closest('.bar-nav') || t.closest('.view-bar') || t.closest('#ctx-menu') || t.closest('.math-dialog') || t.closest('.rich-dialog') || t.closest('#att-preview'))) return
   touchPan = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, st: getViewState(), moved: false }
 }
 function onMapTouchMove(e) {
+  if (pinch && mind.value && e.touches.length >= 2) {
+    e.preventDefault()
+    e.stopPropagation()
+    const t1 = e.touches[0], t2 = e.touches[1]
+    const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+    let ns = pinch.scale * (dist / pinch.dist)
+    const opt = mind.value.opt || {}
+    const min = (opt.minZoomRatio || 20) / 100
+    const max = opt.maxZoomRatio === -1 ? 5 : ((opt.maxZoomRatio || 300) / 100)
+    ns = Math.max(min, Math.min(max, ns))
+    const rect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    const cx = (t1.clientX + t2.clientX) / 2 - (rect ? rect.left : 0)
+    const cy = (t1.clientY + t2.clientY) / 2 - (rect ? rect.top : 0)
+    try { mind.value.view.setScale(ns, cx, cy) } catch (e2) {}
+    return
+  }
   if (!touchPan || !mind.value) return
   if (e.touches.length !== 1) { touchPan = null; return }
   const t = e.touches[0]
@@ -1124,7 +1244,7 @@ function onMapTouchMove(e) {
     try { setViewPan(touchPan.st.x + dx, touchPan.st.y + dy) } catch (e2) {}
   }
 }
-function onMapTouchEnd() { touchPan = null }
+function onMapTouchEnd() { touchPan = null; pinch = null }
 
 function rootPanMove(e) {
   if (!rootPan || !mind.value) return
@@ -1332,6 +1452,8 @@ function richEditConfirm() {
     richMarks.value.forEach(m => { html = html.split(m.mark).join(m.html) })
     try { mind.value.renderer.setNodeDataRender(node, { text: html, richText: true }) } catch (err) {}
     saveDoc()
+    // 公式/富元素写入后自动重渲染画布，让节点尺寸按实际 SVG 高度重算，避免公式节点塌陷（替代整页刷新）
+    setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 30)
   }
   richEditDialog.value = false
   richMathBar.value = false
@@ -1471,6 +1593,7 @@ function insertMathToNode() {
         mathEditMode.value = false
         mathDialog.value = false
         saveDoc()
+        setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 30)
         return
       }
     }
@@ -1524,6 +1647,8 @@ function insertMathToNode() {
   }
   mathDialog.value = false
   saveDoc()
+  // 公式写入后自动重渲染画布，避免公式节点塌陷（替代整页刷新）
+  setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 30)
 }
 
 async function insertEmoji(e) {
@@ -1634,7 +1759,8 @@ async function insertFileToNode(node, file) {
       mind.value.execCommand('SET_NODE_ATTACHMENT', node, src, file.name || '附件')
       // 附件节点文字替换为文件名+后缀（强制纯文本渲染，框随文字自适应，避免文字飘出框外）
       mind.value.renderer.setNodeDataRender(node, { text: file.name || '附件', richText: false })
-      mind.value.execCommand('SET_NODE_STYLES', node, { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6 })
+      // 附件文件名默认染成红色（用户可再手动改回）
+      mind.value.execCommand('SET_NODE_STYLES', node, { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6, textColor: attachTextColor.value })
     }
     if (node.getData('uid')) manualStyled.add(node.getData('uid'))
     scheduleBranchRainbow()
@@ -1673,13 +1799,13 @@ function ctxAct(act) {
     mind.value.execCommand('SET_NODE_ACTIVE', [node])
     try { mind.value.renderer.textEdit.show({ node }) } catch (err) { mind.value.renderer.startTextEdit() }
   } else if (act === 'copy') {
-    mind.value.execCommand('SET_NODE_ACTIVE', [node])
-    mind.value.renderer.copy()
+    mind.value.execCommand('SET_NODE_ACTIVE', node, true)
+    doCopyNode(node)
   } else if (act === 'cut') {
-    mind.value.execCommand('SET_NODE_ACTIVE', [node])
-    mind.value.execCommand('CUT_NODE')
+    mind.value.execCommand('SET_NODE_ACTIVE', node, true)
+    doCutNode(node)
   } else if (act === 'paste') {
-    mind.value.renderer.paste()
+    doPasteNode(node)
   } else if (act === 'insert-image' || act === 'insert-audio' || act === 'insert-video' || act === 'insert-file') {
     const accept = act === 'insert-image' ? 'image/*' : act === 'insert-audio' ? 'audio/*' : act === 'insert-video' ? 'video/*' : '*/*'
     const inp = document.createElement('input')
@@ -1717,13 +1843,133 @@ function ctxAct(act) {
   } else if (act === 'expand') {
     mind.value.execCommand('SET_NODE_EXPAND', node, true)
   } else if (act === 'del') {
-    mind.value.execCommand('SET_NODE_ACTIVE', [node])
-    mind.value.execCommand('REMOVE_NODE')
+    mind.value.execCommand('SET_NODE_ACTIVE', node, true)
+    doDeleteNode(node)
   }
   hideCtxMenu()
 }
 
+// 节点快捷键：选中节点（非编辑态）时 Ctrl+C/X/V、Delete 实现复制/剪切/粘贴/删除。
+// 在 setup 顶层注册（先于 createMind 里库的 keyCommand 注册），capture 阶段先执行并 stopImmediate，
+// 避免与库自带的 Ctrl+C/X/V、Del 删除快捷键冲突造成双删/双处理。
+const onNodeShortcutKeydown = (e) => {
+  if (textEditActive.value) return
+  const k = e.key
+  const mod = e.ctrlKey || e.metaKey
+  if (mod && (k === 'c' || k === 'C')) {
+    if (getActiveNode()) { e.preventDefault(); e.stopImmediatePropagation(); doCopyNode() }
+  } else if (mod && (k === 'x' || k === 'X')) {
+    if (getActiveNode()) { e.preventDefault(); e.stopImmediatePropagation(); doCutNode() }
+  } else if (mod && (k === 'v' || k === 'V')) {
+    if (nodeClipboard && getActiveNode()) { e.preventDefault(); e.stopImmediatePropagation(); doPasteNode() }
+  } else if (k === 'Delete') {
+    if (getActiveNode()) { e.preventDefault(); e.stopImmediatePropagation(); doDeleteNode() }
+  }
+}
+document.addEventListener('keydown', onNodeShortcutKeydown, true)
+
+// ---- 节点复制/剪切/粘贴/删除（内部剪贴板，菜单与快捷键共用） ----
+let nodeClipboard = null
+onBeforeUnmount(() => { document.removeEventListener('keydown', onNodeShortcutKeydown, true) })
+let nodeClipIsCut = false
+function stripUid(d) {
+  if (!d) return
+  delete d.uid; delete d.isActive
+  if (d && d.data) { delete d.data.uid; delete d.data.isActive }
+  if (d && Array.isArray(d.children)) d.children.forEach(stripUid)
+}
+function getActiveNode() {
+  try {
+    const list = mind.value ? mind.value.renderer.activeNodeList : []
+    return list && list.length ? list[list.length - 1] : null
+  } catch (e) { return null }
+}
+// 只复制节点数据（data + children，跳过内部 _ 字段与 uid/isActive），避免循环引用无法序列化
+function cloneNodeData(d) {
+  const src = d && d.nodeData ? d.nodeData : d
+  if (!src) return { data: {}, children: [] }
+  const data = {}
+  for (const k in (src.data || {})) {
+    if (!k.startsWith('_')) data[k] = src.data[k]
+  }
+  delete data.uid
+  delete data.isActive
+  let dataSafe
+  try { dataSafe = JSON.parse(JSON.stringify(data)) } catch (e) { dataSafe = data }
+  const children = (src.children || []).map(c => cloneNodeData(c))
+  return { data: dataSafe, children }
+}
+function doCopyNode(node) {
+  node = node || getActiveNode()
+  if (!node) { toast('请先选中节点再复制'); return }
+  nodeClipboard = cloneNodeData(node)
+  nodeClipIsCut = false
+  toast('已复制节点')
+}
+function doCutNode(node) {
+  node = node || getActiveNode()
+  if (!node) { toast('请先选中节点再剪切'); return }
+  nodeClipboard = cloneNodeData(node)
+  nodeClipIsCut = true
+  try { mind.value.execCommand('SET_NODE_ACTIVE', node, true) } catch (e) {}
+  try { mind.value.execCommand('REMOVE_NODE', [node]) } catch (e) { console.warn('cut remove err', e) }
+  saveDoc()
+  toast('已剪切节点')
+}
+function doPasteNode(target) {
+  if (!nodeClipboard) { toast('剪贴板为空，请先复制或剪切节点'); return }
+  target = target || getActiveNode()
+  if (!target) { toast('请先选中目标节点再粘贴'); return }
+  try {
+    mind.value.execCommand('INSERT_CHILD_NODE', false, [target], nodeClipboard.data || nodeClipboard, nodeClipboard.children || [])
+  } catch (err) {
+    console.warn(err); toast('粘贴失败')
+  }
+  if (nodeClipIsCut) nodeClipboard = null
+  saveDoc()
+}
+function doDeleteNode(node) {
+  node = node || getActiveNode()
+  if (!node) { toast('请先选中节点再删除'); return }
+  try { mind.value.execCommand('SET_NODE_ACTIVE', node, true) } catch (e) {}
+  try { mind.value.execCommand('REMOVE_NODE', [node]) } catch (e) { console.warn('del remove err', e) }
+  saveDoc()
+}
+
 // 附件预览
+// 全屏浏览图片（lightbox）：双击图片节点进入，点 × 或遮罩或 Esc 返回脑图
+function openImageLightbox(url, name) {
+  if (!url) return
+  let wrap = document.getElementById('img-lightbox')
+  if (wrap) wrap.remove()
+  wrap = document.createElement('div')
+  wrap.id = 'img-lightbox'
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;'
+  wrap.innerHTML = '<div class="imglight-mask"></div><img class="imglight-img" alt=""><button class="imglight-close" title="关闭">×</button><div class="imglight-name"></div>'
+  document.body.appendChild(wrap)
+  const mask = wrap.querySelector('.imglight-mask')
+  mask.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.88)'
+  const img = wrap.querySelector('.imglight-img')
+  img.style.cssText = 'position:relative;max-width:94vw;max-height:92vh;object-fit:contain;border-radius:6px;box-shadow:0 12px 48px rgba(0,0,0,.5);user-select:none'
+  const btn = wrap.querySelector('.imglight-close')
+  btn.style.cssText = 'position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,0.14);color:#fff;font-size:26px;line-height:1;cursor:pointer;z-index:2;transition:background .2s'
+  btn.onmouseenter = () => { btn.style.background = 'rgba(255,255,255,0.3)' }
+  btn.onmouseleave = () => { btn.style.background = 'rgba(255,255,255,0.14)' }
+  const nmEl = wrap.querySelector('.imglight-name')
+  nmEl.style.cssText = 'position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;opacity:0.85;z-index:2;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+  nmEl.textContent = name || ''
+  const freshUrl = url + (url.indexOf('?') > -1 ? '&' : '?') + 'v=' + Date.now()
+  img.src = freshUrl
+  const esc = (ev) => { if (ev.key === 'Escape') close() }
+  function close() {
+    document.removeEventListener('keydown', esc)
+    if (wrap && wrap.parentNode) wrap.remove()
+  }
+  btn.addEventListener('click', close)
+  mask.addEventListener('click', close)
+  document.addEventListener('keydown', esc)
+}
+
 function openAttachmentPreview(nodeOrUrl, nameArg) {
   let url, name
   if (typeof nodeOrUrl === 'string') {
@@ -1757,15 +2003,105 @@ function openAttachmentPreview(nodeOrUrl, nameArg) {
     im.src = freshUrl; im.style.cssText = 'max-width:100%;max-height:62vh;border-radius:10px'
     body.appendChild(im)
   } else if (isPdf) {
-    const ifr = document.createElement('iframe')
-    ifr.src = freshUrl; ifr.style.cssText = 'width:100%;height:62vh;border:0;border-radius:10px;background:#fff'
-    body.appendChild(ifr)
+    // pdf.js 渲染（浏览器内置 viewer 对部分 pdf 打不开，pdf.js 兼容性更稳）
+    body.innerHTML = '<div class="attp-loading" style="padding:30px;text-align:center;color:#8a93a6">正在加载 PDF…</div>'
+    new Promise((res, rej) => {
+      if (window.pdfjsLib) return res()
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+      s.onload = () => res(); s.onerror = () => rej(new Error('pdf.js load fail'))
+      document.head.appendChild(s)
+    }).then(() => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+      return window.pdfjsLib.getDocument(freshUrl).promise
+    }).then(pdf => {
+      body.innerHTML = ''
+      const wrap = document.createElement('div')
+      wrap.style.cssText = 'width:100%;height:62vh;overflow:auto;background:#525659;border-radius:10px;padding:16px'
+      body.appendChild(wrap)
+      const renderAll = async () => {
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const vp = page.getViewport({ scale: 1.3 })
+          const canvas = document.createElement('canvas')
+          canvas.width = vp.width; canvas.height = vp.height
+          canvas.style.cssText = 'max-width:100%;height:auto;margin:0 auto 12px;display:block;box-shadow:0 2px 10px rgba(0,0,0,.4)'
+          wrap.appendChild(canvas)
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+        }
+      }
+      renderAll().catch(() => { wrap.innerHTML = '<div style="color:#fff;padding:30px;text-align:center">PDF 渲染失败</div>' })
+    }).catch(() => {
+      body.innerHTML = '<div class="attp-dl">PDF 加载失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+    })
   } else if (isAudio) {
     body.innerHTML = '<audio controls autoplay style="width:100%"></audio>'
     body.querySelector('audio').src = freshUrl
   } else if (isVideo) {
     body.innerHTML = '<video controls autoplay style="width:100%;border-radius:10px;background:#000"></video>'
     body.querySelector('video').src = freshUrl
+  } else if (ext === 'docx' || ext === 'doc') {
+    // Word 在线预览（docx-preview CDN 按需加载）
+    body.innerHTML = '<div class="attp-loading" style="padding:30px;text-align:center;color:#8a93a6">正在加载文档预览…</div>'
+    new Promise((res, rej) => {
+      if (window.docx && window.JSZip) return res()
+      let pending = 0, done = 0
+      const check = () => { done += 1; if (done >= pending) res() }
+      if (!window.JSZip) {
+        pending += 1
+        const s1 = document.createElement('script')
+        s1.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+        s1.onload = check; s1.onerror = () => rej(new Error('jszip load fail'))
+        document.head.appendChild(s1)
+      }
+      if (!window.docx) {
+        pending += 1
+        const s2 = document.createElement('script')
+        s2.src = 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.1/dist/docx-preview.min.js'
+        s2.onload = check; s2.onerror = () => rej(new Error('docx load fail'))
+        document.head.appendChild(s2)
+      }
+      if (pending === 0) res()
+    }).then(() => {
+      fetch(freshUrl, { cache: 'no-store' }).then(r => r.arrayBuffer()).then(buf => {
+        body.innerHTML = ''
+        const box = document.createElement('div')
+        box.style.cssText = 'width:100%;height:62vh;overflow:auto;background:#fff;border-radius:10px;padding:18px;box-shadow:inset 0 0 0 1px #e5e7ef'
+        body.appendChild(box)
+        window.docx.renderAsync(buf, box).catch(() => {
+          body.innerHTML = '<div class="attp-dl">文档渲染失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+        })
+      }).catch(() => {
+        body.innerHTML = '<div class="attp-dl">文档读取失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+      })
+    }).catch(() => {
+      body.innerHTML = '<div class="attp-dl">预览组件加载失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+    })
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+    // Excel 在线预览（SheetJS CDN 按需加载）
+    body.innerHTML = '<div class="attp-loading" style="padding:30px;text-align:center;color:#8a93a6">正在加载表格预览…</div>'
+    new Promise((res, rej) => {
+      if (window.XLSX) return res()
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+      s.onload = () => res(); s.onerror = () => rej(new Error('load fail'))
+      document.head.appendChild(s)
+    }).then(() => {
+      fetch(freshUrl, { cache: 'no-store' }).then(r => r.arrayBuffer()).then(buf => {
+        try {
+          const wb = window.XLSX.read(buf)
+          const sheet = wb.Sheets[wb.SheetNames[0]]
+          const html = window.XLSX.utils.sheet_to_html(sheet)
+          body.innerHTML = '<div style="width:100%;height:62vh;overflow:auto;background:#fff;border-radius:10px;padding:12px;box-shadow:inset 0 0 0 1px #e5e7ef"><style>.attp-table-wrap table{border-collapse:collapse;font-size:13px;font-family:Consolas,monospace}.attp-table-wrap td,.attp-table-wrap th{border:1px solid #dfe3ef;padding:5px 9px;white-space:nowrap}.attp-table-wrap th{background:#f4f6fb;font-weight:600}</style><div class="attp-table-wrap">' + html + '</div></div>'
+        } catch (e) {
+          body.innerHTML = '<div class="attp-dl">表格解析失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+        }
+      }).catch(() => {
+        body.innerHTML = '<div class="attp-dl">表格读取失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+      })
+    }).catch(() => {
+      body.innerHTML = '<div class="attp-dl">预览组件加载失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+    })
   } else {
     // 代码/文本类：CodeMirror 高亮浏览 + 可编辑保存；二进制类仅下载
     // 类型映射来自后台配置（/api/preview-config），未拉到则用内置默认
@@ -1836,6 +2172,21 @@ function openAttachmentPreview(nodeOrUrl, nameArg) {
   }
 }
 
+// 渲染前：附件节点文件名默认色（后台 attachTextColor 可配），未手动设置过文字色的节点补默认色
+function applyAttachDefaultColor(d) {
+  if (!d || typeof d !== 'object') return
+  const col = attachTextColor.value || '#e53935'
+  const apply = (obj) => {
+    if (!obj || typeof obj !== 'object') return
+    const nd = obj.data || {}
+    if ((nd.attachmentUrl || nd.attachmentName) && !nd.textColor) nd.textColor = col
+    if (Array.isArray(obj.children)) obj.children.forEach(apply)
+  }
+  const target = d.root || d
+  apply(target)
+  if (Array.isArray(d._tabs)) d._tabs.forEach(t => { if (t && t.data && t.data.root) apply(t.data.root) })
+}
+
 // 渲染期修正：附件节点文字统一为文件名（纯文本），并触发尺寸重算，避免文字飘出框外
 function fixAttachNodeTexts() {
   if (!mind.value || !mind.value.renderer) return
@@ -1848,6 +2199,7 @@ function fixAttachNodeTexts() {
           const inst = d.uid ? mind.value.renderer.findNodeByUid(d.uid) : null
           if (inst) mind.value.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false })
         }
+
       }
       if (t && t.children) t.children.forEach(walk)
     }
@@ -1949,7 +2301,7 @@ function injectAttachIcons() {
     svg.querySelectorAll('title').forEach(t => {
       const name = (t.textContent || '').trim()
       if (!name || !nameMap[name]) return
-      const gEl = t.closest('g')
+      const gEl = t.closest('g.smm-node') || t.closest('g')
       if (!gEl || gEl.querySelector('.smm-att-icon')) return
       injectIntoGroup(gEl, nameMap[name])
     })
@@ -2330,6 +2682,7 @@ onMounted(async () => {
     const pc = await fetchPreviewConfig()
     if (pc && pc.previewModes && Object.keys(pc.previewModes).length) previewModes.value = pc.previewModes
     if (pc && Array.isArray(pc.textPreviewExts) && pc.textPreviewExts.length) textPreviewExts.value = pc.textPreviewExts
+    if (pc && pc.attachTextColor) attachTextColor.value = pc.attachTextColor
   } catch (e) { /* 后端不可用则用内置默认 */ }
 
   // 拉取后台图标库（按分类分组，覆盖默认表情包）
@@ -2378,6 +2731,8 @@ onMounted(async () => {
   // 解析数据: 后端可能返回 JSON 字符串，需先解析为对象
   let d = data.data || {}
   if (typeof d === 'string' && d) { try { d = JSON.parse(d) } catch (e) { d = {} } }
+  // 附件节点文件名默认色：未手动设置文字色时使用后台配置（渲染前改数据，避免渲染回调副作用）
+  applyAttachDefaultColor(d)
   // 支持新格式 { root, _tabs, _activeTab } 或旧格式 { root }
   if (d._tabs && Array.isArray(d._tabs) && d._tabs.length) {
     canvasTabs.value = d._tabs
@@ -2530,4 +2885,9 @@ onBeforeUnmount(() => {
   .sb-h { bottom: 48px; width: 80vw; }
   .sb-v { right: 6px; }
 }
+</style>
+
+<style>
+/* 全局：隐藏 MathJax 辅助数学标记，防止部分浏览器下与主公式叠加显示成两层 */
+mjx-assistive-mml { display: none !important; }
 </style>

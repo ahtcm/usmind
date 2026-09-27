@@ -1,9 +1,9 @@
 <template>
   <div class="maps-page">
     <div class="maps-header">
-      <h1>我的思维导图</h1>
+      <h1>我的<span class="only-pc">思维</span>导图</h1>
       <div class="user-area">
-        <span>{{ userStore.user?.nickname || userStore.user?.username || '' }}</span>
+        <span class="user-name">{{ userStore.user?.nickname || userStore.user?.username || '' }}</span>
         <button class="btn ghost" @click="onLogout">退出</button>
         <button class="btn" @click="onNew">+ 新建导图</button>
       </div>

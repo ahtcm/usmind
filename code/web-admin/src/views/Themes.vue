@@ -162,6 +162,11 @@
               <el-slider v-model="form.lineWidth" :min="1" :max="8" :show-input="true" />
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <el-form-item label="附件文字色">
+              <div class="inline-color"><el-color-picker v-model="form.attachTextColor" size="small" :predefine="PRESET_COLORS" /><span>{{ form.attachTextColor }}</span></div>
+            </el-form-item>
+          </el-col>
         </el-row>
 
         <el-divider content-position="left">中心主题（第一层）</el-divider>
@@ -214,6 +219,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { themeApi } from '../api/themes'
 import request from '../api/request'
+import { getSettings, saveSettings } from '@/api/settings'
 const uploading = ref(false)
 const PRESET_COLORS = [
   '#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4', '#C084FC', '#60A5FA', '#34D399', '#22D3EE',
@@ -279,7 +285,7 @@ const defaultLevel = () => ({ fillColor: '#ffffff', color: '#334155', borderColo
 const defaultForm = () => ({
   id: null, name: '', themeKey: '', sort: 99, enabled: 1,
   colors: ['#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4', '#C084FC', '#60A5FA', '#34D399', '#22D3EE'],
-  bgColor: '#fafbff', bgImage: '', bgVideo: '', bgOpacity: 100, bgZoom: 1, lineColor: '#94a3b8', lineWidth: 4,
+  bgColor: '#fafbff', bgImage: '', bgVideo: '', bgOpacity: 100, bgZoom: 1, lineColor: '#94a3b8', lineWidth: 4, attachTextColor: '#e53935',
   root: { ...defaultLevel(), fillColor: '#4A5CF7', color: '#ffffff', fontSize: 36, fontWeight: 'bold', paddingX: 30 },
   second: { ...defaultLevel(), fontSize: 25, paddingX: 26 },
   node: { ...defaultLevel(), fontSize: 22, paddingX: 22 }
@@ -409,6 +415,7 @@ async function submitForm() {
   try {
     if (dialog.mode === 'create') await themeApi.create(payload)
     else await themeApi.update(form.id, payload)
+    try { await saveSettings({ attachTextColor: form.attachTextColor }) } catch (e) {}
     ElMessage.success('已保存')
     dialog.visible = false
     await load()
@@ -443,7 +450,13 @@ async function handleBatchDelete() {
   await load()
 }
 
-onMounted(load)
+async function loadGlobal() {
+  try {
+    const s = await getSettings()
+    if (s && s.attachTextColor) form.attachTextColor = s.attachTextColor
+  } catch (e) {}
+}
+onMounted(() => { load(); loadGlobal() })
 </script>
 
 <style scoped>

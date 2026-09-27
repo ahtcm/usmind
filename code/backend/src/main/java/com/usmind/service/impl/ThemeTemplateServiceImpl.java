@@ -1,9 +1,12 @@
 package com.usmind.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.usmind.common.BusinessException;
+import com.usmind.entity.MindMap;
 import com.usmind.entity.ThemeTemplate;
+import com.usmind.mapper.MindMapMapper;
 import com.usmind.mapper.ThemeTemplateMapper;
 import com.usmind.service.ThemeTemplateService;
 import org.springframework.stereotype.Service;
@@ -18,10 +21,12 @@ import java.util.Map;
 public class ThemeTemplateServiceImpl implements ThemeTemplateService {
 
     private final ThemeTemplateMapper themeTemplateMapper;
+    private final MindMapMapper mindMapMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ThemeTemplateServiceImpl(ThemeTemplateMapper themeTemplateMapper) {
+    public ThemeTemplateServiceImpl(ThemeTemplateMapper themeTemplateMapper, MindMapMapper mindMapMapper) {
         this.themeTemplateMapper = themeTemplateMapper;
+        this.mindMapMapper = mindMapMapper;
     }
 
     @Override
@@ -69,6 +74,7 @@ public class ThemeTemplateServiceImpl implements ThemeTemplateService {
     @Override
     public void update(Long id, ThemeTemplate t) {
         ThemeTemplate exist = get(id);
+        String oldName = exist.getName();
         if (t.getName() != null) exist.setName(t.getName());
         if (t.getThemeKey() != null) exist.setThemeKey(t.getThemeKey());
         if (t.getBranchColors() != null) exist.setBranchColors(t.getBranchColors());
@@ -77,6 +83,16 @@ public class ThemeTemplateServiceImpl implements ThemeTemplateService {
         if (t.getEnabled() != null) exist.setEnabled(t.getEnabled());
         exist.setUpdatedAt(LocalDateTime.now());
         themeTemplateMapper.updateById(exist);
+        // 主题名称变更时，同步更新已保存导图中的主题名称，保证导图管理/列表显示一致
+        if (t.getName() != null && !t.getName().equals(oldName)) {
+            try {
+                mindMapMapper.update(null, new LambdaUpdateWrapper<MindMap>()
+                        .eq(MindMap::getTheme, oldName)
+                        .set(MindMap::getTheme, t.getName()));
+            } catch (Exception e) {
+                // 同步失败不影响主题本身更新
+            }
+        }
     }
 
     @Override

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="share-root">
     <!-- 密码弹窗 -->
     <div v-if="needPwd" class="pwd-mask">
@@ -131,6 +131,7 @@ function updateBgSize() {
 const CODE_MODE_DEFAULT = { js:'text/javascript', mjs:'text/javascript', cjs:'text/javascript', ts:'text/javascript', jsx:'text/javascript', tsx:'text/javascript', json:'application/json', map:'application/json', html:'text/html', htm:'text/html', vue:'text/html', xml:'application/xml', svg:'application/xml', css:'text/css', scss:'text/x-scss', less:'text/x-less', md:'text/x-markdown', markdown:'text/x-markdown', py:'text/x-python', python:'text/x-python', java:'text/x-java', kt:'text/x-kotlin', c:'text/x-csrc', h:'text/x-csrc', cpp:'text/x-c++src', cc:'text/x-c++src', cxx:'text/x-c++src', hpp:'text/x-c++src', hh:'text/x-c++src', cs:'text/x-csharp', go:'text/x-go', rs:'text/x-rust', php:'text/x-php', sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh', sql:'text/x-sql', rb:'text/x-ruby', yml:'text/x-yaml', yaml:'text/x-yaml', swift:'text/x-swift' }
 const TEXT_EXT_DEFAULT = ['txt','log','ini','conf','cfg','csv','env','properties','tsv','gitignore','dockerfile','sass','plist']
 const previewModes = ref({ ...CODE_MODE_DEFAULT })
+const attachTextColor = ref('#e53935')
 const textPreviewExts = ref([...TEXT_EXT_DEFAULT])
 async function loadShare() {
   pageLoading.value = true
@@ -146,6 +147,7 @@ async function loadShare() {
     docData = docData || {}
     shareBgZoom = (docData.tabs && docData.tabs[0] && docData.tabs[0].bgZoom) || docData.bgZoom || 1.35
     let root = docData.root || (docData.tabs && docData.tabs[0] && docData.tabs[0].data && docData.tabs[0].data.root) || docData
+    applyAttachDefaultColor(root)
     let vd = data.viewData
     if (typeof vd === 'string') { try { vd = JSON.parse(vd) } catch (e) { vd = null } }
     await nextTick()
@@ -249,15 +251,103 @@ function openAttachmentPreview(nodeOrUrl, nameArg) {
     im.src = freshUrl; im.style.cssText = 'max-width:100%;max-height:62vh;border-radius:10px;display:block;margin:0 auto'
     body.appendChild(im)
   } else if (isPdf) {
-    const ifr = document.createElement('iframe')
-    ifr.src = freshUrl; ifr.style.cssText = 'width:100%;height:62vh;border:0;border-radius:10px;background:#fff'
-    body.appendChild(ifr)
+    // pdf.js 渲染（浏览器内置 viewer 对部分 pdf 打不开，pdf.js 兼容性更稳）
+    body.innerHTML = '<div class="attp-loading" style="padding:30px;text-align:center;color:#8a93a6">正在加载 PDF…</div>'
+    new Promise((res, rej) => {
+      if (window.pdfjsLib) return res()
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+      s.onload = () => res(); s.onerror = () => rej(new Error('pdf.js load fail'))
+      document.head.appendChild(s)
+    }).then(() => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
+      return window.pdfjsLib.getDocument(freshUrl).promise
+    }).then(pdf => {
+      body.innerHTML = ''
+      const wrap = document.createElement('div')
+      wrap.style.cssText = 'width:100%;height:62vh;overflow:auto;background:#525659;border-radius:10px;padding:16px'
+      body.appendChild(wrap)
+      const renderAll = async () => {
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const vp = page.getViewport({ scale: 1.3 })
+          const canvas = document.createElement('canvas')
+          canvas.width = vp.width; canvas.height = vp.height
+          canvas.style.cssText = 'max-width:100%;height:auto;margin:0 auto 12px;display:block;box-shadow:0 2px 10px rgba(0,0,0,.4)'
+          wrap.appendChild(canvas)
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+        }
+      }
+      renderAll().catch(() => { wrap.innerHTML = '<div style="color:#fff;padding:30px;text-align:center">PDF 渲染失败</div>' })
+    }).catch(() => {
+      body.innerHTML = '<div class="attp-dl">PDF 加载失败，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
+    })
   } else if (isAudio) {
     body.innerHTML = '<audio controls autoplay style="width:100%"></audio>'
     body.querySelector('audio').src = freshUrl
   } else if (isVideo) {
     body.innerHTML = '<video controls autoplay style="width:100%;border-radius:10px;background:#000"></video>'
     body.querySelector('video').src = freshUrl
+  } else if (ext === 'docx' || ext === 'doc') {
+    body.innerHTML = '<div style="color:#8a93a6;font-size:14px;padding:30px;text-align:center">正在加载文档预览…</div>'
+    new Promise((res, rej) => {
+      if (window.docx && window.JSZip) return res()
+      let pending = 0, done = 0
+      const check = () => { done += 1; if (done >= pending) res() }
+      if (!window.JSZip) {
+        pending += 1
+        const s1 = document.createElement('script')
+        s1.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'
+        s1.onload = check; s1.onerror = () => rej(new Error('jszip load fail'))
+        document.head.appendChild(s1)
+      }
+      if (!window.docx) {
+        pending += 1
+        const s2 = document.createElement('script')
+        s2.src = 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.1/dist/docx-preview.min.js'
+        s2.onload = check; s2.onerror = () => rej(new Error('docx load fail'))
+        document.head.appendChild(s2)
+      }
+      if (pending === 0) res()
+    }).then(() => {
+      fetch(freshUrl, { cache: 'no-store' }).then(r => r.arrayBuffer()).then(buf => {
+        body.innerHTML = ''
+        const box = document.createElement('div')
+        box.style.cssText = 'width:100%;height:62vh;overflow:auto;background:#fff;border-radius:10px;padding:18px;box-shadow:inset 0 0 0 1px #e5e7ef'
+        body.appendChild(box)
+        window.docx.renderAsync(buf, box).catch(() => {
+          body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">文档渲染失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+        })
+      }).catch(() => {
+        body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">文档读取失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+      })
+    }).catch(() => {
+      body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">预览组件加载失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+    })
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+    body.innerHTML = '<div style="color:#8a93a6;font-size:14px;padding:30px;text-align:center">正在加载表格预览…</div>'
+    new Promise((res, rej) => {
+      if (window.XLSX) return res()
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+      s.onload = () => res(); s.onerror = () => rej(new Error('load fail'))
+      document.head.appendChild(s)
+    }).then(() => {
+      fetch(freshUrl, { cache: 'no-store' }).then(r => r.arrayBuffer()).then(buf => {
+        try {
+          const wb = window.XLSX.read(buf)
+          const sheet = wb.Sheets[wb.SheetNames[0]]
+          const html = window.XLSX.utils.sheet_to_html(sheet)
+          body.innerHTML = '<div style="width:100%;height:62vh;overflow:auto;background:#fff;border-radius:10px;padding:12px;box-shadow:inset 0 0 0 1px #e5e7ef"><style>.attp-table-wrap table{border-collapse:collapse;font-size:13px;font-family:Consolas,monospace}.attp-table-wrap td,.attp-table-wrap th{border:1px solid #dfe3ef;padding:5px 9px;white-space:nowrap}.attp-table-wrap th{background:#f4f6fb;font-weight:600}</style><div class="attp-table-wrap">' + html + '</div></div>'
+        } catch (e) {
+          body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">表格解析失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+        }
+      }).catch(() => {
+        body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">表格读取失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+      })
+    }).catch(() => {
+      body.innerHTML = '<div style="color:#909399;font-size:14px;padding:40px 0 16px;text-align:center">预览组件加载失败</div><a href="' + freshUrl + '" target="_blank" rel="noopener" style="display:inline-block;padding:8px 24px;background:#0e7c86;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">下载文件</a>'
+    })
   } else if (isText) {
     fetch(freshUrl, { cache: 'no-store' }).then(r => r.text()).then(t => {
       if (CODE_MODE[ext] || TEXT_EXT.includes(ext)) {
@@ -289,6 +379,21 @@ function openAttachmentPreview(nodeOrUrl, nameArg) {
 
 // 给有附件的节点注入可点击的附件图标（右上角），单击打开附件预览
 // 渲染期修正：附件节点文字统一为文件名（纯文本），避免文字飘出框外
+// 渲染前：附件节点文件名默认色（后台 attachTextColor 可配）
+function applyAttachDefaultColor(d) {
+  if (!d || typeof d !== 'object') return
+  const col = attachTextColor.value || '#e53935'
+  const apply = (obj) => {
+    if (!obj || typeof obj !== 'object') return
+    const nd = obj.data || {}
+    if ((nd.attachmentUrl || nd.attachmentName) && !nd.textColor) nd.textColor = col
+    if (Array.isArray(obj.children)) obj.children.forEach(apply)
+  }
+  const target = d.root || d
+  apply(target)
+  if (Array.isArray(d._tabs)) d._tabs.forEach(t => { if (t && t.data && t.data.root) apply(t.data.root) })
+}
+
 function fixAttachNodeTexts() {
   if (!mind.value || !mind.value.renderer) return
   try {
@@ -300,6 +405,7 @@ function fixAttachNodeTexts() {
           const inst = d.uid ? mind.value.renderer.findNodeByUid(d.uid) : null
           if (inst) mind.value.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false })
         }
+
       }
       if (t && t.children) t.children.forEach(walk)
     }
@@ -417,6 +523,7 @@ onMounted(async () => {
   try {
     const pc = await fetchPreviewConfig()
     if (pc && pc.previewModes && Object.keys(pc.previewModes).length) previewModes.value = pc.previewModes
+    if (pc && pc.attachTextColor) attachTextColor.value = pc.attachTextColor
     if (pc && Array.isArray(pc.textPreviewExts) && pc.textPreviewExts.length) textPreviewExts.value = pc.textPreviewExts
   } catch (e) { /* 后端不可用则用内置默认 */ }
   await loadShare()
@@ -463,4 +570,9 @@ onBeforeUnmount(() => {
 .share-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
 .share-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
 #map { position: relative; height: 100%; width: 100%; background: transparent !important; }
+</style>
+
+<style>
+/* 全局：隐藏 MathJax 辅助数学标记，防止部分浏览器下与主公式叠加显示成两层 */
+mjx-assistive-mml { display: none !important; }
 </style>

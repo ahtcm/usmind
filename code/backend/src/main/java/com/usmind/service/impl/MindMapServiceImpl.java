@@ -60,7 +60,7 @@ public class MindMapServiceImpl implements MindMapService {
         m.setName(StringUtils.hasText(req.getName()) ? req.getName() : "未命名");
         m.setData(toJson(req.getData()));
         m.setLayout(StringUtils.hasText(req.getLayout()) ? req.getLayout() : "logicalStructure");
-        m.setTheme(StringUtils.hasText(req.getTheme()) ? req.getTheme() : "XMind 浅色");
+        m.setTheme(StringUtils.hasText(req.getTheme()) ? req.getTheme() : "浅色");
         m.setViewData(toJson(req.getViewData()));
         m.setManualStyles(req.getManualStyles() != null ? toJson(req.getManualStyles()) : null);
         m.setIsShared(0);

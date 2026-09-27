@@ -22,6 +22,8 @@ export function tex2svgHtml(tex, display = true) {
   const mj = window.MathJax
   if (!mj || !mj.tex2svg) return '<span style="color:#e74c3c">[公式未就绪]</span>'
   const node = mj.tex2svg(tex, { display: !!display })
+  // 移除辅助数学标记（assistive MML），避免部分浏览器下与主公式叠加显示成"两层"
+  try { node.querySelectorAll('mjx-assistive-mml').forEach(a => a.remove()) } catch (e) {}
   // 附加 LaTeX 源码：data 属性 + SVG <title>，供双击编辑回填
   try { node.setAttribute('data-math-latex', tex) } catch (e) {}
   const svg = node.querySelector('svg')

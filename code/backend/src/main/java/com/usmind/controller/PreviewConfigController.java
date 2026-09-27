@@ -29,6 +29,7 @@ public class PreviewConfigController {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("previewModes", safeParse(settingsService.get("previewModes", "{}"), new TypeReference<Map<String, String>>() {}));
         m.put("textPreviewExts", safeParse(settingsService.get("textPreviewExts", "[]"), new TypeReference<List<String>>() {}));
+        m.put("attachTextColor", settingsService.get("attachTextColor", "#e53935"));
         return Result.ok(m);
     }
 
