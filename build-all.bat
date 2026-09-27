@@ -54,9 +54,33 @@ xcopy /e /i /y /q "%TOOLS%\Redis-x64-5.0.14.1" "%PORTABLE%\components\redis" >nu
 if errorlevel 1 goto :err
 xcopy /e /i /y /q "%TOOLS%\nginx-1.30.5" "%PORTABLE%\components\nginx" >nul
 if errorlevel 1 goto :err
+copy /y "%SRC%\nginx-portable.conf" "%PORTABLE%\components\nginx\conf\nginx.conf" >nul
+if errorlevel 1 goto :err
 copy /y "%ROOT%code\backend\target\usmind-backend.jar" "%PORTABLE%\components\" >nul
 if errorlevel 1 goto :err
 copy /y "%ROOT%sql\init.sql" "%PORTABLE%\components\" >nul
+if errorlevel 1 goto :err
+
+echo   -- 构建并部署前端 (web-user / web-admin) --
+set "NPM=%TOOLS%\nodejs\npm.cmd"
+set "PATH=%TOOLS%\nodejs;%PATH%"
+pushd "%ROOT%code\web-user"
+if not exist node_modules call "%NPM%" install
+call "%NPM%" run build
+if errorlevel 1 goto :err
+popd
+if exist "%PORTABLE%\components\nginx\html\usmind" rmdir /s /q "%PORTABLE%\components\nginx\html\usmind"
+mkdir "%PORTABLE%\components\nginx\html\usmind"
+xcopy /e /i /y /q "%ROOT%code\web-user\dist\*" "%PORTABLE%\components\nginx\html\usmind\" >nul
+if errorlevel 1 goto :err
+pushd "%ROOT%code\web-admin"
+if not exist node_modules call "%NPM%" install
+call "%NPM%" run build
+if errorlevel 1 goto :err
+popd
+if exist "%PORTABLE%\components\nginx\html\admin" rmdir /s /q "%PORTABLE%\components\nginx\html\admin"
+mkdir "%PORTABLE%\components\nginx\html\admin"
+xcopy /e /i /y /q "%ROOT%code\web-admin\dist\*" "%PORTABLE%\components\nginx\html\admin\" >nul
 if errorlevel 1 goto :err
 
 echo   [完成] 便携版: %PORTABLE%
