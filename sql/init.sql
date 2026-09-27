@@ -37,6 +37,7 @@ CREATE TABLE mind_map (
   layout         VARCHAR(32)  DEFAULT 'logicalStructure' COMMENT '布局',
   theme          VARCHAR(64)  DEFAULT 'XMind 浅色' COMMENT '主题名',
   view_data      TEXT         COMMENT '视图数据(缩放/平移)',
+  manual_styles  TEXT         COMMENT '节点手动样式JSON',
   is_shared      TINYINT      DEFAULT 0 COMMENT '是否分享: 1是 0否',
   share_token    VARCHAR(64)  DEFAULT '' COMMENT '分享令牌',
   share_password VARCHAR(64)  DEFAULT '' COMMENT '分享密码(可选)',
