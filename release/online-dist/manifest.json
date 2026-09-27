@@ -1,0 +1,126 @@
+[
+    {
+        "comp":  "core",
+        "dir":  ".",
+        "parts":  [
+                      {
+                          "file":  "core.000",
+                          "size":  217984
+                      }
+                  ]
+    },
+    {
+        "comp":  "jre",
+        "dir":  "runtime",
+        "parts":  [
+                      {
+                          "file":  "jre.000",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "jre.001",
+                          "size":  10823558
+                      }
+                  ]
+    },
+    {
+        "comp":  "mysql",
+        "dir":  "components\\mysql",
+        "parts":  [
+                      {
+                          "file":  "mysql.000",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.001",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.002",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.003",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.004",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.005",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.006",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.007",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.008",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.009",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.010",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "mysql.011",
+                          "size":  13009599
+                      }
+                  ]
+    },
+    {
+        "comp":  "redis",
+        "dir":  "components\\redis",
+        "parts":  [
+                      {
+                          "file":  "redis.000",
+                          "size":  12617894
+                      }
+                  ]
+    },
+    {
+        "comp":  "nginx",
+        "dir":  "components\\nginx",
+        "parts":  [
+                      {
+                          "file":  "nginx.000",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "nginx.001",
+                          "size":  11507112
+                      }
+                  ]
+    },
+    {
+        "comp":  "backend",
+        "dir":  "components",
+        "parts":  [
+                      {
+                          "file":  "backend.000",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "backend.001",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "backend.002",
+                          "size":  20971520
+                      },
+                      {
+                          "file":  "backend.003",
+                          "size":  5222152
+                      }
+                  ]
+    }
+]
