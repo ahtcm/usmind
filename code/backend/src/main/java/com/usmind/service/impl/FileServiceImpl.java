@@ -67,7 +67,7 @@ public class FileServiceImpl implements FileService {
         String ext = dotIdx >= 0 ? original.substring(dotIdx) : "";
         String extLower = dotIdx >= 0 ? original.substring(dotIdx + 1).toLowerCase(Locale.ROOT) : "";
         if (allowed != null && !allowed.isBlank() && !extLower.isEmpty()) {
-            boolean ok = Arrays.stream(allowed.split(","))
+            boolean ok = allowed.trim().equals("*") || Arrays.stream(allowed.split(","))
                     .map(String::trim)
                     .anyMatch(t -> t.equalsIgnoreCase(extLower));
             if (!ok) throw new BusinessException(400, "不允许的文件类型: " + extLower);

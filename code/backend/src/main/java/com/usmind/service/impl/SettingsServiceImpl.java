@@ -62,7 +62,12 @@ public class SettingsServiceImpl implements SettingsService {
         // 写入默认值（仅当不存在）
         putDefaultIfAbsent("jwtExpireHours", "24");
         putDefaultIfAbsent("uploadMaxSizeMb", "100");
-        putDefaultIfAbsent("allowedFileTypes", "jpg,jpeg,png,gif,webp,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,zip");
+        // 上传类型白名单（后台可配）：常见媒体/文档 + 常见代码后缀
+        putDefaultIfAbsent("allowedFileTypes", "jpg,jpeg,png,gif,webp,bmp,ico,avif,svg,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,zip,rar,7z,mp3,wav,ogg,m4a,aac,flac,mp4,webm,ogv,mov,mkv,json,js,mjs,cjs,ts,tsx,jsx,vue,html,htm,css,scss,less,xml,yaml,yml,py,python,java,kt,c,h,cpp,cc,cxx,hpp,hh,cs,go,rs,php,sh,bash,zsh,sql,rb,ini,conf,cfg,env,properties,tsv,gitignore,dockerfile,sass,plist");
+        // 代码/文本在线预览高亮：扩展名 -> CodeMirror mode（后台可配）
+        putDefaultIfAbsent("previewModes", "{\"js\":\"text/javascript\",\"mjs\":\"text/javascript\",\"cjs\":\"text/javascript\",\"ts\":\"text/javascript\",\"jsx\":\"text/javascript\",\"tsx\":\"text/javascript\",\"json\":\"application/json\",\"map\":\"application/json\",\"html\":\"text/html\",\"htm\":\"text/html\",\"vue\":\"text/html\",\"xml\":\"application/xml\",\"svg\":\"application/xml\",\"css\":\"text/css\",\"scss\":\"text/x-scss\",\"less\":\"text/x-less\",\"md\":\"text/x-markdown\",\"markdown\":\"text/x-markdown\",\"py\":\"text/x-python\",\"python\":\"text/x-python\",\"java\":\"text/x-java\",\"kt\":\"text/x-kotlin\",\"c\":\"text/x-csrc\",\"h\":\"text/x-csrc\",\"cpp\":\"text/x-c++src\",\"cc\":\"text/x-c++src\",\"cxx\":\"text/x-c++src\",\"hpp\":\"text/x-c++src\",\"hh\":\"text/x-c++src\",\"cs\":\"text/x-csharp\",\"go\":\"text/x-go\",\"rs\":\"text/x-rust\",\"php\":\"text/x-php\",\"sh\":\"text/x-sh\",\"bash\":\"text/x-sh\",\"zsh\":\"text/x-sh\",\"sql\":\"text/x-sql\",\"rb\":\"text/x-ruby\",\"yml\":\"text/x-yaml\",\"yaml\":\"text/x-yaml\",\"swift\":\"text/x-swift\"}");
+        // 纯文本预览（无高亮）扩展名（后台可配）
+        putDefaultIfAbsent("textPreviewExts", "[\"txt\",\"log\",\"ini\",\"conf\",\"cfg\",\"csv\",\"env\",\"properties\",\"tsv\",\"gitignore\",\"dockerfile\",\"sass\",\"plist\"]");
         putDefaultIfAbsent("aiApiKey", "");
         putDefaultIfAbsent("aiModel", "gpt-3.5-turbo");
         putDefaultIfAbsent("aiEndpoint", "");
@@ -118,6 +123,8 @@ public class SettingsServiceImpl implements SettingsService {
         m.put("jwtExpireHours", getInt("jwtExpireHours", 24));
         m.put("uploadMaxSizeMb", getInt("uploadMaxSizeMb", 100));
         m.put("allowedFileTypes", get("allowedFileTypes", ""));
+        m.put("previewModes", get("previewModes", "{}"));
+        m.put("textPreviewExts", get("textPreviewExts", "[]"));
         m.put("aiApiKey", mask(aiKey));
         m.put("aiModel", get("aiModel", ""));
         m.put("aiEndpoint", get("aiEndpoint", ""));
@@ -139,6 +146,12 @@ public class SettingsServiceImpl implements SettingsService {
         }
         if (body.containsKey("allowedFileTypes") && body.get("allowedFileTypes") != null) {
             set("allowedFileTypes", String.valueOf(body.get("allowedFileTypes")));
+        }
+        if (body.containsKey("previewModes") && body.get("previewModes") != null) {
+            set("previewModes", String.valueOf(body.get("previewModes")));
+        }
+        if (body.containsKey("textPreviewExts") && body.get("textPreviewExts") != null) {
+            set("textPreviewExts", String.valueOf(body.get("textPreviewExts")));
         }
         // aiApiKey 传入脱敏值(含****)时不覆盖
         if (body.containsKey("aiApiKey") && body.get("aiApiKey") != null) {

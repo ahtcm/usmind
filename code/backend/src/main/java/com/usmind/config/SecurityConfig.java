@@ -63,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
                         .requestMatchers("/api/themes", "/api/icons").permitAll()
+                        .requestMatchers("/api/preview-config").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/file/**").permitAll()
                         .requestMatchers("/api/preview/**").permitAll()

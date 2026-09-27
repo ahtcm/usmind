@@ -15,14 +15,15 @@ const routes = [
       { path: 'oss', name: 'Oss', component: () => import('@/views/OssConfig.vue'), meta: { title: 'OSS配置', requireAdmin: true } },
       { path: 'themes', name: 'Themes', component: () => import('@/views/Themes.vue'), meta: { title: '主题模板', requireAdmin: true } },
       { path: 'icons', name: 'Icons', component: () => import('@/views/Icons.vue'), meta: { title: '图标库', requireAdmin: true } },
-      { path: 'settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { title: '系统设置', requireAdmin: true } }
+      { path: 'settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { title: '系统设置', requireAdmin: true } },
+      { path: 'project-config', name: 'ProjectConfig', component: () => import('@/views/ProjectConfig.vue'), meta: { title: '项目配置', requireAdmin: true } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/admin/'),
   routes
 })
 

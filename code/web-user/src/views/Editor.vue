@@ -306,11 +306,29 @@ import ExportPDF from 'simple-mind-map/src/plugins/ExportPDF'
 import JSZip from 'jszip'
 import { THEMES } from '../utils/theme.js'
 import { fetchThemes } from '../api/themes'
+import { fetchPreviewConfig } from '../api/previewConfig'
 import { mindmapApi } from '../api/mindmap'
 import { fetchIcons } from '../api/icons'
 import { uploadMedia } from '../utils/mediastore'
 import { aiApi } from '../api/ai'
 import { loadMathJax, tex2svgHtml, extractLatexFromHtml as extractLatexUtil, migrateKatexToSvg } from '../utils/mathRenderer'
+import CodeMirror from 'codemirror'
+import 'codemirror/lib/codemirror.css'
+import 'codemirror/mode/javascript/javascript'
+import 'codemirror/mode/xml/xml'
+import 'codemirror/mode/css/css'
+import 'codemirror/mode/htmlmixed/htmlmixed'
+import 'codemirror/mode/markdown/markdown'
+import 'codemirror/mode/python/python'
+import 'codemirror/mode/clike/clike'
+import 'codemirror/mode/go/go'
+import 'codemirror/mode/rust/rust'
+import 'codemirror/mode/php/php'
+import 'codemirror/mode/shell/shell'
+import 'codemirror/mode/sql/sql'
+import 'codemirror/mode/ruby/ruby'
+import 'codemirror/mode/yaml/yaml'
+import 'codemirror/mode/swift/swift'
 
 // 注册插件
 MindMap.usePlugin(Drag)
@@ -348,6 +366,11 @@ Object.keys(LAYOUT_MAP).forEach((k) => { LAYOUT_REV[LAYOUT_MAP[k]] = k })
 const mapEl = ref(null)
 const canvasBarEl = ref(null)
 const mind = ref(null)
+// 预览/高亮类型配置：后台 sys_config 可配，内置默认兜底（离线也可用）
+const CODE_MODE_DEFAULT = { js:'text/javascript', mjs:'text/javascript', cjs:'text/javascript', ts:'text/javascript', jsx:'text/javascript', tsx:'text/javascript', json:'application/json', map:'application/json', html:'text/html', htm:'text/html', vue:'text/html', xml:'application/xml', svg:'application/xml', css:'text/css', scss:'text/x-scss', less:'text/x-less', md:'text/x-markdown', markdown:'text/x-markdown', py:'text/x-python', python:'text/x-python', java:'text/x-java', kt:'text/x-kotlin', c:'text/x-csrc', h:'text/x-csrc', cpp:'text/x-c++src', cc:'text/x-c++src', cxx:'text/x-c++src', hpp:'text/x-c++src', hh:'text/x-c++src', cs:'text/x-csharp', go:'text/x-go', rs:'text/x-rust', php:'text/x-php', sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh', sql:'text/x-sql', rb:'text/x-ruby', yml:'text/x-yaml', yaml:'text/x-yaml', swift:'text/x-swift' }
+const TEXT_EXT_DEFAULT = ['txt','log','ini','conf','cfg','csv','env','properties','tsv','gitignore','dockerfile','sass','plist']
+const previewModes = ref({ ...CODE_MODE_DEFAULT })
+const textPreviewExts = ref([...TEXT_EXT_DEFAULT])
 const mindMapId = ref(route.params.id || null)
 
 // 状态
@@ -592,6 +615,8 @@ async function createMind() {
     isLimitMindMapInCanvasWhenHasScrollbar: false,
     enableShortcutOnlyWhenMouseInSvg: false,
     openRealtimeRenderOnNodeTextEdit: true,
+    // 禁用库内置附件图标（内容区右侧），附件图标统一使用自定义注入的节点上方图标
+    attachmentIcon: { style: { size: 0 }, icon: '' },
     rainbowLinesConfig: { open: true, colorsList: getBranchColors() },
     iconList: [
       { type: 'number', list: Array.from({length:10},(_,i)=>({name:String(i+1),icon:numSvg(i+1)})) },
@@ -649,9 +674,14 @@ function bindMindEvents() {
     })
   }
 
-  // 双击公式节点 → 打开公式编辑弹窗（库默认会开文本编辑框，这里接管）
+  // 双击：附件节点 → 打开附件编辑与浏览（统一双击规则）；公式节点 → 公式编辑弹窗
   mind.value.on('node_dblclick', (node, e) => {
     try {
+      if (node.getData('attachmentUrl')) {
+        try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
+        openAttachmentPreview(node)
+        return
+      }
       const text = node.getData('text') || ''
       const rich = node.getData('richText') === true
       if (rich && (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0)) {
@@ -680,8 +710,20 @@ mind.value.on('hide_text_edit', () => textEditActive.value = false)
   }
   document.addEventListener('focusin', onEditFocusIn)
   document.addEventListener('focusout', onEditFocusOut)
-  mind.value.on('node_tree_render_end', () => { try { updateScrollbars() } catch (e) {}; clearTimeout(loadingTimer); if (!mind.value.editNodeClassList || !mind.value.editNodeClassList.length) mapEl.value.classList.remove('no-anim'); if (loadingToken > 0) hideLoading(loadingToken); applyLazyView() })
+  mind.value.on('node_tree_render_end', () => { try { updateScrollbars() } catch (e) {}; clearTimeout(loadingTimer); if (!mind.value.editNodeClassList || !mind.value.editNodeClassList.length) mapEl.value.classList.remove('no-anim'); if (loadingToken > 0) hideLoading(loadingToken); applyLazyView(); try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {} })
   mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
+  // 轮询注入附件图标（不依赖 render_end 时序）
+  if (window.__attIconTimer) clearInterval(window.__attIconTimer)
+  window.__attIconTimer = setInterval(() => {
+    try {
+      const rt = mind.value && mind.value.renderer && mind.value.renderer.renderTree
+      if (rt && !window.__attDebugDone) {
+        window.__attDebugDone = true
+      }
+      try { fixAttachNodeTexts() } catch (e) {}
+      injectAttachIcons()
+    } catch (e) {}
+  }, 700)
 }
 
 function markDirty() { dirty.value = true }
@@ -1590,6 +1632,8 @@ async function insertFileToNode(node, file) {
     } else {
       const src = await uploadMedia(file)
       mind.value.execCommand('SET_NODE_ATTACHMENT', node, src, file.name || '附件')
+      // 附件节点文字替换为文件名+后缀（强制纯文本渲染，框随文字自适应，避免文字飘出框外）
+      mind.value.renderer.setNodeDataRender(node, { text: file.name || '附件', richText: false })
       mind.value.execCommand('SET_NODE_STYLES', node, { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6 })
     }
     if (node.getData('uid')) manualStyled.add(node.getData('uid'))
@@ -1680,9 +1724,15 @@ function ctxAct(act) {
 }
 
 // 附件预览
-function openAttachmentPreview(node) {
-  const url = node.getData('attachmentUrl')
-  const name = node.getData('attachmentName') || '附件'
+function openAttachmentPreview(nodeOrUrl, nameArg) {
+  let url, name
+  if (typeof nodeOrUrl === 'string') {
+    url = nodeOrUrl
+    name = nameArg || '附件'
+  } else {
+    url = nodeOrUrl.getData('attachmentUrl')
+    name = nodeOrUrl.getData('attachmentName') || '附件'
+  }
   if (!url) return
   const ext = (name.match(/\.([a-zA-Z0-9]+)$/) || [,''])[1].toLowerCase()
   const isImg = ['png','jpg','jpeg','gif','webp','bmp','ico','avif','svg'].includes(ext)
@@ -1700,80 +1750,212 @@ function openAttachmentPreview(node) {
   wrap.querySelector('.attp-close').addEventListener('click', close)
   wrap.querySelector('.attp-mask').addEventListener('click', close)
   const body = wrap.querySelector('.attp-body')
+  // 附件文件可被编辑，URL 不变但内容会变；加时间戳参数绕过 /uploads 强缓存，保证各浏览器看到最新内容
+  const freshUrl = url + (url.indexOf('?') > -1 ? '&' : '?') + 'v=' + Date.now()
   if (isImg) {
     const im = document.createElement('img')
-    im.src = url; im.style.cssText = 'max-width:100%;max-height:62vh;border-radius:10px'
+    im.src = freshUrl; im.style.cssText = 'max-width:100%;max-height:62vh;border-radius:10px'
     body.appendChild(im)
   } else if (isPdf) {
     const ifr = document.createElement('iframe')
-    ifr.src = url; ifr.style.cssText = 'width:100%;height:62vh;border:0;border-radius:10px;background:#fff'
+    ifr.src = freshUrl; ifr.style.cssText = 'width:100%;height:62vh;border:0;border-radius:10px;background:#fff'
     body.appendChild(ifr)
   } else if (isAudio) {
     body.innerHTML = '<audio controls autoplay style="width:100%"></audio>'
-    body.querySelector('audio').src = url
+    body.querySelector('audio').src = freshUrl
   } else if (isVideo) {
     body.innerHTML = '<video controls autoplay style="width:100%;border-radius:10px;background:#000"></video>'
-    body.querySelector('video').src = url
+    body.querySelector('video').src = freshUrl
   } else {
-    // 文本类：直接读取显示
-    const isText = ['txt','md','json','csv','log','xml','yaml','yml','html','htm','js','css','ini','conf'].includes(ext)
-    if (isText) {
-      fetch(url).then(r => r.text()).then(t => {
-        // 文本：可浏览 + 可编辑
-        const pre = document.createElement('pre')
-        pre.textContent = t
-        pre.style.cssText = 'max-width:100%;max-height:56vh;overflow:auto;background:#1e1e1e;color:#e6e6e6;padding:14px;border-radius:10px;font-size:13px;white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0 0 10px'
-        body.appendChild(pre)
+    // 代码/文本类：CodeMirror 高亮浏览 + 可编辑保存；二进制类仅下载
+    // 类型映射来自后台配置（/api/preview-config），未拉到则用内置默认
+    const CODE_MODE = Object.keys(previewModes.value).length ? previewModes.value : CODE_MODE_DEFAULT
+    const TEXT_EXT = textPreviewExts.value.length ? textPreviewExts.value : TEXT_EXT_DEFAULT
+    if (CODE_MODE[ext] || TEXT_EXT.includes(ext)) {
+      fetch(freshUrl, { cache: 'no-store' }).then(r => r.text()).then(t => {
+        // CodeMirror：浏览（高亮只读）→ 点击编辑可写 → 保存
+        const cmWrap = document.createElement('div')
+        cmWrap.style.cssText = 'border:1px solid #333;border-radius:10px;overflow:hidden;background:#1e1e1e'
+        body.appendChild(cmWrap)
+        const cm = CodeMirror(cmWrap, {
+          value: t,
+          mode: CODE_MODE[ext] || null,
+          lineNumbers: true,
+          lineWrapping: false,
+          readOnly: 'nocursor',
+          indentUnit: 2,
+          tabSize: 2,
+          scrollbarStyle: 'null'
+        })
+        cm.setSize('100%', '50vh')
         const bar = document.createElement('div')
-        bar.style.cssText = 'text-align:right'
+        bar.style.cssText = 'text-align:right;margin-top:10px;display:flex;justify-content:flex-end;gap:8px'
         const editBtn = document.createElement('button')
         editBtn.textContent = '编辑'
         editBtn.className = 'attp-dl-btn'
         editBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px'
-        bar.appendChild(editBtn)
+        const cancelEdit = document.createElement('button')
+        cancelEdit.textContent = '取消编辑'
+        cancelEdit.style.cssText = 'padding:6px 18px;background:#555;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none'
+        const saveBtn = document.createElement('button')
+        saveBtn.textContent = '保存'
+        saveBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none'
+        bar.appendChild(cancelEdit); bar.appendChild(saveBtn); bar.appendChild(editBtn)
         body.appendChild(bar)
         editBtn.addEventListener('click', () => {
-          pre.style.display = 'none'
-          bar.style.display = 'none'
-          const ta = document.createElement('textarea')
-          ta.value = t
-          ta.style.cssText = 'width:100%;height:50vh;background:#1e1e1e;color:#e6e6e6;border:1px solid #333;border-radius:10px;padding:12px;font-size:13px;font-family:Consolas,monospace;box-sizing:border-box;resize:vertical'
-          body.appendChild(ta)
-          const saveBar = document.createElement('div')
-          saveBar.style.cssText = 'text-align:right;margin-top:10px'
-          const saveBtn = document.createElement('button')
-          saveBtn.textContent = '保存'
-          saveBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px'
-          const cancelBtn = document.createElement('button')
-          cancelBtn.textContent = '取消'
-          cancelBtn.style.cssText = 'padding:6px 18px;background:#555;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;margin-right:8px'
-          saveBar.appendChild(cancelBtn)
-          saveBar.appendChild(saveBtn)
-          body.appendChild(saveBar)
-          cancelBtn.addEventListener('click', () => { wrap.remove() })
-          saveBtn.addEventListener('click', async () => {
-            saveBtn.disabled = true; saveBtn.textContent = '保存中...'
-            try {
-              const res = await fetch('/api/file/content', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('usmind.token') || '') },
-                body: JSON.stringify({ url, content: ta.value })
-              })
-              const j = await res.json()
-              if (j.code === 200) { toast('已保存'); wrap.remove() } else { toast('保存失败: ' + (j.message || ''), 'error') }
-            } catch (e) { toast('保存失败: ' + e.message, 'error') }
-            saveBtn.disabled = false; saveBtn.textContent = '保存'
-          })
+          cm.setOption('readOnly', false)
+          editBtn.style.display = 'none'
+          cancelEdit.style.display = ''; saveBtn.style.display = ''
+          cm.focus()
+        })
+        cancelEdit.addEventListener('click', () => {
+          cm.setOption('readOnly', 'nocursor')
+          editBtn.style.display = ''
+          cancelEdit.style.display = 'none'; saveBtn.style.display = 'none'
+        })
+        saveBtn.addEventListener('click', async () => {
+          saveBtn.disabled = true; saveBtn.textContent = '保存中...'
+          try {
+            const res = await fetch('/api/file/content', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('usmind.token') || '') },
+              body: JSON.stringify({ url, content: cm.getValue() })
+            })
+            const j = await res.json()
+            if (j.code === 200) { toast('已保存'); wrap.remove() } else { toast('保存失败: ' + (j.message || ''), 'error') }
+          } catch (e) { toast('保存失败: ' + e.message, 'error') }
+          saveBtn.disabled = false; saveBtn.textContent = '保存'
         })
       }).catch(() => {
-        body.innerHTML = '<div class="attp-dl">无法读取内容，请下载查看</div><a class="attp-dl-btn" href="' + url + '" target="_blank" rel="noopener">下载文件</a>'
+        body.innerHTML = '<div class="attp-dl">无法读取内容，请下载查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
       })
     } else {
-      // office/压缩包等：弹窗内下载
-      body.innerHTML = '<div class="attp-dl">该类型暂不支持在线预览，请下载后查看</div><a class="attp-dl-btn" href="' + url + '" target="_blank" rel="noopener">下载文件</a>'
+      // 二进制/程序安装包/office 等：弹窗内下载
+      body.innerHTML = '<div class="attp-dl">该类型暂不支持在线预览，请下载后查看</div><a class="attp-dl-btn" href="' + freshUrl + '" target="_blank" rel="noopener">下载文件</a>'
     }
   }
 }
+
+// 渲染期修正：附件节点文字统一为文件名（纯文本），并触发尺寸重算，避免文字飘出框外
+function fixAttachNodeTexts() {
+  if (!mind.value || !mind.value.renderer) return
+  try {
+    const tree = mind.value.getData()
+    const walk = (t) => {
+      if (t && t.data) {
+        const d = t.data
+        if (d.attachmentName && (d.text !== d.attachmentName || d.richText)) {
+          const inst = d.uid ? mind.value.renderer.findNodeByUid(d.uid) : null
+          if (inst) mind.value.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false })
+        }
+      }
+      if (t && t.children) t.children.forEach(walk)
+    }
+    walk(tree)
+  } catch (e) {}
+  try {
+    // DOM 对齐兜底：附件节点的文字可能因样式重建而与节点框分离（飘出框外），强制将文字居中到框内
+    const c = document.querySelector('.smm-container')
+    if (c) {
+      c.querySelectorAll('text.smm-text-node-wrap').forEach(tx => {
+        const tr = tx.getBoundingClientRect()
+        if (!tr || !tr.width) return
+        let g = tx.parentElement
+        let shape = null, ng = g
+        for (let i = 0; i < 8 && ng; i++) {
+          const s2 = ng.querySelector(':scope > rect, :scope > [class*=shape]')
+          if (s2 && s2 !== tx) { shape = s2; break }
+          ng = ng.parentElement
+        }
+        if (!shape) return
+        const sr = shape.getBoundingClientRect()
+        if (!sr || !sr.width) return
+        const tc = tr.x + tr.width / 2
+        const sc = sr.x + sr.width / 2
+        if (Math.abs(tc - sc) > 2) {
+          const ctm = tx.getScreenCTM && tx.getScreenCTM()
+          const k = ctm && ctm.a ? ctm.a : 1
+          const dx = (sc - tc) / k
+          tx.setAttribute('transform', 'translate(' + dx.toFixed(2) + ' 0)')
+        }
+      })
+    }
+  } catch (e) {}
+}
+
+// 给有附件的节点注入可点击的附件图标（右上角），单击打开附件预览
+function injectAttachIcons() {
+  if (!mind.value || !mind.value.renderer) return
+  const NS = 'http://www.w3.org/2000/svg'
+  // 构建 uidMap 与 附件名->数据 映射（来自导图数据树）
+  let uidMap = null
+  const nameMap = {}
+  try {
+    const tree = mind.value.getData()
+    uidMap = {}
+    const walk = (t) => {
+      if (t && t.data) {
+        if (t.data.uid) uidMap[t.data.uid] = t.data
+        if (t.data.attachmentUrl && t.data.attachmentName) nameMap[t.data.attachmentName] = t.data
+      }
+      if (t && t.children) t.children.forEach(walk)
+    }
+    walk(tree)
+  } catch (e) {}
+  const injectIntoGroup = (gEl, d) => {
+    if (!gEl || gEl.querySelector('.smm-att-icon')) return
+    // 优先取文字框边界（节点文字），图标放其右上角；退回节点组整体边界
+    let shape = gEl.querySelector('.smm-text-node-wrap, [class*=text]')
+    let bb = null
+    if (shape) { try { bb = shape.getBBox() } catch (e) {} }
+    if (!bb && gEl.getBBox) { try { bb = gEl.getBBox() } catch (e) {} }
+    const fo = document.createElementNS(NS, 'foreignObject')
+    fo.setAttribute('class', 'smm-att-icon')
+    const x = bb ? Math.max(0, bb.x + bb.width - 26) : 0
+    const y = bb ? Math.max(0, bb.y + 2) : 0
+    fo.setAttribute('x', x)
+    fo.setAttribute('y', y)
+    fo.setAttribute('width', '24')
+    fo.setAttribute('height', '24')
+    const div = document.createElement('div')
+    div.style.cssText = 'width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:7px;color:#fff;line-height:1;transition:transform .15s ease,background .15s ease'
+    div.title = d.attachmentName || '附件'
+    div.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'
+    div.addEventListener('mouseenter', () => { div.style.transform = 'scale(1.15)'; div.style.background = 'rgba(14,124,134,.85)' })
+    div.addEventListener('mouseleave', () => { div.style.transform = 'scale(1)'; div.style.background = 'rgba(20,22,26,.55)' })
+    div.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation()
+      openAttachmentPreview(d.attachmentUrl, d.attachmentName || '附件')
+    })
+    fo.appendChild(div)
+    gEl.appendChild(fo)
+  }
+  // 主路径：渲染器节点缓存（兼容 group / group.node 两种结构）
+  try {
+    const cache = mind.value.renderer.nodeCache || {}
+    Object.keys(cache).forEach(uid => {
+      const n = cache[uid]
+      const gEl = (n && n.group && n.group.node) ? n.group.node : (n && n.group ? n.group : null)
+      if (!gEl || gEl.querySelector('.smm-att-icon')) return
+      const d = (uidMap && uidMap[uid]) || (n && n.data) || {}
+      if (!d.attachmentUrl) return
+      injectIntoGroup(gEl, d)
+    })
+  } catch (e) {}
+  // 兜底：DOM 遍历（不依赖渲染器缓存结构），按附件名匹配数据
+  try {
+    const svg = document.querySelector('.smm-container svg')
+    if (!svg) return
+    svg.querySelectorAll('title').forEach(t => {
+      const name = (t.textContent || '').trim()
+      if (!name || !nameMap[name]) return
+      const gEl = t.closest('g')
+      if (!gEl || gEl.querySelector('.smm-att-icon')) return
+      injectIntoGroup(gEl, nameMap[name])
+    })
+  } catch (e) {}
+}
+
 
 // AI
 async function runAI() {
@@ -2143,6 +2325,13 @@ onMounted(async () => {
   mapEl.value.addEventListener('touchcancel', onMapTouchEnd)
   pageLoading.value = true
   if (mapEl.value) mapEl.value.classList.add('map-loading')
+  // 拉取后台预览/高亮类型配置（覆盖内置默认）
+  try {
+    const pc = await fetchPreviewConfig()
+    if (pc && pc.previewModes && Object.keys(pc.previewModes).length) previewModes.value = pc.previewModes
+    if (pc && Array.isArray(pc.textPreviewExts) && pc.textPreviewExts.length) textPreviewExts.value = pc.textPreviewExts
+  } catch (e) { /* 后端不可用则用内置默认 */ }
+
   // 拉取后台图标库（按分类分组，覆盖默认表情包）
   try {
     const icons = await fetchIcons()
@@ -2193,6 +2382,15 @@ onMounted(async () => {
   if (d._tabs && Array.isArray(d._tabs) && d._tabs.length) {
     canvasTabs.value = d._tabs
     docIndex.value = d._activeTab || 0
+    // 顶层 root 是活动画布的最新数据（保存/脚本写入时同步），加载时兜底同步到 _tabs 活动项，
+    // 避免 _tabs 与顶层 root 不一致导致附件等字段丢失
+    if (d.root) {
+      const active = canvasTabs.value[docIndex.value]
+      if (active) {
+        if (active.data) active.data.root = d.root
+        else active.data = { root: d.root }
+      }
+    }
   } else {
     canvasTabs.value = [{
       name: data.name || '未命名',
@@ -2226,6 +2424,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('focusin', onEditFocusIn)
   document.removeEventListener('focusout', onEditFocusOut)
   document.removeEventListener('paste', onPaste)
+  if (window.__attIconTimer) { clearInterval(window.__attIconTimer); window.__attIconTimer = null }
   if (mind.value) { try { mind.value.dispose && mind.value.dispose() } catch(e){} }
 })
 </script>
@@ -2244,6 +2443,23 @@ onBeforeUnmount(() => {
 .pl-text { font-size: 14px; color: #667; }
 @keyframes pl-rot { to { transform: rotate(360deg) } }
 .attp-box .attp-dl { color:#909399; font-size:14px; padding:40px 0 16px; text-align:center; } .attp-box .attp-dl-btn { display:inline-block; padding:8px 24px; background:#0e7c86; color:#fff; border-radius:6px; text-decoration:none; font-size:14px; }
+.attp-body .CodeMirror { background:#1e1e1e; color:#e6e6e6; font-family:Consolas,'Courier New',monospace; font-size:13px; line-height:1.6; height:100% }
+.attp-body .CodeMirror-gutters { background:#252526; border-right:1px solid #333 }
+.attp-body .CodeMirror-linenumber { color:#6e6e6e }
+.attp-body .CodeMirror-cursor { border-left:1px solid #fff }
+.attp-body .CodeMirror-selected { background:#264f78 }
+.attp-body span.cm-keyword { color:#569cd6 }
+.attp-body span.cm-string, .attp-body span.cm-string-2 { color:#ce9178 }
+.attp-body span.cm-comment { color:#6a9955 }
+.attp-body span.cm-number { color:#b5cea8 }
+.attp-body span.cm-atom { color:#d7ba7d }
+.attp-body span.cm-variable, .attp-body span.cm-variable-2, .attp-body span.cm-property { color:#9cdcfe }
+.attp-body span.cm-def, .attp-body span.cm-builtin, .attp-body span.cm-qualifier { color:#dcdcaa }
+.attp-body span.cm-operator { color:#d4d4d4 }
+.attp-body span.cm-tag { color:#569cd6 }
+.attp-body span.cm-attribute { color:#9cdcfe }
+.attp-body span.cm-meta { color:#d4d4d4 }
+.attp-body span.cm-error { color:#f44747 }
 /* 数学公式弹窗 */
 /* 编辑态快速插入公式入口 */
 .math-quick { position: fixed; z-index: 2600; width: 34px; height: 34px; border-radius: 50%;

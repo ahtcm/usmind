@@ -113,7 +113,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting } from '@element-plus/icons-vue'
+import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,7 +131,8 @@ const menus = [
   { path: '/oss', label: 'OSS配置', icon: FolderOpened },
   { path: '/themes', label: '主题模板', icon: Brush },
   { path: '/icons', label: '图标库', icon: Star },
-  { path: '/settings', label: '系统设置', icon: Setting }
+  { path: '/settings', label: '系统设置', icon: Setting },
+  { path: '/project-config', label: '项目配置', icon: Tools }
 ]
 
 const activeMenu = computed(() => route.path)
