@@ -76,7 +76,10 @@ public class UserServiceImpl implements UserService {
     public void delete(Long id) {
         SysUser u = userMapper.selectById(id);
         if (u == null) throw new BusinessException(404, "用户不存在");
-        if ("ADMIN".equals(u.getRole())) throw new BusinessException(400, "不能删除管理员账号");
+        if ("ADMIN".equals(u.getRole())) {
+            Long adminCount = userMapper.selectCount(new LambdaQueryWrapper<SysUser>().eq(SysUser::getRole, "ADMIN"));
+            if (adminCount == null || adminCount <= 1) throw new BusinessException(400, "至少保留一个管理员账号");
+        }
         userMapper.deleteById(id);
     }
 
