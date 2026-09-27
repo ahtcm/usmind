@@ -20,7 +20,8 @@
       </div>
       <div class="share-bg">
         <div class="share-bg-color" :style="{ background: bgColorVal }"></div>
-        <div class="share-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
+        <div v-show="!bgVideoVal" class="share-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
+        <video v-if="bgVideoVal" class="share-bg-video" :src="bgVideoVal" autoplay loop muted playsinline :style="{ opacity: bgOpacityVal }"></video>
         <div id="map" ref="mapEl"></div>
       </div>
       <div v-if="pageLoading" class="page-loading">
@@ -71,6 +72,7 @@ const shareName = ref('')
 const zoomPct = ref('100%')
 const bgColorVal = ref('#fafbff')
 const bgImageVal = ref('')
+const bgVideoVal = ref('')
 const bgOpacityVal = ref(1)
 let remoteThemes = []
 const pageLoading = ref(true)
@@ -83,7 +85,8 @@ function themeConfigOf(name) {
 function applyShareBg(name) {
   const cfg = themeConfigOf(name)
   bgColorVal.value = cfg.backgroundColor || '#fafbff'
-  bgImageVal.value = cfg.backgroundImage || ''
+  bgImageVal.value = (cfg.backgroundImage && cfg.backgroundImage !== 'none') ? cfg.backgroundImage : ''
+  bgVideoVal.value = (cfg.backgroundVideo && cfg.backgroundVideo !== 'none') ? cfg.backgroundVideo : ''
   bgOpacityVal.value = (typeof cfg.backgroundOpacity === 'number') ? cfg.backgroundOpacity : 1
   if (mapEl.value) mapEl.value.style.background = 'transparent'
   updateBgSize()
@@ -257,5 +260,6 @@ onBeforeUnmount(() => {
 @keyframes pl-rot { to { transform: rotate(360deg) } }
 .share-bg-color { position: absolute; inset: 0; }
 .share-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.share-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
 #map { position: relative; height: 100%; width: 100%; background: transparent !important; }
 </style>

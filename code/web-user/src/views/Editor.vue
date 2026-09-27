@@ -44,7 +44,8 @@
     <!-- 画布（三层背景：底色 → 背景图 → 脑图） -->
     <div class="canvas-bg">
       <div class="canvas-bg-color" :style="{ background: bgColorVal }"></div>
-      <div class="canvas-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
+      <div v-show="!bgVideoVal" class="canvas-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
+      <video v-if="bgVideoVal" class="canvas-bg-video" :src="bgVideoVal" autoplay loop muted playsinline :style="{ opacity: bgOpacityVal, transform: 'scale(' + bgZoom + ')' }"></video>
       <div id="map" ref="mapEl"></div>
     </div>
 
@@ -383,6 +384,7 @@ function hideLoading(tk) {
 }
 const bgColorVal = ref('#16181d')
 const bgImageVal = ref('')
+const bgVideoVal = ref('')
 const bgZoom = ref(1.35)
 const sbH = reactive({ size: 100, pos: 0 })
 const sbV = reactive({ size: 100, pos: 0 })
@@ -1159,7 +1161,9 @@ function applyCanvasBackground(name) {
   const t = themes.value.find(x => x.name === name) || themes.value[0]
   const cfg = (t && t.config) || {}
   bgColorVal.value = cfg.backgroundColor || '#16181d'
-  bgImageVal.value = cfg.backgroundImage || ''
+  bgImageVal.value = (cfg.backgroundImage && cfg.backgroundImage !== 'none') ? cfg.backgroundImage : ''
+  bgVideoVal.value = (cfg.backgroundVideo && cfg.backgroundVideo !== 'none') ? cfg.backgroundVideo : ''
+  bgVideoVal.value = (cfg.backgroundVideo && cfg.backgroundVideo !== 'none') ? cfg.backgroundVideo : ''
   bgOpacityVal.value = (typeof cfg.backgroundOpacity === 'number') ? cfg.backgroundOpacity : 1
   bgZoom.value = (typeof cfg.backgroundZoom === 'number' && cfg.backgroundZoom >= 1) ? cfg.backgroundZoom : 1
   bgColor.value = bgColorVal.value
@@ -2231,6 +2235,8 @@ onBeforeUnmount(() => {
 .canvas-bg { position: absolute; inset: 0; overflow: hidden; }
 .canvas-bg-color { position: absolute; inset: 0; }
 .canvas-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.canvas-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
+.canvas-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
 #map { position: relative; height: 100%; width: 100%; background: transparent !important; opacity: 1; transition: opacity .5s ease; }
 #map.map-loading { opacity: 0; }
 .page-loading { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(255,255,255,.7); backdrop-filter: blur(2px); }

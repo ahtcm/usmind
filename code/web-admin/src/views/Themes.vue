@@ -129,6 +129,20 @@
             </el-form-item>
           </el-col>
           <el-col :span="8">
+            <el-form-item label="背景视频">
+              <div class="bg-upload">
+                <el-upload :show-file-list="false" :http-request="uploadBgVideo" accept="video/*">
+                  <el-button size="small" :loading="uploading">上传视频</el-button>
+                </el-upload>
+                <div v-if="form.bgVideo" class="bg-thumb">
+                  <video :src="form.bgVideo" muted autoplay loop playsinline></video>
+                  <span class="bg-thumb-x" @click="form.bgVideo = ''" title="清除">×</span>
+                </div>
+                <el-input v-model="form.bgVideo" placeholder="或粘贴视频URL" clearable size="small" />
+              </div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="图片透明度">
               <el-slider v-model="form.bgOpacity" :min="0" :max="100" :show-input="true" />
             </el-form-item>
@@ -220,6 +234,18 @@ async function uploadBgImage(opt) {
   uploading.value = false
 }
 
+async function uploadBgVideo(opt) {
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', opt.file)
+    const res = await request.post('/file/upload', fd)
+    if (res && res.url) form.bgVideo = res.url
+    else ElMessage.error('上传返回异常')
+  } catch (e) { ElMessage.error('上传失败: ' + (e.message || '网络错误')) }
+  uploading.value = false
+}
+
 const list = ref([])
 const loading = ref(false)
 const selectedIds = ref([])
@@ -253,7 +279,7 @@ const defaultLevel = () => ({ fillColor: '#ffffff', color: '#334155', borderColo
 const defaultForm = () => ({
   id: null, name: '', themeKey: '', sort: 99, enabled: 1,
   colors: ['#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4', '#C084FC', '#60A5FA', '#34D399', '#22D3EE'],
-  bgColor: '#fafbff', bgImage: '', bgOpacity: 100, bgZoom: 1, lineColor: '#94a3b8', lineWidth: 4,
+  bgColor: '#fafbff', bgImage: '', bgVideo: '', bgOpacity: 100, bgZoom: 1, lineColor: '#94a3b8', lineWidth: 4,
   root: { ...defaultLevel(), fillColor: '#4A5CF7', color: '#ffffff', fontSize: 36, fontWeight: 'bold', paddingX: 30 },
   second: { ...defaultLevel(), fontSize: 25, paddingX: 26 },
   node: { ...defaultLevel(), fontSize: 22, paddingX: 22 }
@@ -335,6 +361,7 @@ function openEdit(row) {
     const cfg = JSON.parse(row.configJson || '{}')
     form.bgColor = cfg.backgroundColor || '#fafbff'
     form.bgImage = cfg.backgroundImage || ''
+    form.bgVideo = cfg.backgroundVideo || ''
     form.bgOpacity = (typeof cfg.backgroundOpacity === 'number') ? Math.round(cfg.backgroundOpacity * 100) : 100
     form.bgZoom = (typeof cfg.backgroundZoom === 'number' && cfg.backgroundZoom >= 1) ? cfg.backgroundZoom : 1
     form.lineColor = cfg.lineColor || '#94a3b8'
@@ -362,6 +389,7 @@ function buildConfig() {
     lineStyle: 'curve', rootLineKeepSameInCurve: true, rootLineStartPositionKeepSameInCurve: true,
     backgroundColor: form.bgColor,
     backgroundImage: form.bgImage || 'none',
+    backgroundVideo: form.bgVideo || 'none',
     backgroundOpacity: form.bgOpacity / 100,
     backgroundZoom: form.bgZoom,
     backgroundRepeat: 'no-repeat', backgroundPosition: 'center center', backgroundSize: 'cover',
@@ -436,6 +464,7 @@ onMounted(load)
 .bg-upload { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .bg-thumb { position: relative; width: 100%; height: 56px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,.1); }
 .bg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bg-thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .bg-thumb-x { position: absolute; top: 2px; right: 4px; width: 18px; height: 18px; line-height: 16px; text-align: center; background: rgba(0,0,0,.55); color: #fff; border-radius: 50%; cursor: pointer; font-size: 12px; }
 .theme-preview { position: relative; width: 100%; height: 220px; border-radius: 10px; border: 1px solid rgba(0,0,0,.08); overflow: hidden; }
 .preview-bg-img { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
