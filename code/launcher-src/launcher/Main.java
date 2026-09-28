@@ -63,6 +63,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
         smoke = Arrays.asList(args).contains("--smoke");
         locateRoot();
+        checkPortablePath();
         logsDir = new File(dataDir, "logs");
         logsDir.mkdirs();
 
@@ -539,6 +540,29 @@ public class Main {
     // =====================================================
     //  服务控制
     // =====================================================
+    /** 便携版路径检测：MySQL/nginx（Windows 版）在含空格或中文等非 ASCII 字符的路径下无法启动
+     *  （mysqld 参数解析在空格处截断，nginx 报 1113 编码错误），启动前明确提示 */
+    static void checkPortablePath() {
+        String p = root.getAbsolutePath();
+        boolean bad = false; String reason = "";
+        for (char c : p.toCharArray()) {
+            if (c > 127) { bad = true; reason = "包含中文等非英文字符"; break; }
+        }
+        if (!bad && p.contains(" ")) { bad = true; reason = "包含空格"; }
+        if (bad) {
+            if (smoke) {
+                System.err.println("[SMOKE] FAIL: 程序路径" + reason + "，MySQL/nginx 无法启动: " + p);
+                System.exit(1);
+            }
+            String msg = "检测到程序路径" + reason + "：\n  " + p +
+                    "\n\nMySQL / Nginx（Windows 版）在含空格或中文的路径下无法启动，" +
+                    "系统将无法正常运行。\n请把整个 usmind-portable 文件夹移动到" +
+                    "纯英文、无空格的路径（例如 D:\\usmind-portable）后再运行。";
+            JOptionPane.showMessageDialog(null, msg, "USMIND 路径提示", JOptionPane.WARNING_MESSAGE);
+            System.exit(1);
+        }
+    }
+
     static void locateRoot() throws Exception {
         File javaHome = new File(System.getProperty("java.home"));
         File candidate = javaHome.getParentFile();
