@@ -1,9 +1,10 @@
 @echo off
 setlocal EnableDelayedExpansion
-title USMIND 构建（仅便携版）
-cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%.."
+set "ROOT=%CD%\"
+title USMIND 一键构建（便携版 / 自解压版 / 在线版）
 
-set "ROOT=%~dp0"
 set "RELEASE=%ROOT%release"
 set "TOOLS=%ROOT%tools"
 set "JDK=%TOOLS%\jdk-17.0.2"
@@ -11,11 +12,18 @@ set "JAVAC=%JDK%\bin\javac.exe"
 set "JAR=%JDK%\bin\jar.exe"
 set "JLINK=%JDK%\bin\jlink.exe"
 set "JPACKAGE=%JDK%\bin\jpackage.exe"
+set "CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 set "SRC=%ROOT%code\launcher-src"
 set "BUILD_OUT=%RELEASE%\launcher-out"
 
+if not exist "%CSC%" (
+  echo [错误] 未找到 .NET Framework csc.exe，请确认已安装 .NET Framework 4.x
+  pause & exit /b 1
+)
+
+:: ================= [1/3] 便携绿色版 =================
 echo.
-echo ============ 构建便携绿色版 usmind-portable ============
+echo ============ [1/3] 便携绿色版 usmind-portable ============
 set "PORTABLE=%RELEASE%\usmind-portable"
 if exist "%PORTABLE%" rmdir /s /q "%PORTABLE%"
 mkdir "%PORTABLE%\components" "%PORTABLE%\data" "%PORTABLE%\app" 2>nul
@@ -25,6 +33,7 @@ if exist "%BUILD_OUT%" rmdir /s /q "%BUILD_OUT%"
 mkdir "%BUILD_OUT%\classes"
 "%JAVAC%" -encoding UTF-8 -d "%BUILD_OUT%\classes" "%SRC%\launcher\Main.java"
 if errorlevel 1 goto :err
+
 "%JAR%" cf "%BUILD_OUT%\launcher.jar" -C "%BUILD_OUT%\classes" .
 if errorlevel 1 goto :err
 copy /y "%BUILD_OUT%\launcher.jar" "%PORTABLE%\app\launcher.jar" >nul
@@ -88,9 +97,47 @@ mkdir "%PORTABLE%\components\nginx\html\admin"
 xcopy /e /i /y /q "%ROOT%code\web-admin\dist\*" "%PORTABLE%\components\nginx\html\admin\" >nul
 if errorlevel 1 goto :err
 
+echo   [完成] 便携版: %PORTABLE%
+
+:: ================= [2/3] 单文件自解压版 =================
+echo.
+echo ============ [2/3] 单文件自解压版 USMIND-setup.exe ============
+echo   -- 压缩便携版 (Optimal, 耗时较长) --
+if exist "%RELEASE%\_setup.zip" del "%RELEASE%\_setup.zip"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory('%PORTABLE%', '%RELEASE%\_setup.zip', [System.IO.Compression.CompressionLevel]::Optimal, $false)"
+if errorlevel 1 goto :err
+
+echo   -- 编译自解压 stub --
+"%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-setup-stub.exe" /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\selfextract.cs"
+if errorlevel 1 goto :err
+
+echo   -- 拼接 stub + zip --
+copy /b "%BUILD_OUT%\USMIND-setup-stub.exe" + "%RELEASE%\_setup.zip" "%RELEASE%\USMIND-setup.exe" >nul
+if errorlevel 1 goto :err
+del "%RELEASE%\_setup.zip"
+echo   [完成] 自解压版: %RELEASE%\USMIND-setup.exe
+
+:: ================= [3/3] 在线安装版 =================
+echo.
+echo ============ [3/3] 在线安装版 USMIND-online.exe ============
+echo   -- 生成环境分片 (build_online.ps1) --
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC%\build_online.ps1"
+if errorlevel 1 goto :err
+
+echo   -- 编译在线下载器 (Installer.cs) --
+"%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-online-stub.exe" /res:"%RELEASE%\online-dist\manifest.json",Installer.manifest /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\Installer.cs"
+if errorlevel 1 goto :err
+
+copy /y "%BUILD_OUT%\USMIND-online-stub.exe" "%RELEASE%\USMIND-online.exe" >nul
+if errorlevel 1 goto :err
+echo   [完成] 在线版: %RELEASE%\USMIND-online.exe
+
 echo.
 echo ============================================
-echo   便携版构建完成: %PORTABLE%\USMIND.exe
+echo   全部构建完成
+echo   - 便携版   : %RELEASE%\usmind-portable\USMIND.exe
+echo   - 自解压版 : %RELEASE%\USMIND-setup.exe
+echo   - 在线版   : %RELEASE%\USMIND-online.exe
 echo ============================================
 if /i not "%1"=="-s" pause
 exit /b 0
