@@ -28,6 +28,7 @@ public class Main {
     // ---------------- 常量 ----------------
     static final String[] LOG_NAMES = {"launcher", "backend", "mysql", "redis", "nginx"};
     static final String[] LOG_LABELS = {"启动器", "后端", "MySQL", "Redis", "Nginx"};
+    static final int MAX_CACHE_LINES = 600;   // 每个日志缓存的最近行数（固定窗口）
     static final Color BG      = new Color(0x1E, 0x1E, 0x1E);
     static final Color CARD    = new Color(0x2A, 0x2A, 0x2A);
     static final Color BORDER  = new Color(0x3A, 0x3A, 0x3A);
@@ -270,14 +271,33 @@ public class Main {
         if (sb == null) return;
         synchronized (sb) {
             sb.append(text);
-            if (sb.length() > 400_000) sb.delete(0, sb.length() / 2);
+            // 固定窗口：只保留最近 MAX_CACHE_LINES 行，超出时丢弃最旧行
+            int nl = 0, last = -1;
+            for (int i = sb.length() - 1; i >= 0 && nl <= MAX_CACHE_LINES; i--) {
+                if (sb.charAt(i) == '\n') { nl++; if (nl == MAX_CACHE_LINES + 1) { last = i; break; } }
+            }
+            if (last >= 0) sb.delete(0, last + 1);
         }
         if (name.equals(currentLog)) {
             SwingUtilities.invokeLater(() -> {
                 logArea.setText(logCache.get(currentLog).toString());
-                logArea.setCaretPosition(Math.max(0, logArea.getDocument().getLength() - 1));
+                // 仅当用户在看最新内容时才自动滚到底部；回看历史时不打扰
+                if (isAtBottom()) {
+                    logArea.setCaretPosition(Math.max(0, logArea.getDocument().getLength() - 1));
+                }
             });
         }
+    }
+
+    /** 判断日志滚动条是否在底部（用户在跟随最新日志） */
+    static boolean isAtBottom() {
+        Component comp = logArea.getParent();
+        while (comp != null && !(comp instanceof JScrollPane)) comp = comp.getParent();
+        if (comp == null) return true;
+        JScrollPane sp = (JScrollPane) comp;
+        JScrollBar bar = sp.getVerticalScrollBar();
+        int max = bar.getMaximum() - bar.getVisibleAmount();
+        return max <= 0 || bar.getValue() >= max - 30;
     }
 
     static void tailLogs() {

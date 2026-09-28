@@ -39,14 +39,19 @@ echo   -- 生成精简 JRE (jlink) --
 if errorlevel 1 goto :err
 
 echo   -- 生成 USMIND.exe (jpackage) --
+if exist "%RELEASE%\_app" rmdir /s /q "%RELEASE%\_app"
+mkdir "%RELEASE%\_app"
+copy /y "%PORTABLE%\app\launcher.jar" "%RELEASE%\_app\" >nul
+if errorlevel 1 goto :err
 if exist "%RELEASE%\_jp" rmdir /s /q "%RELEASE%\_jp"
-"%JPACKAGE%" --type app-image --input "%PORTABLE%\app" --main-jar launcher.jar --main-class launcher.Main --runtime-image "%PORTABLE%\runtime" --name USMIND --dest "%RELEASE%\_jp"
+"%JPACKAGE%" --type app-image --input "%RELEASE%\_app" --main-jar launcher.jar --main-class launcher.Main --runtime-image "%PORTABLE%\runtime" --name USMIND --dest "%RELEASE%\_jp"
 if errorlevel 1 goto :err
 copy /y "%RELEASE%\_jp\USMIND\USMIND.exe" "%PORTABLE%\USMIND.exe" >nul
 if errorlevel 1 goto :err
 copy /y "%RELEASE%\_jp\USMIND\app\USMIND.cfg" "%PORTABLE%\app\USMIND.cfg" >nul
 if errorlevel 1 goto :err
 rmdir /s /q "%RELEASE%\_jp"
+rmdir /s /q "%RELEASE%\_app"
 
 echo   -- 复制组件 (mysql/redis/nginx/backend/init.sql) --
 xcopy /e /i /y /q "%TOOLS%\mysql-8.0.36-winx64" "%PORTABLE%\components\mysql" >nul
