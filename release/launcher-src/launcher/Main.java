@@ -41,7 +41,7 @@ public class Main {
 
     static final String[] SVC_NAMES = {"MySQL", "Redis", "Nginx", "后端"};
     static final String[] SVC_PORTS = {"3306", "6379", "80 / 8866 / 8867", "8899"};
-    static final String[] LOG_FILES = {"backend.log", "mysql.log", "redis.log", "nginx.log"};
+    static final String[] LOG_FILES = {"mysql.log", "redis.log", "nginx.log", "backend.log"};
 
     // ---------------- 运行状态 ----------------
     static File root, components, dataDir, logsDir;
@@ -103,6 +103,8 @@ public class Main {
         });
         Image logo = loadLogoIcon();
         if (logo != null) frame.setIconImage(logo);
+        // 无系统边框：自绘标题栏，保证头部与身体配色一致
+        frame.setUndecorated(true);
         frame.setSize(900, 620);
         frame.setMinimumSize(new Dimension(720, 500));
         frame.setLocationRelativeTo(null);
@@ -110,33 +112,10 @@ public class Main {
 
         JPanel rootPane = new JPanel(new BorderLayout(0, 0));
         rootPane.setBackground(BG);
-        rootPane.setBorder(new EmptyBorder(18, 20, 16, 20));
+        rootPane.setBorder(new EmptyBorder(0, 20, 16, 20));
 
-        // ---------- 头（与身体同色） ----------
-        JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(true);
-        top.setBackground(BG);
-        JPanel titleBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        titleBox.setOpaque(false);
-        JLabel logoLbl = new JLabel("USMIND");
-        logoLbl.setFont(uiFont.deriveFont(Font.BOLD, 22f));
-        logoLbl.setForeground(ACCENT);
-        JLabel subLbl = new JLabel("思维导图 · 便携版");
-        subLbl.setForeground(SUB);
-        titleBox.add(logoLbl);
-        titleBox.add(subLbl);
-
-        JPanel statusBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        statusBox.setOpaque(false);
-        statusDot = new JLabel("●");
-        statusDot.setFont(uiFont.deriveFont(Font.BOLD, 18f));
-        statusDot.setForeground(RED);
-        statusText = new JLabel("未启动");
-        statusText.setForeground(TEXT);
-        statusBox.add(statusDot); statusBox.add(statusText);
-        top.add(titleBox, BorderLayout.WEST);
-        top.add(statusBox, BorderLayout.EAST);
-        rootPane.add(top, BorderLayout.NORTH);
+        // ---------- 自绘标题栏（与身体同色 + logo 图标 + 窗口控制） ----------
+        rootPane.add(buildTitleBar(uiFont, logo), BorderLayout.NORTH);
 
         // ---------- 中部 ----------
         JPanel mid = new JPanel(new BorderLayout(0, 14));
@@ -189,6 +168,83 @@ public class Main {
 
         statusTimer = new javax.swing.Timer(1500, e -> refresh());
         statusTimer.start();
+    }
+
+    /** 自绘标题栏：logo 图标 + 标题 + 运行状态 + 最小化/关闭；支持鼠标拖动 */
+    static JPanel buildTitleBar(Font uiFont, Image logo) {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setOpaque(true);
+        bar.setBackground(BG);
+        bar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        bar.setPreferredSize(new Dimension(0, 46));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 11));
+        left.setOpaque(false);
+        if (logo != null) {
+            JLabel ic = new JLabel(new ImageIcon(logo.getScaledInstance(22, 22, Image.SCALE_SMOOTH)));
+            left.add(ic);
+        }
+        JLabel t = new JLabel("USMIND 思维导图 · 便携版");
+        t.setForeground(TEXT);
+        t.setFont(uiFont.deriveFont(Font.BOLD, 14f));
+        left.add(t);
+
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 9));
+        right.setOpaque(false);
+        statusDot = new JLabel("●");
+        statusDot.setFont(uiFont.deriveFont(Font.BOLD, 14f));
+        statusDot.setForeground(RED);
+        statusText = new JLabel("未启动");
+        statusText.setForeground(SUB);
+        JLabel gap = new JLabel("   ");
+        JButton min = new JButton("—");
+        JButton close = new JButton("✕");
+        styleTitleBtn(min, uiFont);
+        styleTitleBtn(close, uiFont);
+        close.addActionListener(e -> shutdown());
+        min.addActionListener(e -> frame.setExtendedState(JFrame.ICONIFIED));
+        right.add(statusDot); right.add(statusText); right.add(gap); right.add(min); right.add(close);
+
+        MouseAdapter drag = new MouseAdapter() {
+            int px, py;
+            public void mousePressed(MouseEvent e) { px = e.getX(); py = e.getY(); }
+            public void mouseDragged(MouseEvent e) {
+                Point p = frame.getLocation();
+                frame.setLocation(p.x + e.getX() - px, p.y + e.getY() - py);
+            }
+        };
+        bar.addMouseListener(drag); bar.addMouseMotionListener(drag);
+        left.addMouseListener(drag); left.addMouseMotionListener(drag);
+        t.addMouseListener(drag); t.addMouseMotionListener(drag);
+
+        bar.add(left, BorderLayout.WEST);
+        bar.add(right, BorderLayout.EAST);
+        return bar;
+    }
+
+    static void styleTitleBtn(JButton b, Font f) {
+        b.setFocusPainted(false);
+        b.setBorderPainted(false);
+        b.setContentAreaFilled(false);
+        b.setOpaque(false);
+        b.setForeground(SUB);
+        b.setFont(f.deriveFont(Font.PLAIN, 13f));
+        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        b.setPreferredSize(new Dimension(38, 26));
+        b.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) {
+                b.setForeground(Color.WHITE);
+                b.setBackground(new Color(0x3A, 0x44, 0x53));
+                b.setOpaque(true);
+                b.repaint();
+            }
+            public void mouseExited(MouseEvent e) {
+                b.setForeground(SUB);
+                b.setBackground(BG);
+                b.setOpaque(false);
+                b.repaint();
+            }
+        });
     }
 
     /** 圆角卡片：服务名 + 状态点 + 端口 + 错误计数 */
@@ -362,7 +418,7 @@ public class Main {
 
     /** 增量扫描日志错误关键字，更新卡片错误计数 */
     static void scanErrors(boolean[] ok) {
-        String[] names = {"backend", "mysql", "redis", "nginx"};
+        String[] names = {"mysql", "redis", "nginx", "backend"};
         for (int i = 0; i < 4; i++) {
             File f = new File(logsDir, names[i] + ".log");
             int cnt = errCount.getOrDefault(names[i], 0);
@@ -401,6 +457,14 @@ public class Main {
         statusDot.setForeground(ORANGE);
         statusText.setText("启动中…");
         guiMsg("正在启动全部服务…");
+        // 重置错误检测：只统计本次运行产生的错误（跳过历史日志）
+        errPos.clear();
+        errCount.clear();
+        for (int i = 0; i < 4; i++) cards[i].setErrors(0);
+        for (String n : new String[]{"mysql", "redis", "nginx", "backend"}) {
+            File f = new File(logsDir, n + ".log");
+            errPos.put(n, f.exists() ? f.length() : 0L);
+        }
         new Thread(() -> {
             try {
                 ensureMysqlData();
