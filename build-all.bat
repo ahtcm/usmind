@@ -13,7 +13,8 @@ set "JAR=%JDK%\bin\jar.exe"
 set "JLINK=%JDK%\bin\jlink.exe"
 set "JPACKAGE=%JDK%\bin\jpackage.exe"
 set "CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-set "SRC=%RELEASE%\launcher-src"
+set "SRC=%ROOT%code\launcher-src"
+set "BUILD_OUT=%RELEASE%\launcher-out"
 
 if not exist "%CSC%" (
   echo [错误] 未找到 .NET Framework csc.exe，请确认已安装 .NET Framework 4.x
@@ -28,10 +29,14 @@ if exist "%PORTABLE%" rmdir /s /q "%PORTABLE%"
 mkdir "%PORTABLE%\components" "%PORTABLE%\data" "%PORTABLE%\app" 2>nul
 
 echo   -- 编译启动器 (Main.java) --
-"%JAVAC%" -encoding UTF-8 -d "%SRC%\classes" "%SRC%\launcher\Main.java"
+if exist "%BUILD_OUT%" rmdir /s /q "%BUILD_OUT%"
+mkdir "%BUILD_OUT%\classes"
+"%JAVAC%" -encoding UTF-8 -d "%BUILD_OUT%\classes" "%SRC%\launcher\Main.java"
 if errorlevel 1 goto :err
 
-"%JAR%" cf "%PORTABLE%\app\launcher.jar" -C "%SRC%\classes" .
+"%JAR%" cf "%BUILD_OUT%\launcher.jar" -C "%BUILD_OUT%\classes" .
+if errorlevel 1 goto :err
+copy /y "%BUILD_OUT%\launcher.jar" "%PORTABLE%\app\launcher.jar" >nul
 if errorlevel 1 goto :err
 
 echo   -- 生成精简 JRE (jlink) --
@@ -43,7 +48,7 @@ copy /y "%SRC%\logo.ico" "%PORTABLE%\logo.ico" >nul
 if errorlevel 1 goto :err
 if exist "%RELEASE%\_app" rmdir /s /q "%RELEASE%\_app"
 mkdir "%RELEASE%\_app"
-copy /y "%PORTABLE%\app\launcher.jar" "%RELEASE%\_app\" >nul
+copy /y "%BUILD_OUT%\launcher.jar" "%RELEASE%\_app\" >nul
 if errorlevel 1 goto :err
 if exist "%RELEASE%\_jp" rmdir /s /q "%RELEASE%\_jp"
 "%JPACKAGE%" --type app-image --input "%RELEASE%\_app" --main-jar launcher.jar --main-class launcher.Main --runtime-image "%PORTABLE%\runtime" --icon "%SRC%\logo.ico" --name USMIND --dest "%RELEASE%\_jp"
@@ -103,11 +108,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName S
 if errorlevel 1 goto :err
 
 echo   -- 编译自解压 stub --
-"%CSC%" /nologo /target:winexe /out:"%SRC%\USMIND-setup-stub.exe" /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\selfextract.cs"
+"%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-setup-stub.exe" /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\selfextract.cs"
 if errorlevel 1 goto :err
 
 echo   -- 拼接 stub + zip --
-copy /b "%SRC%\USMIND-setup-stub.exe" + "%RELEASE%\_setup.zip" "%RELEASE%\USMIND-setup.exe" >nul
+copy /b "%BUILD_OUT%\USMIND-setup-stub.exe" + "%RELEASE%\_setup.zip" "%RELEASE%\USMIND-setup.exe" >nul
 if errorlevel 1 goto :err
 del "%RELEASE%\_setup.zip"
 echo   [完成] 自解压版: %RELEASE%\USMIND-setup.exe
@@ -120,10 +125,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC%\build_online.ps1"
 if errorlevel 1 goto :err
 
 echo   -- 编译在线下载器 (Installer.cs) --
-"%CSC%" /nologo /target:winexe /out:"%SRC%\USMIND-online-stub.exe" /res:"%RELEASE%\online-dist\manifest.json",Installer.manifest /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\Installer.cs"
+"%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-online-stub.exe" /res:"%RELEASE%\online-dist\manifest.json",Installer.manifest /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\Installer.cs"
 if errorlevel 1 goto :err
 
-copy /y "%SRC%\USMIND-online-stub.exe" "%RELEASE%\USMIND-online.exe" >nul
+copy /y "%BUILD_OUT%\USMIND-online-stub.exe" "%RELEASE%\USMIND-online.exe" >nul
 if errorlevel 1 goto :err
 echo   [完成] 在线版: %RELEASE%\USMIND-online.exe
 

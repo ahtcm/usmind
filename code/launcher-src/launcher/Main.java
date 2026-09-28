@@ -197,8 +197,8 @@ public class Main {
         statusText = new JLabel("未启动");
         statusText.setForeground(SUB);
         JLabel gap = new JLabel("   ");
-        JButton min = new JButton("—");
-        JButton close = new JButton("✕");
+        JButton min = new JButton("_");
+        JButton close = new JButton("X");
         styleTitleBtn(min, uiFont);
         styleTitleBtn(close, uiFont);
         close.addActionListener(e -> shutdown());
@@ -410,7 +410,12 @@ public class Main {
         for (int i = 0; i < 4; i++) {
             cards[i].setState(ok[i], started);
         }
-        scanErrors(ok);
+        // 未启动时不扫描日志（避免把历史错误算进来）；启动后增量扫描
+        if (started) {
+            scanErrors(ok);
+        } else {
+            for (int i = 0; i < 4; i++) cards[i].setErrors(0);
+        }
         boolean all = ok[0] && ok[1] && ok[2] && ok[3];
         statusDot.setForeground(all ? GREEN : (started ? ORANGE : RED));
         statusText.setText(all ? "全部服务运行中" : (started ? "启动中…" : "未启动"));
@@ -468,7 +473,7 @@ public class Main {
         new Thread(() -> {
             try {
                 // 先清理便携版残留孤儿进程（异常退出遗留的 nginx/java/mysql/redis），避免端口占用导致启动失败
-                killPortableStale();
+                killUsmindFamily();
                 ensureMysqlData();
                 startRedis();
                 startNginx();
@@ -509,7 +514,7 @@ public class Main {
         new Thread(() -> {
             try { stopAll(); } catch (Exception ignored) {}
             // 兜底：清理所有便携版残留进程（含非本实例启动的孤儿）
-            killPortableStale();
+            killUsmindFamily();
             started = false;
             SwingUtilities.invokeLater(() -> {
                 statusDot.setForeground(RED);
@@ -661,8 +666,8 @@ public class Main {
                 if (!mysqlProc.waitFor(3, TimeUnit.SECONDS)) taskkill(mysqlProc.pid());
             }
         }
-        // 最终兜底：清理便携版残留
-        killPortableStale();
+        // 最终兜底：清理 USMIND 家族残留（便携版 + 安装版）
+        killUsmindFamily();
     }
 
     /** 强制结束某 PID 及其子进程树 */
@@ -673,18 +678,21 @@ public class Main {
         } catch (Exception ignored) {}
     }
 
-    /** 清理便携版残留进程（异常退出留下的孤儿 nginx/java/mysql/redis），避免端口占用 */
-    static void killPortableStale() {
+    /** 清理 USMIND 家族残留进程（便携版 usmind-portable + 安装版 %LOCALAPPDATA%\USMIND / USMIND-online），
+     *  避免端口占用导致启动失败；不触碰开发环境（tools 路径）进程 */
+    static void killUsmindFamily() {
         try {
-            String ps = "Get-CimInstance Win32_Process | Where-Object { ($_.Name -in 'nginx.exe','java.exe','mysqld.exe','redis-server.exe') -and ($_.ExecutablePath -like '*usmind-portable*') } | ForEach-Object { $_.ProcessId }";
+            String ps = "Get-CimInstance Win32_Process | Where-Object { ($_.Name -in 'nginx.exe','java.exe','mysqld.exe','redis-server.exe') -and (($_.ExecutablePath -like '*usmind-portable*') -or ($_.ExecutablePath -like '*AppData\\Local\\USMIND*')) } | ForEach-Object { $_.ProcessId }";
             Process p = new ProcessBuilder("powershell", "-NoProfile", "-Command", ps)
                     .redirectErrorStream(true).start();
             p.waitFor(15, TimeUnit.SECONDS);
             String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int killed = 0;
             for (String line : out.split("\\r?\\n")) {
                 String pid = line.trim();
-                if (pid.matches("\\d+")) taskkill(Long.parseLong(pid));
+                if (pid.matches("\\d+")) { taskkill(Long.parseLong(pid)); killed++; }
             }
+            if (killed > 0) guiMsg("已清理 " + killed + " 个残留的 USMIND 服务进程");
             Thread.sleep(1500);
         } catch (Exception ignored) {}
     }
@@ -789,7 +797,7 @@ public class Main {
     static void runSmoke() throws Exception {
         System.out.println("== USMIND SMOKE ==");
         try {
-            killPortableStale();
+            killUsmindFamily();
             ensureMysqlData();
             startRedis();
             startNginx();
