@@ -6,14 +6,19 @@ import com.usmind.mapper.SysConfigMapper;
 import com.usmind.service.SettingsService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -21,6 +26,10 @@ public class SettingsServiceImpl implements SettingsService {
 
     private final SysConfigMapper sysConfigMapper;
     private final JdbcTemplate jdbcTemplate;
+
+    /** 可选：nginx.conf 绝对路径覆盖（默认自动探测便携版/原项目位置） */
+    @Value("${nginx.conf-path:}")
+    private String nginxConfPath;
 
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
@@ -145,7 +154,11 @@ public class SettingsServiceImpl implements SettingsService {
             set("jwtExpireHours", String.valueOf(body.get("jwtExpireHours")));
         }
         if (body.containsKey("uploadMaxSizeMb") && body.get("uploadMaxSizeMb") != null) {
-            set("uploadMaxSizeMb", String.valueOf(body.get("uploadMaxSizeMb")));
+            String v = String.valueOf(body.get("uploadMaxSizeMb"));
+            set("uploadMaxSizeMb", v);
+            try {
+                syncNginxBodySize(Integer.parseInt(v.trim()));
+            } catch (NumberFormatException ignored) { }
         }
         if (body.containsKey("allowedFileTypes") && body.get("allowedFileTypes") != null) {
             set("allowedFileTypes", String.valueOf(body.get("allowedFileTypes")));
@@ -177,5 +190,74 @@ public class SettingsServiceImpl implements SettingsService {
     @Override
     public long getJwtExpireMs() {
         return getInt("jwtExpireHours", 24) * 3600_000L;
+    }
+
+    // =====================================================
+    //  nginx 上传大小联动：后台改 uploadMaxSizeMb -> 同步 nginx.conf + 热重载
+    // =====================================================
+
+    private void syncNginxBodySize(int mb) {
+        File conf = detectNginxConf();
+        if (conf == null) {
+            log.warn("未找到 nginx.conf，上传大小仅后端生效（可在 application.yml 配置 nginx.conf-path 覆盖）");
+            return;
+        }
+        try {
+            String text = new String(Files.readAllBytes(conf.toPath()), StandardCharsets.UTF_8);
+            String updated;
+            if (text.contains("client_max_body_size")) {
+                updated = text.replaceAll("client_max_body_size\\s+\\d+[kKmMgG]?;", "client_max_body_size " + mb + "m;");
+            } else {
+                updated = text.replaceFirst("(?s)(\\s*)(http\\s*\\{)", "$1$2\n    client_max_body_size " + mb + "m;");
+            }
+            if (!updated.equals(text)) {
+                Files.write(conf.toPath(), updated.getBytes(StandardCharsets.UTF_8));
+                log.info("nginx.conf 已同步 client_max_body_size {}m: {}", mb, conf.getAbsolutePath());
+                reloadNginx(conf.getParentFile().getParentFile());
+            }
+        } catch (Exception e) {
+            log.warn("同步 nginx client_max_body_size 失败: {}", e.getMessage());
+        }
+    }
+
+    /** 探测 nginx.conf：优先配置项，其次便携版 components/nginx、原项目 tools/nginx */
+    private File detectNginxConf() {
+        if (nginxConfPath != null && !nginxConfPath.trim().isEmpty()) {
+            File f = new File(nginxConfPath.trim());
+            if (f.isFile()) return f;
+        }
+        File jarParent;
+        try {
+            jarParent = new File(SettingsServiceImpl.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI()).getParentFile();
+        } catch (Exception e) {
+            jarParent = new File(System.getProperty("user.dir"));
+        }
+        File[] candidates = {
+            new File(jarParent, "nginx/conf/nginx.conf"),                          // 便携版: portable\components\nginx
+            new File(jarParent, "../../../tools/nginx-1.30.5/conf/nginx.conf"),    // 原项目: code\backend\target -> 项目根\tools
+            new File(System.getProperty("user.dir"), "tools/nginx-1.30.5/conf/nginx.conf"),
+            new File(System.getProperty("user.dir"), "components/nginx/conf/nginx.conf"),
+        };
+        for (File c : candidates) if (c.isFile()) return c;
+        return null;
+    }
+
+    /** 热重载 nginx（reload 依赖 pid 文件；失败仅告警，不强行杀进程） */
+    private void reloadNginx(File nginxDir) {
+        try {
+            Process p = new ProcessBuilder(
+                    new File(nginxDir, "nginx.exe").getAbsolutePath(),
+                    "-p", nginxDir.getAbsolutePath(), "-c", "conf/nginx.conf", "-s", "reload")
+                    .redirectErrorStream(true).start();
+            if (p.waitFor(15, TimeUnit.SECONDS)) {
+                log.info("nginx reload 完成 (exit {})", p.exitValue());
+            } else {
+                p.destroyForcibly();
+                log.warn("nginx reload 超时，请手动重启 nginx 使上传配置生效");
+            }
+        } catch (Exception e) {
+            log.warn("nginx reload 失败: {}", e.getMessage());
+        }
     }
 }
