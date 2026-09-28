@@ -102,6 +102,14 @@
 - 导出某个含图片/附件的导图为 `.usmind` → 换一个系统（或清空后）导入。
 - 观察资源被自动上传入库、节点 URL 被改写、图片正常显示 —— 理解"脑图+资源整体迁移"。
 
+**Demo 9：Linux 服务器部署**
+- 上传项目（或 `git clone`）到服务器；`tools/` 放入 Linux 版环境（命名风格与 Windows 一致：`jdk-17.0.2` / `apache-maven-3.9.6` / `nodejs` / `mysql-*` / `redis-*` / `nginx-*`）。
+- 初始化：`bash script/shell/init-db.sh`（首次建库建表，root/root，admin/admin123）。
+- 一键启动：`bash script/shell/start-all.sh`（MySQL → Redis → nginx → 后端 8899 → 构建两个前端到 nginx html）。
+- 生产精简：只跑 `start-mysql.sh` → `start-redis.sh` → `start-nginx.sh` → `start-backend.sh`，前端用 `build-web-user.sh` / `build-web-admin.sh` 构建部署。
+- 对外服务：按服务器开放端口/域名修改 `tools/nginx-*/conf/nginx.conf` 后 `bash script/shell/start-nginx.sh`（reload）生效。
+- 学习点：对比 Windows `script/bat/` 与 Linux `script/shell/` 同名脚本，理解跨平台部署的差异（进程管理 pkill vs taskkill、后台 nohup vs start、路径分隔符）。
+
 ---
 
 ## 阶段五：深入进阶（按兴趣选）
