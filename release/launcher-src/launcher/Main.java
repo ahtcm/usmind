@@ -1,9 +1,11 @@
 package launcher;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -19,24 +21,27 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 双击 USMIND.exe：
  *   1. 幂等初始化并启动 MySQL(3306) -> Redis(6379) -> Nginx(80/8866/8867) -> 后端(8899)
  *   2. 自动打开浏览器 http://127.0.0.1/（80 统一入口）
- *   3. 窗口内可一键停止、切换查看各服务日志、查看服务连接状态
+ *   3. 界面显示各服务状态 / 错误检测 / 日志文件位置，一键启停
  * 关闭窗口 = 优雅停止所有服务并退出。
  * 支持 --smoke：无界面模式，启动全部服务并健康检查后自动停止（用于构建验证）。
  */
 public class Main {
 
     // ---------------- 常量 ----------------
-    static final String[] LOG_NAMES = {"launcher", "backend", "mysql", "redis", "nginx"};
-    static final String[] LOG_LABELS = {"启动器", "后端", "MySQL", "Redis", "Nginx"};
-    static final int MAX_CACHE_LINES = 600;   // 每个日志缓存的最近行数（固定窗口）
-    static final Color BG      = new Color(0x1E, 0x1E, 0x1E);
-    static final Color CARD    = new Color(0x2A, 0x2A, 0x2A);
-    static final Color BORDER  = new Color(0x3A, 0x3A, 0x3A);
-    static final Color TEXT    = new Color(0xE0, 0xE0, 0xE0);
-    static final Color SUB     = new Color(0x9A, 0x9A, 0x9A);
+    static final Color BG      = new Color(0x1B, 0x20, 0x28);
+    static final Color CARD    = new Color(0x25, 0x2C, 0x37);
+    static final Color CARD_HI = new Color(0x2F, 0x38, 0x45);
+    static final Color BORDER  = new Color(0x39, 0x43, 0x52);
+    static final Color TEXT    = new Color(0xE8, 0xEC, 0xF2);
+    static final Color SUB     = new Color(0x9A, 0xA4, 0xB2);
     static final Color ACCENT  = new Color(0x4A, 0x9E, 0xFF);
-    static final Color GREEN   = new Color(0x3F, 0xC9, 0x6B);
-    static final Color RED     = new Color(0xE5, 0x4D, 0x4D);
+    static final Color GREEN   = new Color(0x45, 0xD0, 0x8A);
+    static final Color RED     = new Color(0xF0, 0x5D, 0x5D);
+    static final Color ORANGE  = new Color(0xF0, 0xA5, 0x2E);
+
+    static final String[] SVC_NAMES = {"MySQL", "Redis", "Nginx", "后端"};
+    static final String[] SVC_PORTS = {"3306", "6379", "80 / 8866 / 8867", "8899"};
+    static final String[] LOG_FILES = {"backend.log", "mysql.log", "redis.log", "nginx.log"};
 
     // ---------------- 运行状态 ----------------
     static File root, components, dataDir, logsDir;
@@ -47,27 +52,22 @@ public class Main {
 
     // ---------------- GUI ----------------
     static JFrame frame;
-    static JLabel statusDot, statusText;
+    static JLabel statusDot, statusText, msgBar;
     static JButton btnStart, btnStop, btnBrowser;
-    static JComboBox<String> logCombo;
-    static JTextArea logArea;
-    static JLabel[] cards = new JLabel[4];       // MySQL/Redis/Nginx/后端 状态卡片
-    static javax.swing.Timer tailTimer, statusTimer;
-    static Map<String, StringBuilder> logCache = new LinkedHashMap<>();
-    static Map<String, Long> logPos = new LinkedHashMap<>();
-    static String currentLog = "backend";
+    static RoundedCard[] cards = new RoundedCard[4];
+    static javax.swing.Timer statusTimer;
     static FileLock singleLock;
+    static Map<String, Long> errPos = new HashMap<>();
+    static Map<String, Integer> errCount = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
         smoke = Arrays.asList(args).contains("--smoke");
         locateRoot();
         logsDir = new File(dataDir, "logs");
         logsDir.mkdirs();
-        for (String n : LOG_NAMES) { logCache.put(n, new StringBuilder()); logPos.put(n, 0L); }
 
         if (smoke) { runSmoke(); return; }
 
-        // 单实例锁（防止重复双击起多个服务）
         try {
             FileChannel ch = FileChannel.open(Paths.get(dataDir.getAbsolutePath(), ".lock"),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE);
@@ -76,7 +76,7 @@ public class Main {
                 JOptionPane.showMessageDialog(null, "USMIND 已在运行中，请勿重复启动。", "USMIND", JOptionPane.INFORMATION_MESSAGE);
                 System.exit(0);
             }
-        } catch (Exception e) { /* 锁获取失败不阻塞启动 */ }
+        } catch (Exception ignored) {}
 
         SwingUtilities.invokeLater(Main::buildUI);
     }
@@ -101,31 +101,35 @@ public class Main {
         frame.addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) { shutdown(); }
         });
-        frame.setBackground(BG);
-        frame.setSize(960, 640);
-        frame.setMinimumSize(new Dimension(760, 480));
+        Image logo = loadLogoIcon();
+        if (logo != null) frame.setIconImage(logo);
+        frame.setSize(900, 620);
+        frame.setMinimumSize(new Dimension(720, 500));
         frame.setLocationRelativeTo(null);
+        frame.setBackground(BG);
 
         JPanel rootPane = new JPanel(new BorderLayout(0, 0));
         rootPane.setBackground(BG);
-        rootPane.setBorder(new EmptyBorder(14, 16, 10, 16));
+        rootPane.setBorder(new EmptyBorder(18, 20, 16, 20));
 
-        // ---------- 顶部：标题 + 状态 ----------
+        // ---------- 头（与身体同色） ----------
         JPanel top = new JPanel(new BorderLayout());
-        top.setOpaque(false);
-        JPanel titleBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        top.setOpaque(true);
+        top.setBackground(BG);
+        JPanel titleBox = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         titleBox.setOpaque(false);
-        JLabel logo = new JLabel("USMIND");
-        logo.setFont(uiFont.deriveFont(Font.BOLD, 20f));
-        logo.setForeground(ACCENT);
-        JLabel sub = new JLabel("思维导图 · 便携版");
-        sub.setForeground(SUB);
-        titleBox.add(logo); titleBox.add(sub);
+        JLabel logoLbl = new JLabel("USMIND");
+        logoLbl.setFont(uiFont.deriveFont(Font.BOLD, 22f));
+        logoLbl.setForeground(ACCENT);
+        JLabel subLbl = new JLabel("思维导图 · 便携版");
+        subLbl.setForeground(SUB);
+        titleBox.add(logoLbl);
+        titleBox.add(subLbl);
 
         JPanel statusBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         statusBox.setOpaque(false);
         statusDot = new JLabel("●");
-        statusDot.setFont(uiFont.deriveFont(Font.BOLD, 16f));
+        statusDot.setFont(uiFont.deriveFont(Font.BOLD, 18f));
         statusDot.setForeground(RED);
         statusText = new JLabel("未启动");
         statusText.setForeground(TEXT);
@@ -134,193 +138,213 @@ public class Main {
         top.add(statusBox, BorderLayout.EAST);
         rootPane.add(top, BorderLayout.NORTH);
 
-        // ---------- 中部：服务卡片 + 地址 + 按钮 ----------
-        JPanel mid = new JPanel(new BorderLayout(0, 10));
+        // ---------- 中部 ----------
+        JPanel mid = new JPanel(new BorderLayout(0, 14));
         mid.setOpaque(false);
 
-        // 服务卡片
-        JPanel svcRow = new JPanel(new GridLayout(1, 4, 8, 0));
-        svcRow.setOpaque(false);
-        String[][] svcs = {
-            {"MySQL", "3306"}, {"Redis", "6379"}, {"Nginx", "80/8866/8867"}, {"后端", "8899"}
-        };
+        // 服务卡片 2x2
+        JPanel grid = new JPanel(new GridLayout(2, 2, 10, 10));
+        grid.setOpaque(false);
         for (int i = 0; i < 4; i++) {
-            cards[i] = makeCard(svcs[i][0], svcs[i][1]);
-            svcRow.add(cards[i]);
+            cards[i] = new RoundedCard(SVC_NAMES[i], SVC_PORTS[i], LOG_FILES[i]);
+            grid.add(cards[i]);
         }
-        mid.add(svcRow, BorderLayout.NORTH);
+        mid.add(grid, BorderLayout.NORTH);
 
-        // 连接地址
-        JPanel addr = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 6));
-        addr.setOpaque(false);
-        addr.add(makeLink("用户端  http://127.0.0.1/", "http://127.0.0.1/"));
-        addr.add(makeLink("管理后台  http://127.0.0.1/admin/", "http://127.0.0.1/admin/"));
-        addr.add(makeLink("后端API  http://127.0.0.1/api/", "http://127.0.0.1/api/"));
-        mid.add(addr, BorderLayout.CENTER);
+        // 消息条
+        JPanel msgRow = new JPanel(new BorderLayout());
+        msgRow.setOpaque(false);
+        msgBar = new JLabel("就绪：点击「启动全部服务」开始");
+        msgBar.setForeground(SUB);
+        msgBar.setFont(uiFont.deriveFont(Font.PLAIN, 13f));
+        msgRow.add(msgBar, BorderLayout.WEST);
+        mid.add(msgRow, BorderLayout.CENTER);
 
-        // 按钮
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+        // 日志位置提示
+        JPanel logBox = new JPanel(new GridLayout(2, 2, 10, 8));
+        logBox.setOpaque(false);
+        for (int i = 0; i < 4; i++) {
+            logBox.add(makeLogPath(SVC_NAMES[i], LOG_FILES[i]));
+        }
+        mid.add(logBox, BorderLayout.SOUTH);
+
+        rootPane.add(mid, BorderLayout.CENTER);
+
+        // ---------- 底部按钮 ----------
+        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 4));
         btns.setOpaque(false);
         btnStart = makeBtn("启动全部服务", ACCENT);
-        btnStop = makeBtn("停止全部服务", new Color(0x55, 0x5F, 0x6E));
-        btnBrowser = makeBtn("打开浏览器", new Color(0x55, 0x5F, 0x6E));
+        btnStop = makeBtn("停止全部服务", new Color(0x3D, 0x45, 0x52));
+        btnBrowser = makeBtn("打开浏览器", new Color(0x3D, 0x45, 0x52));
         btnStart.addActionListener(e -> startAll());
         btnStop.addActionListener(e -> stopAllGui());
         btnBrowser.addActionListener(e -> openBrowser("http://127.0.0.1/"));
         btnStop.setEnabled(false);
         btns.add(btnStart); btns.add(btnStop); btns.add(btnBrowser);
-        mid.add(btns, BorderLayout.SOUTH);
-
-        rootPane.add(mid, BorderLayout.CENTER);
-
-        // ---------- 日志区 ----------
-        JPanel logPanel = new JPanel(new BorderLayout(0, 6));
-        logPanel.setOpaque(false);
-        logPanel.setBorder(new EmptyBorder(6, 0, 0, 0));
-        JPanel logBar = new JPanel(new BorderLayout());
-        logBar.setOpaque(false);
-        JLabel l1 = new JLabel("服务日志");
-        l1.setForeground(TEXT);
-        logCombo = new JComboBox<>(LOG_LABELS);
-        logCombo.setBackground(CARD);
-        logCombo.setForeground(TEXT);
-        logCombo.setFocusable(false);
-        logCombo.addActionListener(e -> switchLog(logCombo.getSelectedIndex()));
-        logBar.add(l1, BorderLayout.WEST);
-        logBar.add(logCombo, BorderLayout.EAST);
-        logPanel.add(logBar, BorderLayout.NORTH);
-
-        logArea = new JTextArea();
-        logArea.setEditable(false);
-        logArea.setBackground(new Color(0x14, 0x14, 0x14));
-        logArea.setForeground(new Color(0xC8, 0xC8, 0xC8));
-        logArea.setFont(new Font("Consolas", Font.PLAIN, 12));
-        logArea.setBorder(new EmptyBorder(6, 8, 6, 8));
-        JScrollPane sp = new JScrollPane(logArea);
-        sp.setBorder(BorderFactory.createLineBorder(BORDER));
-        sp.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
-            protected void configureScrollBarColors() {
-                thumbColor = new Color(0x55, 0x5F, 0x6E);
-                trackColor = new Color(0x1E, 0x1E, 0x1E);
-            }
-        });
-        logPanel.add(sp, BorderLayout.CENTER);
-        rootPane.add(logPanel, BorderLayout.SOUTH);
+        rootPane.add(btns, BorderLayout.SOUTH);
 
         frame.setContentPane(rootPane);
         frame.setVisible(true);
-        appendLog("launcher", "USMIND 便携版启动器 v1.0 就绪\n点击「启动全部服务」开始，或关闭窗口退出。\n");
-        switchLog(1);
+        guiMsg("就绪：点击「启动全部服务」开始，关闭窗口将停止所有服务");
 
-        tailTimer = new javax.swing.Timer(600, e -> tailLogs());
-        tailTimer.start();
-        statusTimer = new javax.swing.Timer(1500, e -> refreshStatus());
+        statusTimer = new javax.swing.Timer(1500, e -> refresh());
         statusTimer.start();
     }
 
-    static JLabel makeCard(String name, String port) {
-        JLabel c = new JLabel();
-        c.setOpaque(true);
-        c.setBackground(CARD);
-        c.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER),
-                new EmptyBorder(8, 12, 8, 12)));
-        c.setLayout(new BorderLayout(0, 2));
-        JLabel nm = new JLabel(name);
-        nm.setForeground(TEXT);
-        nm.setFont(nm.getFont().deriveFont(Font.BOLD, 14f));
-        JLabel info = new JLabel("● 未启动  (" + port + ")");
-        info.setForeground(RED);
-        c.add(nm, BorderLayout.NORTH);
-        c.add(info, BorderLayout.CENTER);
-        c.putClientProperty("info", info);
-        c.putClientProperty("port", port);
-        return c;
+    /** 圆角卡片：服务名 + 状态点 + 端口 + 错误计数 */
+    static class RoundedCard extends JPanel {
+        final String name, port, logFile;
+        final JLabel nm, info, err;
+        RoundedCard(String name, String port, String logFile) {
+            this.name = name; this.port = port; this.logFile = logFile;
+            setOpaque(false);
+            setBackground(CARD);
+            setBorder(new EmptyBorder(14, 16, 14, 16));
+            setLayout(new BorderLayout(0, 6));
+            nm = new JLabel(name);
+            nm.setForeground(TEXT);
+            nm.setFont(nm.getFont().deriveFont(Font.BOLD, 16f));
+            info = new JLabel("● 未启动");
+            info.setForeground(RED);
+            info.setFont(info.getFont().deriveFont(Font.PLAIN, 14f));
+            err = new JLabel("");
+            err.setForeground(RED);
+            err.setFont(err.getFont().deriveFont(Font.PLAIN, 12f));
+            JPanel left = new JPanel(new BorderLayout());
+            left.setOpaque(false);
+            left.add(nm, BorderLayout.NORTH);
+            left.add(info, BorderLayout.CENTER);
+            left.add(err, BorderLayout.SOUTH);
+            JLabel portLbl = new JLabel(port);
+            portLbl.setForeground(SUB);
+            portLbl.setFont(portLbl.getFont().deriveFont(Font.PLAIN, 13f));
+            add(left, BorderLayout.CENTER);
+            add(portLbl, BorderLayout.EAST);
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            addMouseListener(new MouseAdapter() {
+                public void mouseClicked(MouseEvent e) { openLogFile(); }
+                public void mouseEntered(MouseEvent e) { setBackground(CARD_HI); repaint(); }
+                public void mouseExited(MouseEvent e) { setBackground(CARD); repaint(); }
+            });
+        }
+        void openLogFile() {
+            try {
+                File f = new File(logsDir, logFile);
+                if (f.exists()) Desktop.getDesktop().open(logsDir);
+                else guiMsg("日志 " + logFile + " 尚未生成");
+            } catch (Exception ignored) {}
+        }
+        void setState(boolean ok, boolean startedNow) {
+            info.setText((ok ? "● 运行中" : (startedNow ? "● 启动中…" : "● 未启动")));
+            info.setForeground(ok ? GREEN : RED);
+        }
+        void setErrors(int n) {
+            err.setText(n > 0 ? "⚠ 检测到错误 " + n + " 条（点击查看日志）" : "");
+        }
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fill(new RoundRectangle2D.Float(0, 0, getWidth() - 1, getHeight() - 1, 12, 12));
+            g2.setColor(BORDER);
+            g2.draw(new RoundRectangle2D.Float(0, 0, getWidth() - 1, getHeight() - 1, 12, 12));
+            g2.dispose();
+            super.paintComponent(g);
+        }
     }
 
-    static JLabel makeLink(String text, String url) {
-        JLabel l = new JLabel("<html><u>" + text + "</u></html>");
-        l.setForeground(ACCENT);
-        l.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        l.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { openBrowser(url); }
+    static JPanel makeLogPath(String name, String file) {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        p.setOpaque(false);
+        JLabel n = new JLabel(name);
+        n.setForeground(TEXT);
+        n.setFont(n.getFont().deriveFont(Font.BOLD, 12f));
+        JLabel path = new JLabel("data/logs/" + file);
+        path.setForeground(SUB);
+        path.setFont(path.getFont().deriveFont(Font.PLAIN, 12f));
+        JLabel open = new JLabel("<html><u>打开</u></html>");
+        open.setForeground(ACCENT);
+        open.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        open.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                try { if (new File(logsDir, file).exists()) Desktop.getDesktop().open(logsDir);
+                      else guiMsg("日志 " + file + " 尚未生成"); } catch (Exception ignored) {}
+            }
         });
-        return l;
+        p.add(n); p.add(path); p.add(open);
+        return p;
     }
 
     static JButton makeBtn(String text, Color bg) {
-        JButton b = new JButton(text);
+        JButton b = new JButton(text) {
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fill(new RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 8, 8));
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
         b.setBackground(bg);
         b.setForeground(Color.WHITE);
         b.setFocusPainted(false);
         b.setBorderPainted(false);
+        b.setContentAreaFilled(false);
+        b.setOpaque(false);
         b.setFont(b.getFont().deriveFont(Font.BOLD, 13f));
         b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        b.setPreferredSize(new Dimension(130, 34));
+        b.setPreferredSize(new Dimension(132, 36));
+        b.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { b.setBackground(brighten(bg)); }
+            public void mouseExited(MouseEvent e) { b.setBackground(bg); }
+        });
         return b;
     }
 
-    static void switchLog(int idx) {
-        currentLog = LOG_NAMES[idx];
-        logArea.setText(logCache.get(currentLog).toString());
-        logArea.setCaretPosition(Math.max(0, logArea.getDocument().getLength() - 1));
+    static Color brighten(Color c) {
+        return new Color(Math.min(255, c.getRed() + 24), Math.min(255, c.getGreen() + 24), Math.min(255, c.getBlue() + 24));
     }
 
-    static void appendLog(String name, String text) {
-        StringBuilder sb = logCache.get(name);
-        if (sb == null) return;
-        synchronized (sb) {
-            sb.append(text);
-            // 固定窗口：只保留最近 MAX_CACHE_LINES 行，超出时丢弃最旧行
-            int nl = 0, last = -1;
-            for (int i = sb.length() - 1; i >= 0 && nl <= MAX_CACHE_LINES; i--) {
-                if (sb.charAt(i) == '\n') { nl++; if (nl == MAX_CACHE_LINES + 1) { last = i; break; } }
+    /** 从 logo.ico 解析出窗口图标（取其中最大 PNG 帧） */
+    static Image loadLogoIcon() {
+        try {
+            File f = new File(root, "logo.ico");
+            if (!f.exists()) f = new File(root, "app/logo.ico");
+            if (!f.exists()) return null;
+            byte[] ico = Files.readAllBytes(f.toPath());
+            if (ico.length < 6) return null;
+            int count = (ico[5] & 0xff) << 8 | (ico[4] & 0xff);
+            int bestSize = -1, bestOff = -1, bestLen = -1;
+            for (int i = 0; i < count; i++) {
+                int e = 6 + i * 16;
+                if (e + 16 > ico.length) break;
+                int w = ico[e] & 0xff;
+                int size = (w == 0 ? 256 : w);
+                int len = ((ico[e + 11] & 0xff) << 24) | ((ico[e + 10] & 0xff) << 16) |
+                          ((ico[e + 9] & 0xff) << 8) | (ico[e + 8] & 0xff);
+                int off = ((ico[e + 15] & 0xff) << 24) | ((ico[e + 14] & 0xff) << 16) |
+                          ((ico[e + 13] & 0xff) << 8) | (ico[e + 12] & 0xff);
+                if (len > 0 && off + len <= ico.length && size >= bestSize) {
+                    bestSize = size; bestOff = off; bestLen = len;
+                }
             }
-            if (last >= 0) sb.delete(0, last + 1);
-        }
-        if (name.equals(currentLog)) {
-            SwingUtilities.invokeLater(() -> {
-                logArea.setText(logCache.get(currentLog).toString());
-                // 仅当用户在看最新内容时才自动滚到底部；回看历史时不打扰
-                if (isAtBottom()) {
-                    logArea.setCaretPosition(Math.max(0, logArea.getDocument().getLength() - 1));
-                }
-            });
-        }
+            if (bestOff < 0) return null;
+            byte[] img = Arrays.copyOfRange(ico, bestOff, bestOff + bestLen);
+            return ImageIO.read(new ByteArrayInputStream(img));
+        } catch (Exception e) { return null; }
     }
 
-    /** 判断日志滚动条是否在底部（用户在跟随最新日志） */
-    static boolean isAtBottom() {
-        Component comp = logArea.getParent();
-        while (comp != null && !(comp instanceof JScrollPane)) comp = comp.getParent();
-        if (comp == null) return true;
-        JScrollPane sp = (JScrollPane) comp;
-        JScrollBar bar = sp.getVerticalScrollBar();
-        int max = bar.getMaximum() - bar.getVisibleAmount();
-        return max <= 0 || bar.getValue() >= max - 30;
+    static void guiMsg(String text) {
+        SwingUtilities.invokeLater(() -> {
+            if (msgBar != null) msgBar.setText(text);
+        });
     }
 
-    static void tailLogs() {
-        for (String n : LOG_NAMES) {
-            if ("launcher".equals(n)) continue;
-            File f = new File(logsDir, n + ".log");
-            if (!f.exists()) continue;
-            try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
-                long len = raf.length();
-                long pos = logPos.get(n);
-                if (len < pos) pos = 0;
-                if (len > pos) {
-                    raf.seek(pos);
-                    byte[] buf = new byte[(int) Math.min(len - pos, 65536)];
-                    raf.readFully(buf);
-                    appendLog(n, new String(buf, StandardCharsets.UTF_8));
-                    logPos.put(n, len);
-                }
-            } catch (Exception ignored) {}
-        }
-    }
-
-    static void refreshStatus() {
+    // =====================================================
+    //  状态刷新 + 错误检测
+    // =====================================================
+    static void refresh() {
         boolean[] ok = {
             portOpen("127.0.0.1", 3306),
             portOpen("127.0.0.1", 6379),
@@ -328,13 +352,44 @@ public class Main {
             httpOk("http://127.0.0.1:8899/")
         };
         for (int i = 0; i < 4; i++) {
-            JLabel info = (JLabel) cards[i].getClientProperty("info");
-            info.setText((ok[i] ? "● 运行中  (" : "● 未启动  (") + cards[i].getClientProperty("port") + ")");
-            info.setForeground(ok[i] ? GREEN : RED);
+            cards[i].setState(ok[i], started);
         }
+        scanErrors(ok);
         boolean all = ok[0] && ok[1] && ok[2] && ok[3];
-        statusDot.setForeground(all ? GREEN : (started ? new Color(0xF0, 0xA5, 0x2E) : RED));
+        statusDot.setForeground(all ? GREEN : (started ? ORANGE : RED));
         statusText.setText(all ? "全部服务运行中" : (started ? "启动中…" : "未启动"));
+    }
+
+    /** 增量扫描日志错误关键字，更新卡片错误计数 */
+    static void scanErrors(boolean[] ok) {
+        String[] names = {"backend", "mysql", "redis", "nginx"};
+        for (int i = 0; i < 4; i++) {
+            File f = new File(logsDir, names[i] + ".log");
+            int cnt = errCount.getOrDefault(names[i], 0);
+            if (f.exists()) {
+                try (RandomAccessFile raf = new RandomAccessFile(f, "r")) {
+                    long len = raf.length();
+                    long pos = errPos.getOrDefault(names[i], 0L);
+                    if (len < pos) { pos = 0; cnt = 0; }
+                    if (len > pos) {
+                        raf.seek(pos);
+                        byte[] buf = new byte[(int) Math.min(len - pos, 262144)];
+                        raf.readFully(buf);
+                        String s = new String(buf, StandardCharsets.UTF_8);
+                        cnt += countOccur(s, "ERROR") + countOccur(s, "Exception") + countOccur(s, "FATAL");
+                        errPos.put(names[i], len);
+                        errCount.put(names[i], cnt);
+                    }
+                } catch (Exception ignored) {}
+            }
+            cards[i].setErrors(cnt);
+        }
+    }
+
+    static int countOccur(String s, String key) {
+        int c = 0, idx = 0;
+        while ((idx = s.indexOf(key, idx)) >= 0) { c++; idx += key.length(); }
+        return c;
     }
 
     // =====================================================
@@ -343,9 +398,9 @@ public class Main {
     static void startAll() {
         if (!busy.compareAndSet(false, true)) return;
         btnStart.setEnabled(false); btnStop.setEnabled(false);
-        statusDot.setForeground(new Color(0xF0, 0xA5, 0x2E));
+        statusDot.setForeground(ORANGE);
         statusText.setText("启动中…");
-        appendLog("launcher", "开始启动全部服务...\n");
+        guiMsg("正在启动全部服务…");
         new Thread(() -> {
             try {
                 ensureMysqlData();
@@ -361,14 +416,14 @@ public class Main {
                     btnStart.setEnabled(false);
                 });
                 if (ok) {
-                    appendLog("launcher", "服务全部就绪，自动打开浏览器 http://127.0.0.1/ \n");
+                    guiMsg("服务全部就绪，已自动打开浏览器 http://127.0.0.1/");
                     openBrowser("http://127.0.0.1/");
                 } else {
-                    appendLog("launcher", "[错误] 服务启动超时，请查看各服务日志\n");
+                    guiMsg("启动超时：请点击对应服务卡片查看日志");
                 }
             } catch (Exception ex) {
                 started = true;
-                appendLog("launcher", "[错误] 启动失败: " + ex.getMessage() + "\n");
+                guiMsg("启动失败：" + ex.getMessage() + "（详见日志）");
                 SwingUtilities.invokeLater(() -> {
                     statusDot.setForeground(RED);
                     statusText.setText("启动失败");
@@ -384,7 +439,7 @@ public class Main {
     static void stopAllGui() {
         if (!busy.compareAndSet(false, true)) return;
         btnStart.setEnabled(false); btnStop.setEnabled(false);
-        appendLog("launcher", "正在停止全部服务...\n");
+        guiMsg("正在停止全部服务…");
         new Thread(() -> {
             try { stopAll(); } catch (Exception ignored) {}
             started = false;
@@ -394,14 +449,14 @@ public class Main {
                 btnStart.setEnabled(true);
                 btnStop.setEnabled(false);
             });
+            guiMsg("所有服务已停止");
             busy.set(false);
         }).start();
     }
 
     static void shutdown() {
-        appendLog("launcher", "关闭窗口，正在优雅停止服务...\n");
+        guiMsg("关闭窗口，正在优雅停止服务…");
         try { stopAll(); } catch (Exception ignored) {}
-        if (tailTimer != null) tailTimer.stop();
         if (statusTimer != null) statusTimer.stop();
         try { if (singleLock != null) singleLock.release(); } catch (Exception ignored) {}
         frame.dispose();
@@ -428,7 +483,7 @@ public class Main {
         File mysqlDir = new File(components, "mysql");
         File datadir = new File(dataDir, "mysql");
         File log = new File(logsDir, "mysql.log");
-        appendLog("launcher", "[1/5] 启动 MySQL (3306)...\n");
+        guiMsg("[1/5] 启动 MySQL (3306)…");
         mysqlProc = new ProcessBuilder(
                 new File(mysqlDir, "bin/mysqld.exe").getAbsolutePath(),
                 "--console",
@@ -441,7 +496,7 @@ public class Main {
     static void startRedis() throws Exception {
         File redisDir = new File(components, "redis");
         File log = new File(logsDir, "redis.log");
-        appendLog("launcher", "[2/5] 启动 Redis (6379)...\n");
+        guiMsg("[2/5] 启动 Redis (6379)…");
         redisProc = new ProcessBuilder(
                 new File(redisDir, "redis-server.exe").getAbsolutePath(), "redis.windows.conf")
                 .directory(redisDir)
@@ -452,7 +507,7 @@ public class Main {
         File nginxDir = new File(components, "nginx");
         new File(nginxDir, "logs").mkdirs();
         File log = new File(logsDir, "nginx.log");
-        appendLog("launcher", "[3/5] 启动 Nginx (80/8866/8867)...\n");
+        guiMsg("[3/5] 启动 Nginx (80/8866/8867)…");
         nginxProc = new ProcessBuilder(
                 new File(nginxDir, "nginx.exe").getAbsolutePath(),
                 "-p", nginxDir.getAbsolutePath(), "-c", "conf/nginx.conf")
@@ -464,7 +519,7 @@ public class Main {
         File java = new File(System.getProperty("java.home"), "bin/java.exe");
         File jar = new File(components, "usmind-backend.jar");
         File log = new File(logsDir, "backend.log");
-        appendLog("launcher", "[4/5] 启动后端服务 (8899)...\n");
+        guiMsg("[4/5] 启动后端服务 (8899)…");
         backendProc = new ProcessBuilder(
                 java.getAbsolutePath(),
                 "-jar", jar.getAbsolutePath(),
@@ -474,7 +529,7 @@ public class Main {
     }
 
     static boolean waitReady(int seconds) {
-        appendLog("launcher", "[5/5] 等待服务就绪...\n");
+        guiMsg("[5/5] 等待服务就绪…");
         long deadline = System.currentTimeMillis() + seconds * 1000L;
         while (System.currentTimeMillis() < deadline) {
             if (httpOk("http://127.0.0.1/") && httpOk("http://127.0.0.1:8899/")) return true;
@@ -484,7 +539,6 @@ public class Main {
     }
 
     static void stopAll() throws Exception {
-        appendLog("launcher", "正在停止服务...\n");
         if (backendProc != null) { backendProc.destroy(); backendProc.waitFor(10, TimeUnit.SECONDS); }
         if (nginxProc != null) {
             try {
@@ -510,18 +564,17 @@ public class Main {
             } catch (Exception ignored) {}
             mysqlProc.destroy();
         }
-        appendLog("launcher", "所有服务已停止。\n");
     }
 
     // =====================================================
-    //  MySQL 幂等初始化（防止初始化被打断/表结构落后）
+    //  MySQL 幂等初始化
     // =====================================================
     static void ensureMysqlData() throws Exception {
         File datadir = new File(dataDir, "mysql");
         boolean firstRun = !new File(datadir, "mysql").exists();
         if (firstRun) {
             File mysqlDir = new File(components, "mysql");
-            appendLog("launcher", "[0/5] 首次运行，初始化 MySQL 数据目录...\n");
+            guiMsg("[0/5] 首次运行，初始化 MySQL 数据目录…");
             Process init = new ProcessBuilder(
                     new File(mysqlDir, "bin/mysqld.exe").getAbsolutePath(),
                     "--initialize-insecure",
@@ -530,33 +583,32 @@ public class Main {
                     .redirectErrorStream(true)
                     .redirectOutput(new File(logsDir, "mysql.log")).redirectError(new File(logsDir, "mysql.log")).start();
             init.waitFor(180, TimeUnit.SECONDS);
-            appendLog("launcher", "[0/5] 数据目录初始化完成\n");
+            guiMsg("[0/5] 数据目录初始化完成");
         }
         startMysql();
         waitMysqlReady(90);
 
-        // 幂等：root 密码 = root；库存在；字段齐全
         File bin = new File(components, "mysql/bin");
         File mysql = new File(bin, "mysql.exe");
         boolean withPass = runMysql(mysql, "-proot", "SELECT 1") == 0;
         if (!withPass) {
-            appendLog("launcher", "检测到 root 无密码，正在设置密码并建库...\n");
+            guiMsg("检测到 root 无密码，正在设置密码并建库…");
             runMysql(mysql, null, "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root'; " +
                     "CREATE DATABASE IF NOT EXISTS usmind_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
         }
         String hasDb = runMysqlQuery(mysql, "-proot", "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='usmind_db'");
         if (!"1".equals(hasDb)) {
-            appendLog("launcher", "数据库 usmind_db 不存在，导入表结构...\n");
+            guiMsg("数据库 usmind_db 不存在，导入表结构…");
             File initSql = new File(components, "init.sql");
             if (initSql.exists()) runMysql(mysql, "-proot", "source " + initSql.getAbsolutePath().replace("\\", "/"));
         }
         String hasCol = runMysqlQuery(mysql, "-proot",
                 "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='usmind_db' AND TABLE_NAME='mind_map' AND COLUMN_NAME='manual_styles'");
         if (!"1".equals(hasCol)) {
-            appendLog("launcher", "mind_map 表缺 manual_styles 列，自动补齐...\n");
+            guiMsg("mind_map 表缺 manual_styles 列，自动补齐…");
             runMysql(mysql, "-proot", "ALTER TABLE usmind_db.mind_map ADD COLUMN manual_styles TEXT COMMENT '节点手动样式JSON' AFTER view_data;");
         }
-        appendLog("launcher", "MySQL 初始化校验完成 (root/root, usmind_db)\n");
+        guiMsg("MySQL 初始化校验完成");
     }
 
     static void waitMysqlReady(int seconds) {
@@ -565,13 +617,11 @@ public class Main {
         while (System.currentTimeMillis() < deadline) {
             try {
                 Process p = new ProcessBuilder(new File(bin, "mysqladmin.exe").getAbsolutePath(),
-                        "-uroot", "--skip-password", "ping")
-                        .redirectErrorStream(true).start();
+                        "-uroot", "--skip-password", "ping").redirectErrorStream(true).start();
                 p.waitFor(5, TimeUnit.SECONDS);
                 if (p.exitValue() == 0) return;
                 Process p2 = new ProcessBuilder(new File(bin, "mysqladmin.exe").getAbsolutePath(),
-                        "-uroot", "-proot", "ping")
-                        .redirectErrorStream(true).start();
+                        "-uroot", "-proot", "ping").redirectErrorStream(true).start();
                 p2.waitFor(5, TimeUnit.SECONDS);
                 if (p2.exitValue() == 0) return;
             } catch (Exception ignored) {}
