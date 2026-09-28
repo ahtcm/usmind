@@ -1,5 +1,12 @@
 ﻿# USMIND 变更记录
 
+## 2026-09-28 · 移除便携绿色版（按需求）
+
+- **删除便携版全部内容**：elease\usmind-portable\（产物目录此前已清理）；构建脚本 script\bat\build-portable.bat / uild-all.bat（便携+自解压+在线一键构建，随便携产物一并移除）；启动器源码 code\launcher-src\launcher\Main.java、logo.ico、min.svg、x.svg、
+ginx-portable.conf、launcher.jar、classes\。
+- **保留自解压 / 在线版源码**：code\launcher-src\selfextract.cs / Installer.cs / uild_online.ps1 / 两个 stub exe（用户未要求删除；二者基于便携产物组装，如需重新启用需先重建便携产物）。
+- **文档同步**：README 目录树 / 发布形态章节（三种→两种，重编号）/ 构建表格 / FAQ；FILE_GUIDE「发布与构建体系」章节与脚本表格同步更新。
+
 ## 2026-09-28 · 脚本体系重组：bat 移入 script\bat + 新增 Linux shell
 
 - **Windows 批处理全部移入 `script\bat\`**：15 个 bat（start-all / stop-all / delete-all / init-db / start-{mysql,redis,nginx,backend,web-user,web-admin} / build-{backend,web-user,web-admin,portable,all}）从 `script\` 根移入 `script\bat\`；所有脚本的项目根定位从 `cd /d "%SCRIPT_DIR%.."` 改为 `cd /d "%SCRIPT_DIR%..\.."`（bat 在 script\bat，上两级即项目根），同目录兄弟调用（start-all → start-*.bat）不受影响。

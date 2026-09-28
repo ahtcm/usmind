@@ -121,17 +121,14 @@ usmind/
 ├── release/               # 构建产物与发布形态
 │   ├── usmind/            # 用户端 dist（nginx 8866 托管）
 │   ├── admin/             # 管理后台 dist（nginx 8867 /admin/ 托管）
-│   ├── usmind-portable/   # ① 便携绿色版（USMIND.exe + app + runtime + components + data）
-│   ├── USMIND-setup.exe   # ② 单文件自解压版（zip 内嵌 exe）
-│   ├── USMIND-online.exe  # ③ 在线安装器（16KB，CDN 实时拉取环境）
+│   ├── USMIND-setup.exe   # ① 单文件自解压版（zip 内嵌 exe）
+│   ├── USMIND-online.exe  # ② 在线安装器（16KB，CDN 实时拉取环境）
 │   ├── online-dist/       # 在线版环境分片（22 片 + manifest.json，推送 GitHub @v1 经 jsDelivr 分发）
 │   （release 为构建产物，git 忽略；launcher 构建源码在 code\launcher-src\）
 ├── script/                  # 一键脚本（启动/停止/构建/初始化数据库等，全部相对路径）
-│   ├── bat/                 # Windows 批处理（start-all.bat / stop-all.bat / build-*.bat 等 15 个）
+│   ├── bat/                 # Windows 批处理（start-all.bat / stop-all.bat / build-*.bat 等 13 个）
 │   │   ├── start-all.bat    # 一键启动（MySQL → Redis → 后端 8899 → 构建两个前端）
 │   │   ├── stop-all.bat     # 全部停止
-│   │   ├── build-portable.bat  # 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 前端构建）
-│   │   ├── build-all.bat    # 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
 │   │   └── ...              # 其余见 docs\FILE_GUIDE.md「脚本体系」
 │   └── shell/               # Linux shell 等价物（作用同 bat，环境放 tools/ 命名一致）
 │       ├── start-all.sh     # 一键启动（Linux）
@@ -179,13 +176,12 @@ usmind/
 
 | 版本 | 产物 | 体积 | 首次运行 |
 | --- | --- | --- | --- |
-| 便携绿色版 | `release\usmind-portable\USMIND.exe` | ~1.1GB | 自动初始化 MySQL（2~5 分钟）后打开浏览器 |
 | 单文件自解压版 | `release\USMIND-setup.exe` | ~371MB | 自动解压到 `%LOCALAPPDATA%\USMIND` 并启动 |
 | 在线安装版 | `release\USMIND-online.exe` | 16KB | 从国内 CDN 实时下载环境（可视化进度条），装好后自动启动 |
 
 > 在线版原理：安装器内置分片清单，从 `cdn.jsdelivr.net/gh/ahtcm/usmind@v1/release/online-dist`（GitHub 公开仓库 v1 标签，jsDelivr 国内加速节点）下载 22 个分片 → 拼接解压 → 组装为便携版目录 → 启动。已安装（目标目录存在 `USMIND.exe`）则直接启动，跳过下载。可用环境变量 `USMIND_BASE_URL` 覆盖下载源；可用 `--dir <目录>` 指定安装目录（默认 `%LOCALAPPDATA%\USMIND-online`）。
 >
-> ⚠️ **当前状态**：分片已按需求从 GitHub 移除（不再托管 `online-dist`）。`script\bat\build-all.bat` / `code\launcher-src\build_online.ps1` 仍可随时重新生成分片；若需继续使用在线版，请自行托管 `release\online-dist`（如推回 GitHub `@v1` 或私有对象存储）后重新构建安装器。
+> ⚠️ **当前状态**：分片已按需求从 GitHub 移除（不再托管 `online-dist`）。`code\launcher-src\build_online.ps1` 仍可随时重新生成分片；若需继续使用在线版，请自行托管 `release\online-dist`（如推回 GitHub `@v1` 或私有对象存储）后重新构建安装器。
 
 ### 一键启动
 
@@ -227,8 +223,7 @@ bash script/shell/init-db.sh    :: 同上（Linux）
 script\bat\build-backend.bat    :: 构建后端 jar（mvn clean package -DskipTests，产物 code\backend\target\usmind-backend.jar）
 script\bat\build-web-user.bat   :: 构建用户端并部署到 release\usmind
 script\bat\build-web-admin.bat  :: 构建管理后台并部署到 release\admin
-script\bat\build-portable.bat   :: 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 两个前端构建部署）
-script\bat\build-all.bat        :: 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
+
 ```
 
 Linux 对应：`bash script/shell/build-backend.sh` / `build-web-user.sh` / `build-web-admin.sh` / `build-all.sh`（前端 dist 部署到 nginx `html/{usmind,admin}`）。
@@ -350,28 +345,17 @@ spring:
 
 ## 九、发布形态与分发
 
-项目提供三种"免装环境、双击即用"的发布形态，适合分享给任意电脑用户（含无开发环境、无网络或弱网用户）。
+项目提供两种"免装环境、双击即用"的发布形态，适合分享给任意电脑用户（含无开发环境、无网络或弱网用户）。便携绿色版（`release\usmind-portable`）已按需求移除；自解压版与在线版均基于便携产物（zip / 分片源）组装，对应构建源码保留在 `code\launcher-src\`（`selfextract.cs` / `Installer.cs` / `build_online.ps1`），如需重新启用请先重建便携产物。
 
-### 1. 便携绿色版 `release\usmind-portable\`
-- 结构：`USMIND.exe`（Java 启动器）+ `app/launcher.jar` + `runtime/`（jlink 精简 JRE，44MB，含 `jdk.unsupported` 模块）+ `components/`（MySQL 8 / Redis / nginx / `usmind-backend.jar` / `init.sql`）+ `data/`（运行数据）。
-- 启动顺序：MySQL（首次自动 `--initialize-insecure` 建空库并设密码 `root`，导入 `init.sql` 建表灌默认数据）→ Redis → nginx → 后端 → 打开浏览器；回车 / 关窗优雅停机。
-- 数据目录：`data/`（勿删除，脑图、上传资源、日志都在其中）。整个目录拷贝即迁移。
-
-### 2. 单文件自解压版 `release\USMIND-setup.exe`
+### 1. 单文件自解压版 `release\USMIND-setup.exe`
 - 原理：C# stub（`selfextract.cs`）尾部拼接 Optimal 压缩的便携版 zip；运行时自定位 zip 起点（EOCD 扫描）→ 解压到 `%LOCALAPPDATA%\USMIND` → 启动。
 - 已安装则直接二次启动，不再解压。支持 `--extract-only`（仅解压，供验证）。
 
-### 3. 在线安装版 `release\USMIND-online.exe`
-- 原理：C# WinForms 下载器（`Installer.cs`，16KB）内嵌 `manifest.json`（组件/目录/分片清单，编译为 Win32 资源）；运行时从 **jsDelivr CDN**（GitHub 公开仓库 `@v1` 标签，国内加速节点）按序下载分片 → 拼接为各组件 zip → 解压组装为便携版目录（默认 `%LOCALAPPDATA%\USMIND-online`）→ 启动。
+### 2. 在线安装版 `release\USMIND-online.exe`
+- 原理：C# WinForms 下载器（`Installer.cs`，16KB）内嵌 `manifest.json`（组件/目录/分片清单，编译为 Win32 资源）；运行时从 **jsDelivr CDN**（GitHub 公开仓库 `@v1` 标签，国内加速节点）按序下载分片 → 拼接为各组件 zip → 解压组装为运行目录（默认 `%LOCALAPPDATA%\USMIND-online`）→ 启动。
 - 分片：`release/online-dist/` 由 `build_online.ps1` 生成（6 个组件 zip 按 20MB 切分，共 22 片 371MB，`mysql` 12 片最多）。分片已推 GitHub `@v1`，jsDelivr 自动缓存分发。
 - 进度：总进度条 + 当前组件/分片 + 已下载量，可取消；下载失败提示重试（已下载分片会重新开始，断点续传留待后续）。
 - 覆盖下载源：环境变量 `USMIND_BASE_URL`（本地模拟验证用）。
-
-### 一键重建三种形态
-```bat
-script\bat\build-all.bat
-```
-依次重建：便携版（javac + jlink + jpackage + 组件复制）→ 自解压版（zip + csc stub 拼接）→ 在线版（`build_online.ps1` 分片 + csc 下载器）。全部使用**相对路径**（`SCRIPT_DIR` 定位项目根；csc 取 `%WINDIR%` 下 .NET Framework 编译器），项目整体拷到任意位置可直接重建。构建源码在 `code\launcher-src\`。
 
 ### 更新在线版分片（重新发布）
 > 现状：分片已从 GitHub 移除，不再托管。以下为**如需重新启用在线版**的操作步骤：
@@ -379,7 +363,7 @@ script\bat\build-all.bat
 2. 托管分片（二选一）：
    - 推回 GitHub：`git add -f release/online-dist` + 提交（`release/` 被 .gitignore 忽略，需 `-f`）→ 推送 develop → 更新 `v1` 标签（`git tag -f v1 && git push github v1 -f`）；
    - 或用 `USMIND_BASE_URL` 指向自建对象存储 / 静态托管；
-3. 用 `script\bat\build-all.bat` 重新构建在线安装器；
+3. 用 csc 重新编译 `code\launcher-src\Installer.cs`（内嵌新 manifest）生成 `USMIND-online.exe`；
 4. 注意 jsDelivr 对新文件/更新有缓存延迟（几分钟），旧 URL 立即生效、更新内容需等缓存刷新。
 
 ---
@@ -392,6 +376,6 @@ script\bat\build-all.bat
 - **上传的文件打不开**：确认 nginx `/uploads/` 反代/别名正确；附件在线预览依赖预览服务配置。
 - **删除管理员被拒**：系统要求至少保留一个管理员账号。
 - **换机器后登录失败**：确认 MySQL 与 Redis 已启动、`init-db` 已执行、`application-dev.yml` 连接正确。
-- **在线版首次下载慢 / 卡住**：首次需下载约 371MB（国内 CDN，一般 5~15 分钟）；卡住多为网络波动，关闭后重开安装器会重新下载；也可改用便携版或自解压版。
+- **在线版首次下载慢 / 卡住**：首次需下载约 371MB（国内 CDN，一般 5~15 分钟）；卡住多为网络波动，关闭后重开安装器会重新下载；也可改用自解压版。
 - **在线版更新后下载到旧环境**：jsDelivr 对分片有缓存延迟，刚推新分片后 5~30 分钟内可能拉到旧版，属正常现象。
-- **`script\bat\build-all.bat` 构建失败**：确认 `.NET Framework 4.x` 已安装（csc 编译 C# 需要）；后端 jar 未构建时先 `script\bat\build-backend.bat`。
+
