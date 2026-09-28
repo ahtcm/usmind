@@ -306,6 +306,7 @@ import Scrollbar from 'simple-mind-map/src/plugins/Scrollbar'
 import Export from 'simple-mind-map/src/plugins/Export'
 import ExportPDF from 'simple-mind-map/src/plugins/ExportPDF'
 import JSZip from 'jszip'
+import { PDFDocument } from 'pdf-lib'
 import { THEMES } from '../utils/theme.js'
 import { fetchThemes } from '../api/themes'
 import { fetchPreviewConfig } from '../api/previewConfig'
@@ -2370,34 +2371,127 @@ function downloadDataUrl(dataUrl, filename) {
   a.click()
 }
 
+// 从 SVG 字符串解析画布宽高（handleBeingExportSvg 已注入 viewBox="0 0 W H"）
+function parseSvgSize(svgStr) {
+  const m = svgStr.match(/viewBox="[^"]*0\s+0\s+([\d.]+)\s+([\d.]+)"/)
+  if (m) return { W: parseFloat(m[1]), H: parseFloat(m[2]) }
+  const mw = svgStr.match(/width="([\d.]+)"/)
+  const mh = svgStr.match(/height="([\d.]+)"/)
+  return { W: mw ? parseFloat(mw[1]) : 0, H: mh ? parseFloat(mh[1]) : 0 }
+}
+// 生成指定区域的块 SVG：保持全部节点，仅通过 viewBox/宽高裁剪视口
+function makeChunkSvg(svgStr, W, ch, y0) {
+  return svgStr
+    .replace(/width="[\d.]+"/, 'width="' + W + '"')
+    .replace(/height="[\d.]+"/, 'height="' + ch + '"')
+    .replace(/viewBox="[^"]*"/, 'viewBox="0 ' + y0 + ' ' + W + ' ' + ch + '"')
+}
+function loadImg(url) {
+  const img = new Image()
+  return new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+}
+
+// 分块导出图片（PNG/JPG/JPEG）：超大画布按块切割打包 zip；小图直接导出单张
+// 不依赖全量大图 Image 解码（浏览器对大 SVG 有高度截断），改为逐块生成小 SVG 渲染
+async function exportChunkedImages(type) {
+  const name = docName.value || '思维导图'
+  toast('正在生成画布数据...')
+  const { str } = await mind.value.doExport.getSvgData()
+  const { W, H } = parseSvgSize(str)
+  if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
+  const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
+  const CHUNK = 5000
+  const chunks = Math.max(1, Math.ceil(H / CHUNK))
+  const isJpg = type === 'jpg' || type === 'jpeg'
+  const ext = isJpg ? 'jpg' : 'png'
+  const parts = []
+  for (let i = 0; i < chunks; i++) {
+    if (chunks > 1) toast('正在导出第 ' + (i + 1) + '/' + chunks + ' 块...')
+    const y0 = i * CHUNK
+    const ch = Math.min(CHUNK, H - y0)
+    const chunkSvg = makeChunkSvg(str, W, ch, y0)
+    const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
+    const img = await loadImg(url)
+    URL.revokeObjectURL(url)
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = ch
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, ch)
+    ctx.drawImage(img, 0, 0)
+    parts.push(canvas.toDataURL(isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined))
+    canvas.width = 1
+    canvas.height = 1
+  }
+  if (chunks === 1) {
+    downloadDataUrl(parts[0], name + '.' + ext)
+    toast('导出完成')
+  } else {
+    const zip = new JSZip()
+    parts.forEach((d, i) => zip.file(name + '_' + (i + 1) + '.' + ext, d.split(',')[1], { base64: true }))
+    const blob = await zip.generateAsync({ type: 'blob' })
+    downloadBlob(blob, name + '_分块导出.zip')
+    toast('导出完成，共 ' + chunks + ' 块（已打包 zip）')
+  }
+}
+
+// 分页导出 PDF：超大画布自动分页，每页一块内容
+async function exportChunkedPdf() {
+  const name = docName.value || '思维导图'
+  toast('正在生成画布数据...')
+  const { str } = await mind.value.doExport.getSvgData()
+  const { W, H } = parseSvgSize(str)
+  if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
+  const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
+  const CHUNK = 5000
+  const chunks = Math.max(1, Math.ceil(H / CHUNK))
+  const pdfDoc = await PDFDocument.create()
+  for (let i = 0; i < chunks; i++) {
+    if (chunks > 1) toast('正在生成 PDF 第 ' + (i + 1) + '/' + chunks + ' 页...')
+    const y0 = i * CHUNK
+    const ch = Math.min(CHUNK, H - y0)
+    const chunkSvg = makeChunkSvg(str, W, ch, y0)
+    const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
+    const img = await loadImg(url)
+    URL.revokeObjectURL(url)
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = ch
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, ch)
+    ctx.drawImage(img, 0, 0)
+    const b64 = canvas.toDataURL('image/png').split(',')[1]
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    const pngImage = await pdfDoc.embedPng(bytes)
+    const page = pdfDoc.addPage([W, ch])
+    page.drawImage(pngImage, { x: 0, y: 0, width: W, height: ch })
+    canvas.width = 1
+    canvas.height = 1
+  }
+  const pdfBytes = await pdfDoc.save()
+  downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), name + '.pdf')
+  toast('导出完成，共 ' + chunks + ' 页')
+}
 async function runExport(type) {
   exportOpen.value = false
   if (!mind.value) { toast('请先进入画布', 'error'); return }
-  const name = docName.value || '思维导图'
   try {
-    toast('正在导出 ' + type.toUpperCase() + ' ...')
-    if (type === 'jpg' || type === 'jpeg') {
-      // 用 png 数据源转成 jpeg（白底）
-      const dataUrl = await mind.value.doExport.export('png', false, name)
-      const img = new Image()
-      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl })
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      const ctx = canvas.getContext('2d')
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.drawImage(img, 0, 0)
-      downloadDataUrl(canvas.toDataURL('image/jpeg', 0.92), name + '.' + type)
+    if (type === 'png' || type === 'jpg' || type === 'jpeg') {
+      await exportChunkedImages(type)
+    } else if (type === 'pdf') {
+      await exportChunkedPdf()
     } else {
+      const name = docName.value || '思维导图'
+      toast('正在导出 ' + type.toUpperCase() + ' ...')
       await mind.value.doExport.export(type, true, name)
+      toast('导出完成')
     }
-    toast('导出完成')
   } catch (e) {
     toast('导出失败: ' + e.message, 'error')
   }
 }
-
 async function exportUsmind() {
   exportOpen.value = false
   if (!mind.value) { toast('请先进入画布', 'error'); return }
