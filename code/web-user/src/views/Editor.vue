@@ -662,7 +662,22 @@ async function createMind() {
       try {
         const w = parseFloat(svg.attr('width')) || 0
         const h = parseFloat(svg.attr('height')) || 0
-        if (w && h && !svg.attr('viewBox')) svg.attr('viewBox', '0 0 ' + w + ' ' + h)
+        // 先按画布尺寸给默认 viewBox，再用内容实际边界扩展，
+        // 解决缩放/平移后内容 transform 偏移导致导出 SVG 打开空白/只显示部分的问题
+        if (w && h) {
+          svg.attr('viewBox', '0 0 ' + w + ' ' + h)
+          const container = svg.find('.smm-container')[0]
+          if (container) {
+            const rb = container.rbox()
+            if (rb && isFinite(rb.x) && isFinite(rb.y) && rb.width > 0 && rb.height > 0) {
+              const x = Math.min(0, rb.x)
+              const y = Math.min(0, rb.y)
+              const maxX = Math.max(w, rb.x + rb.width)
+              const maxY = Math.max(h, rb.y + rb.height)
+              svg.attr('viewBox', x + ' ' + y + ' ' + (maxX - x) + ' ' + (maxY - y))
+            }
+          }
+        }
         // 浅色文字转深色：部分主题（如晨曦白）节点文字为白色，导出 SVG 后
         // 节点背景（CSS 渲染）不随 SVG 序列化，白字在浅色底上看不见，强制转深保证可读
         svg.find('text').each(function () {
@@ -2386,20 +2401,27 @@ function downloadDataUrl(dataUrl, filename) {
   a.click()
 }
 
-// 从 SVG 字符串解析画布宽高（handleBeingExportSvg 已注入 viewBox="0 0 W H"）
+// 从 SVG 字符串解析画布宽高与原点偏移（支持任意 viewBox 格式 "x y W H"）
 function parseSvgSize(svgStr) {
-  const m = svgStr.match(/viewBox="[^"]*0\s+0\s+([\d.]+)\s+([\d.]+)"/)
-  if (m) return { W: parseFloat(m[1]), H: parseFloat(m[2]) }
+  const mv = svgStr.match(/viewBox="([^"]*)"/)
+  if (mv) {
+    const parts = mv[1].trim().split(/[\s,]+/).map(Number)
+    if (parts.length >= 4 && isFinite(parts[2]) && isFinite(parts[3]) && parts[2] > 0 && parts[3] > 0) {
+      return { W: parts[2], H: parts[3], X: isFinite(parts[0]) ? parts[0] : 0, Y: isFinite(parts[1]) ? parts[1] : 0 }
+    }
+  }
   const mw = svgStr.match(/width="([\d.]+)"/)
   const mh = svgStr.match(/height="([\d.]+)"/)
-  return { W: mw ? parseFloat(mw[1]) : 0, H: mh ? parseFloat(mh[1]) : 0 }
+  return { W: mw ? parseFloat(mw[1]) : 0, H: mh ? parseFloat(mh[1]) : 0, X: 0, Y: 0 }
 }
-// 生成指定区域的块 SVG：保持全部节点，仅通过 viewBox/宽高裁剪视口
-function makeChunkSvg(svgStr, W, ch, y0) {
+// 生成指定区域的块 SVG：保持全部节点，仅通过 viewBox/宽高裁剪视口（保留原点偏移 X/Y）
+function makeChunkSvg(svgStr, W, ch, y0, X, Y) {
+  const vx = X || 0
+  const vy = (Y || 0) + y0
   return svgStr
     .replace(/width="[\d.]+"/, 'width="' + W + '"')
     .replace(/height="[\d.]+"/, 'height="' + ch + '"')
-    .replace(/viewBox="[^"]*"/, 'viewBox="0 ' + y0 + ' ' + W + ' ' + ch + '"')
+    .replace(/viewBox="[^"]*"/, 'viewBox="' + vx + ' ' + vy + ' ' + W + ' ' + ch + '"')
 }
 function loadImg(url) {
   const img = new Image()
@@ -2412,7 +2434,7 @@ async function exportChunkedImages(type) {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
   const { str } = await mind.value.doExport.getSvgData()
-  const { W, H } = parseSvgSize(str)
+  const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
   const CHUNK = 5000
@@ -2424,7 +2446,7 @@ async function exportChunkedImages(type) {
     if (chunks > 1) toast('正在导出第 ' + (i + 1) + '/' + chunks + ' 块...')
     const y0 = i * CHUNK
     const ch = Math.min(CHUNK, H - y0)
-    const chunkSvg = makeChunkSvg(str, W, ch, y0)
+    const chunkSvg = makeChunkSvg(str, W, ch, y0, X, Y)
     const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
     const img = await loadImg(url)
     const canvas = document.createElement('canvas')
@@ -2456,7 +2478,7 @@ async function exportChunkedPdf() {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
   const { str } = await mind.value.doExport.getSvgData()
-  const { W, H } = parseSvgSize(str)
+  const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
   const CHUNK = 5000
@@ -2466,7 +2488,7 @@ async function exportChunkedPdf() {
     if (chunks > 1) toast('正在生成 PDF 第 ' + (i + 1) + '/' + chunks + ' 页...')
     const y0 = i * CHUNK
     const ch = Math.min(CHUNK, H - y0)
-    const chunkSvg = makeChunkSvg(str, W, ch, y0)
+    const chunkSvg = makeChunkSvg(str, W, ch, y0, X, Y)
     const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
     const img = await loadImg(url)
     const canvas = document.createElement('canvas')
