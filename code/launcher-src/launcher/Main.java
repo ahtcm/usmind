@@ -1,10 +1,12 @@
 package launcher;
 
 import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.Path2D;
 import java.awt.geom.RoundRectangle2D;
 import java.io.*;
 import java.net.*;
@@ -15,6 +17,8 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * USMIND 便携版可视化启动器（GUI）
@@ -28,13 +32,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Main {
 
     // ---------------- 常量 ----------------
-    static final Color BG      = new Color(0x1B, 0x20, 0x28);
-    static final Color CARD    = new Color(0x25, 0x2C, 0x37);
-    static final Color CARD_HI = new Color(0x2F, 0x38, 0x45);
-    static final Color BORDER  = new Color(0x39, 0x43, 0x52);
-    static final Color TEXT    = new Color(0xE8, 0xEC, 0xF2);
-    static final Color SUB     = new Color(0x9A, 0xA4, 0xB2);
-    static final Color ACCENT  = new Color(0x4A, 0x9E, 0xFF);
+    static final Color BG      = new Color(0xF2, 0xF4, 0xF8);
+    static final Color CARD    = new Color(0xFF, 0xFF, 0xFF);
+    static final Color CARD_HI = new Color(0xE6, 0xEC, 0xF5);
+    static final Color BORDER  = new Color(0xD5, 0xDC, 0xE6);
+    static final Color TEXT    = new Color(0x1F, 0x29, 0x37);
+    static final Color SUB     = new Color(0x64, 0x74, 0x8B);
+    static final Color ACCENT  = new Color(0x3B, 0x82, 0xF6);
     static final Color GREEN   = new Color(0x45, 0xD0, 0x8A);
     static final Color RED     = new Color(0xF0, 0x5D, 0x5D);
     static final Color ORANGE  = new Color(0xF0, 0xA5, 0x2E);
@@ -154,8 +158,8 @@ public class Main {
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 4));
         btns.setOpaque(false);
         btnStart = makeBtn("启动全部服务", ACCENT);
-        btnStop = makeBtn("停止全部服务", new Color(0x3D, 0x45, 0x52));
-        btnBrowser = makeBtn("打开浏览器", new Color(0x3D, 0x45, 0x52));
+        btnStop = makeBtn("停止全部服务", new Color(0xE2, 0xE8, 0xF0));
+        btnBrowser = makeBtn("打开浏览器", new Color(0xE2, 0xE8, 0xF0));
         btnStart.addActionListener(e -> startAll());
         btnStop.addActionListener(e -> stopAllGui());
         btnBrowser.addActionListener(e -> openBrowser("http://127.0.0.1/"));
@@ -200,8 +204,8 @@ public class Main {
         statusText = new JLabel("未启动");
         statusText.setForeground(SUB);
         JLabel gap = new JLabel("   ");
-        JButton min = new JButton("_");
-        JButton close = new JButton("X");
+        JButton min = new JButton(loadTitleIcon("min.svg", "—"));
+        JButton close = new JButton(loadTitleIcon("x.svg", "×"));
         styleTitleBtn(min, uiFont);
         styleTitleBtn(close, uiFont);
         close.addActionListener(e -> shutdown());
@@ -236,8 +240,8 @@ public class Main {
         b.setPreferredSize(new Dimension(38, 26));
         b.addMouseListener(new MouseAdapter() {
             public void mouseEntered(MouseEvent e) {
-                b.setForeground(Color.WHITE);
-                b.setBackground(new Color(0x3A, 0x44, 0x53));
+                b.setForeground(TEXT);
+                b.setBackground(new Color(0xD5, 0xDC, 0xE6));
                 b.setOpaque(true);
                 b.repaint();
             }
@@ -346,7 +350,7 @@ public class Main {
             }
         };
         b.setBackground(bg);
-        b.setForeground(Color.WHITE);
+        b.setForeground(isDark(bg) ? Color.WHITE : TEXT);
         b.setFocusPainted(false);
         b.setBorderPainted(false);
         b.setContentAreaFilled(false);
@@ -363,6 +367,204 @@ public class Main {
 
     static Color brighten(Color c) {
         return new Color(Math.min(255, c.getRed() + 24), Math.min(255, c.getGreen() + 24), Math.min(255, c.getBlue() + 24));
+    }
+
+    static boolean isDark(Color c) {
+        return 0.299 * c.getRed() + 0.587 * c.getGreen() + 0.114 * c.getBlue() < 140;
+    }
+
+    // ==================== SVG 鏍囬鏍忓浘鏍囷紙min.svg / x.svg锛?====================
+    // 杩愯鏃朵粠 jar 鍐呰鍙栨瀯寤烘椂鎵撳叆鐨?svg 璧勬簮锛岃В鏋愬叾 <path> 缁樺埗涓烘寜閽浘鏍囷紱
+    // 璧勬簮缂哄け鏃跺洖閫€涓烘枃瀛楁寜閽紙"鈥?/"脳"锛夛紝淇濊瘉浠讳綍鎯呭喌涓嬮兘鏈夊彲鐢ㄦ寜閽€?
+    static Icon loadTitleIcon(String resName, String fallbackText) {
+        try (InputStream in = Main.class.getResourceAsStream("/" + resName)) {
+            if (in != null) {
+                ImageIcon icon = svgIcon(in, 16);
+                if (icon != null) return icon;
+            }
+        } catch (Exception ignored) { }
+        return new TextIcon(fallbackText);
+    }
+
+    static ImageIcon svgIcon(InputStream in, int size) {
+        try {
+            String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            Matcher m = Pattern.compile("<path\\s+d=\"([^\"]*)\"[^>]*?fill=\"([^\"]*)\"").matcher(text);
+            if (!m.find()) return null;
+            String d = m.group(1);
+            String fill = m.group(2);
+            Matcher vb = Pattern.compile("viewBox=\"([^\"]*)\"").matcher(text);
+            double vbx = 0, vby = 0, vbw = 1024, vbh = 1024;
+            if (vb.find()) {
+                String[] p = vb.group(1).trim().split("[\\s,]+");
+                if (p.length == 4) {
+                    vbx = Double.parseDouble(p[0]); vby = Double.parseDouble(p[1]);
+                    vbw = Double.parseDouble(p[2]); vbh = Double.parseDouble(p[3]);
+                }
+            }
+            BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = img.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            double s = Math.min(size / vbw, size / vbh);
+            g2.translate((size - vbw * s) / 2, (size - vbh * s) / 2);
+            g2.scale(s, s);
+            try { g2.setColor(parseHexColor(fill)); } catch (Exception e) { g2.setColor(SUB); }
+            Path2D path = parseSvgPath(d, vbx, vby);
+            if (path != null) g2.fill(path);
+            g2.dispose();
+            return new ImageIcon(img);
+        } catch (Exception e) { return null; }
+    }
+
+    static Color parseHexColor(String hex) {
+        String h = hex.trim();
+        if (h.startsWith("#")) h = h.substring(1);
+        if (h.length() == 3) h = "" + h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+        return new Color(Integer.parseInt(h, 16));
+    }
+
+    /** 杞婚噺 SVG path 瑙ｆ瀽锛氭敮鎸?M/L/H/V/C/S/Q/T/A/Z 鍙婄浉瀵瑰皬鍐欏懡浠わ紙鐢ㄤ簬鏍囬鏍忓浘鏍囷級 */
+    static Path2D parseSvgPath(String d, double ox, double oy) {
+        try {
+            Path2D.Double p = new Path2D.Double();
+            Matcher tm = Pattern.compile("([a-zA-Z]|-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)").matcher(d);
+            java.util.List<String> toks = new java.util.ArrayList<>();
+            while (tm.find()) toks.add(tm.group(1));
+            int i = 0; double cx = 0, cy = 0, sx = 0, sy = 0; char cur = 0;
+            double[] prevCtrl = null;
+            while (i < toks.size()) {
+                String tok = toks.get(i);
+                char cmd;
+                if (tok.length() == 1 && Character.isLetter(tok.charAt(0))) { cmd = tok.charAt(0); i++; }
+                else { if (cur == 0) break; cmd = cur; }
+                cur = cmd;
+                int need = needArgs(cmd);
+                if (i + need > toks.size()) break;
+                double[] a = new double[need];
+                for (int k = 0; k < need; k++) a[k] = Double.parseDouble(toks.get(i + k));
+                i += need;
+                boolean rel = Character.isLowerCase(cmd);
+                char up = Character.toUpperCase(cmd);
+                switch (up) {
+                    case 'M': {
+                        double x = rel ? cx + a[0] : a[0], y = rel ? cy + a[1] : a[1];
+                        p.moveTo(x, y); cx = x; cy = y; sx = x; sy = y;
+                        break;
+                    }
+                    case 'L': {
+                        double x = rel ? cx + a[0] : a[0], y = rel ? cy + a[1] : a[1];
+                        p.lineTo(x, y); cx = x; cy = y;
+                        break;
+                    }
+                    case 'H': { double x = rel ? cx + a[0] : a[0]; p.lineTo(x, cy); cx = x; break; }
+                    case 'V': { double y = rel ? cy + a[0] : a[0]; p.lineTo(cx, y); cy = y; break; }
+                    case 'C': {
+                        double x1 = rel ? cx + a[0] : a[0], y1 = rel ? cy + a[1] : a[1];
+                        double x2 = rel ? cx + a[2] : a[2], y2 = rel ? cy + a[3] : a[3];
+                        double x = rel ? cx + a[4] : a[4], y = rel ? cy + a[5] : a[5];
+                        p.curveTo(x1, y1, x2, y2, x, y);
+                        prevCtrl = new double[]{x2, y2}; cx = x; cy = y;
+                        break;
+                    }
+                    case 'S': {
+                        double x1 = prevCtrl != null ? 2 * cx - prevCtrl[0] : cx;
+                        double y1 = prevCtrl != null ? 2 * cy - prevCtrl[1] : cy;
+                        double x2 = rel ? cx + a[0] : a[0], y2 = rel ? cy + a[1] : a[1];
+                        double x = rel ? cx + a[2] : a[2], y = rel ? cy + a[3] : a[3];
+                        p.curveTo(x1, y1, x2, y2, x, y);
+                        prevCtrl = new double[]{x2, y2}; cx = x; cy = y;
+                        break;
+                    }
+                    case 'Q': {
+                        double x1 = rel ? cx + a[0] : a[0], y1 = rel ? cy + a[1] : a[1];
+                        double x = rel ? cx + a[2] : a[2], y = rel ? cy + a[3] : a[3];
+                        p.quadTo(x1, y1, x, y);
+                        prevCtrl = new double[]{x1, y1}; cx = x; cy = y;
+                        break;
+                    }
+                    case 'T': {
+                        double x1 = prevCtrl != null ? 2 * cx - prevCtrl[0] : cx;
+                        double y1 = prevCtrl != null ? 2 * cy - prevCtrl[1] : cy;
+                        double x = rel ? cx + a[0] : a[0], y = rel ? cy + a[1] : a[1];
+                        p.quadTo(x1, y1, x, y);
+                        prevCtrl = new double[]{x1, y1}; cx = x; cy = y;
+                        break;
+                    }
+                    case 'A': {
+                        double rx = Math.abs(a[0]), ry = Math.abs(a[1]);
+                        double phi = Math.toRadians(a[2]);
+                        int laf = (int) a[3], sf = (int) a[4];
+                        double x = rel ? cx + a[5] : a[5], y = rel ? cy + a[6] : a[6];
+                        arcTo(p, cx, cy, rx, ry, phi, laf, sf, x, y);
+                        cx = x; cy = y;
+                        break;
+                    }
+                    case 'Z': p.closePath(); cx = sx; cy = sy; break;
+                    default: break;
+                }
+            }
+            return p;
+        } catch (Exception e) { return null; }
+    }
+
+    static int needArgs(char cmd) {
+        switch (Character.toUpperCase(cmd)) {
+            case 'M': case 'L': case 'T': return 2;
+            case 'H': case 'V': return 1;
+            case 'S': case 'Q': return 4;
+            case 'C': return 6;
+            case 'A': return 7;
+            default: return 0;
+        }
+    }
+
+    /** 妞渾寮ц繎浼硷紙SVG A 鍛戒护锛夛細鎸変腑蹇冨弬鏁板寲澶氭涓夋璐濆灏旀嫙鍚?*/
+    static void arcTo(Path2D.Double p, double x0, double y0, double rx, double ry,
+                      double phi, int laf, int sf, double x1, double y1) {
+        double dx = (x0 - x1) / 2, dy = (y0 - y1) / 2;
+        double cphi = Math.cos(phi), sphi = Math.sin(phi);
+        double xp = cphi * dx + sphi * dy, yp = -sphi * dx + cphi * dy;
+        double lam = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+        if (lam > 1) { double s = Math.sqrt(lam); rx *= s; ry *= s; }
+        double num = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp;
+        double den = rx * rx * yp * yp + ry * ry * xp * xp;
+        double rad = (den <= 0 || num < 0) ? 0 : Math.sqrt(num / den);
+        double cxp = rad * rx * yp / ry, cyp = -rad * ry * xp / rx;
+        if (laf == sf) { cxp = -cxp; cyp = -cyp; }
+        double cx = cphi * cxp - sphi * cyp + (x0 + x1) / 2;
+        double cy = sphi * cxp + cphi * cyp + (y0 + y1) / 2;
+        double th0 = Math.atan2((yp - cyp) / ry, (xp - cxp) / rx);
+        double th1 = Math.atan2((-yp - cyp) / ry, (-xp - cxp) / rx);
+        double sweep = th1 - th0;
+        if (!(sf > 0) && sweep > 0) sweep -= 2 * Math.PI;
+        else if (sf > 0 && sweep < 0) sweep += 2 * Math.PI;
+        int seg = Math.max(1, (int) Math.ceil(Math.abs(sweep) / (Math.PI / 2)));
+        for (int k = 1; k <= seg; k++) {
+            double t0 = th0 + sweep * (k - 1) / seg;
+            double t1 = th0 + sweep * k / seg;
+            double alpha = 4.0 / 3.0 * Math.tan((t1 - t0) / 4);
+            double c1x = cx + rx * Math.cos(t0) - alpha * rx * Math.sin(t0);
+            double c1y = cy + ry * Math.sin(t0) + alpha * ry * Math.cos(t0);
+            double c2x = cx + rx * Math.cos(t1) + alpha * rx * Math.sin(t1);
+            double c2y = cy + ry * Math.sin(t1) - alpha * ry * Math.cos(t1);
+            p.curveTo(c1x, c1y, c2x, c2y, cx + rx * Math.cos(t1), cy + ry * Math.sin(t1));
+        }
+    }
+
+    /** 鏂囧瓧鍥為€€鍥炬爣锛坰vg 璧勬簮缂哄け鏃舵樉绀猴級 */
+    static class TextIcon implements Icon {
+        final String txt;
+        TextIcon(String txt) { this.txt = txt; }
+        public int getIconWidth() { return 18; }
+        public int getIconHeight() { return 18; }
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(SUB);
+            g2.setFont(g2.getFont().deriveFont(Font.BOLD, 15f));
+            g2.drawString(txt, x + 3, y + 14);
+            g2.dispose();
+        }
     }
 
     /** 从 logo.ico 解析出窗口图标（取其中最大 PNG 帧） */

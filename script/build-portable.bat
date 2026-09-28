@@ -26,6 +26,10 @@ if exist "%BUILD_OUT%" rmdir /s /q "%BUILD_OUT%"
 mkdir "%BUILD_OUT%\classes"
 "%JAVAC%" -encoding UTF-8 -d "%BUILD_OUT%\classes" "%SRC%\launcher\Main.java"
 if errorlevel 1 goto :err
+copy /y "%SRC%\min.svg" "%BUILD_OUT%\classes\min.svg" >nul
+if errorlevel 1 goto :err
+copy /y "%SRC%\x.svg" "%BUILD_OUT%\classes\x.svg" >nul
+if errorlevel 1 goto :err
 "%JAR%" cf "%BUILD_OUT%\launcher.jar" -C "%BUILD_OUT%\classes" .
 if errorlevel 1 goto :err
 copy /y "%BUILD_OUT%\launcher.jar" "%PORTABLE%\app\launcher.jar" >nul

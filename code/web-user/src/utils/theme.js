@@ -3,7 +3,7 @@
 // 结构参考 simple-mind-map 内置 default 主题; branchColors 为彩虹分支配色顺序
 export const THEMES = [
   {
-    "name": "XMind 浅色",
+    "name": "晨曦白",
     "key": "usmind-light",
     "branchColors": ["#2FB36B", "#22A7C9", "#F6A609", "#E8684A", "#F08BB4", "#9270CA", "#5B8FF9", "#FF9F43"],
     "config": {

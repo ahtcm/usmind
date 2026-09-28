@@ -411,21 +411,21 @@ html, body, #app {
   background: linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.02) 100%);
 }
 
-/* XMind 浅色(默认): 浅色画布 + 白卡片节点 + 彩色边框 + 深蓝实心根 */
-#map[data-theme="XMind 浅色"] .map-canvas {
+/* 晨曦白(默认): 浅色画布 + 白卡片节点 + 彩色边框 + 深蓝实心根 */
+#map[data-theme="晨曦白"] .map-canvas {
   background: #fafbff;
 }
-#map[data-theme="XMind 浅色"] me-root {
+#map[data-theme="晨曦白"] me-root {
   background: #4A5CF7;
   color: #ffffff;
   border: none;
   box-shadow: 0 6px 16px rgba(74,92,247,.32);
 }
-#map[data-theme="XMind 浅色"] me-parent {
+#map[data-theme="晨曦白"] me-parent {
   background: #ffffff;
   box-shadow: 0 3px 10px rgba(31,41,55,.08);
 }
-#map[data-theme="XMind 浅色"] me-tpc {
+#map[data-theme="晨曦白"] me-tpc {
   color: #334155;
 }
 

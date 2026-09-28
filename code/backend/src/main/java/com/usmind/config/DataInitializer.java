@@ -189,7 +189,7 @@ public class DataInitializer implements CommandLineRunner {
         DEFAULT_THEMES.add(new Object[]{"玫瑰", "usmind-rose", "#FF758F", "#FF758F", new String[]{"#FF758F", "#FF8C9B", "#F7B2B7", "#FAD0C4", "#FDA7DF", "#F78FB3", "#FFD3E0", "#E0A4B7"}});
         DEFAULT_THEMES.add(new Object[]{"薄荷", "usmind-mint", "#00B894", "#00B894", new String[]{"#55EFC4", "#00D2FF", "#81ECEC", "#18DCAA", "#00B894", "#55E6C1", "#A8E6CF", "#7ED321"}});
         // 原有内置主题（深色为主）
-        DEFAULT_THEMES.add(new Object[]{"XMind 浅色", "usmind-light", "#4A5CF7", "#94a3b8", new String[]{"#2FB36B", "#22A7C9", "#F6A609", "#E8684A", "#F08BB4", "#9270CA", "#5B8FF9", "#FF9F43"}});
+        DEFAULT_THEMES.add(new Object[]{"晨曦白", "usmind-light", "#4A5CF7", "#94a3b8", new String[]{"#2FB36B", "#22A7C9", "#F6A609", "#E8684A", "#F08BB4", "#9270CA", "#5B8FF9", "#FF9F43"}});
         DEFAULT_THEMES.add(new Object[]{"深空黑", "usmind-dark", "#3b82f6", "#64748b", new String[]{"#4ADE80", "#22D3EE", "#FACC15", "#FB7185", "#C084FC", "#818CF8", "#F97316", "#2DD4BF"}});
         DEFAULT_THEMES.add(new Object[]{"极简白", "usmind-white", "#1e293b", "#cbd5e1", new String[]{"#2FB36B", "#22A7C9", "#F6A609", "#E8684A", "#F08BB4", "#9270CA", "#5B8FF9", "#FF9F43"}});
         DEFAULT_THEMES.add(new Object[]{"暮色紫", "usmind-purple", "#7c3aed", "#8b5cf6", new String[]{"#C084FC", "#F472B6", "#FB923C", "#4ADE80", "#22D3EE", "#FACC15", "#818CF8", "#F87171"}});
