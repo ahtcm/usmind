@@ -234,12 +234,32 @@
 | `USMIND-online.exe`（release 根） | 在线版正式产物（16KB，内嵌清单，从 CDN 拉取环境） |
 | `online-dist\manifest.json` | 分片清单（组件 / 解压目录 / 分片文件名与大小），同时作为下载器编译时的内嵌资源 |
 
-### script/ 一键脚本（相对路径）
+### 脚本体系（Windows: `script\bat\` / Linux: `script\shell\`，全部相对路径）
+
+**Windows 批处理（`script\bat\`，15 个）**
+
 | 文件 | 作用 |
 | --- | --- |
-| `start-all.bat` / `stop-all.bat` / `delete-all.bat` | 依次启动 / 停止 / 清理（慎用）MySQL、Redis、后端、nginx |
-| `start-mysql.bat` / `start-redis.bat` / `start-backend.bat` / `start-nginx.bat` | 单独启动各服务 |
-| `start-web-user.bat` / `start-web-admin.bat` | 单独构建并部署前端到 release（开发热更入口） |
-| `init-db.bat` | 执行 `sql\init.sql` 建库建表（首次初始化） |
-| `build-backend.bat` / `build-web-user.bat` / `build-web-admin.bat` | 构建后端 jar / 用户端 / 管理后台 |
+| `start-all.bat` | 一键启动：MySQL → Redis → nginx → 后端 8899（先 Maven 构建）→ 构建两个前端 |
+| `stop-all.bat` | 全部停止（taskkill + netstat + mysqladmin 优雅关闭） |
+| `delete-all.bat` | 停止 + 清日志 + 清构建产物 + 可选清 MySQL/Redis 数据（慎用） |
+| `start-mysql.bat` / `start-redis.bat` / `start-nginx.bat` | 单独启动各服务（首次自动初始化 / 建目录） |
+| `start-backend.bat` | Maven 构建 + 启动后端（端口 8899） |
+| `start-web-user.bat` / `start-web-admin.bat` | 前端 Vite 开发服务器（5173 / 5174，首次自动 npm install） |
+| `init-db.bat` | 执行 `sql\init.sql` 建库建表 + 设置 root 密码（首次初始化） |
+| `build-backend.bat` / `build-web-user.bat` / `build-web-admin.bat` | 构建后端 jar / 用户端 dist → `release\usmind` / 管理后台 dist → `release\admin` |
 | `build-portable.bat` / `build-all.bat` | 构建便携绿色版 / 一键重建三种发布形态（见「四、发布与构建体系」） |
+
+**Linux shell（`script\shell\`，14 个，作用与 bat 一一对应）**
+
+| 文件 | 作用 |
+| --- | --- |
+| `start-all.sh` / `stop-all.sh` / `delete-all.sh` | 一键启动 / 停止 / 清理（Linux） |
+| `start-mysql.sh` / `start-redis.sh` / `start-nginx.sh` | 单独启动各服务（端口等待就绪后返回） |
+| `start-backend.sh` | Maven 构建 + 启动后端（8899） |
+| `start-web-user.sh` / `start-web-admin.sh` | Vite 开发服务器（5173 / 5174） |
+| `init-db.sh` | 执行 `sql/init.sql` 初始化数据库 |
+| `build-backend.sh` / `build-web-user.sh` / `build-web-admin.sh` | 构建后端 jar / 前端 dist → nginx `html/{usmind,admin}` |
+| `build-all.sh` | 一键构建（后端 + 两个前端；不含便携版，服务器部署不需要） |
+
+> **Linux 环境约定**：与 Windows 一致放项目 `tools\` 下（`jdk-17.0.2` / `apache-maven-3.9.6` / `nodejs` / `mysql-*` / `redis-*` / `nginx-*`，mysql/redis/nginx 的版本目录名自动探测，放 Linux 版即可）。全部脚本均为 bash 语法（已通过 `bash -n` 检查），项目根由 `$(dirname "$0")/../..` 定位。

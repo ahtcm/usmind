@@ -201,6 +201,17 @@ script\bat\delete-all.bat       :: 清理数据与日志（慎用）
 
 各服务也可单独启停：`start-mysql / start-redis / start-backend / start-nginx / start-web-user / start-web-admin`。
 
+### Linux 部署（`script\shell\`，作用与 bat 一致）
+```bash
+bash script/shell/start-all.sh        # 依次启动 MySQL → Redis → nginx → 后端(8899) → 构建前端
+bash script/shell/stop-all.sh         # 全部停止
+bash script/shell/delete-all.sh       # 清理数据与日志（慎用）
+bash script/shell/init-db.sh          # 首次初始化数据库（sql/init.sql）
+bash script/shell/build-all.sh        # 一键构建：后端 jar + 两个前端部署到 nginx html
+```
+
+> Linux 环境放项目 `tools/` 下，命名与 Windows 一致：`jdk-17.0.2` / `apache-maven-3.9.6` / `nodejs` / `mysql-*` / `redis-*` / `nginx-*`（mysql/redis/nginx 版本目录自动探测）。全部为 bash 脚本（`bash -n` 语法通过），项目根由 `$(dirname "$0")/../..` 定位。
+
 启动后访问：
 - 用户端：http://127.0.0.1:8866
 - 管理后台：http://127.0.0.1:8867（默认账号 `admin / admin123`）
@@ -208,6 +219,7 @@ script\bat\delete-all.bat       :: 清理数据与日志（慎用）
 ### 首次初始化数据库
 ```bat
 script\bat\init-db.bat          :: 执行 sql\init.sql 建库建表（已有数据可跳过）
+bash script/shell/init-db.sh    :: 同上（Linux）
 ```
 
 ### 构建
@@ -218,6 +230,8 @@ script\bat\build-web-admin.bat  :: 构建管理后台并部署到 release\admin
 script\bat\build-portable.bat   :: 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 两个前端构建部署）
 script\bat\build-all.bat        :: 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
 ```
+
+Linux 对应：`bash script/shell/build-backend.sh` / `build-web-user.sh` / `build-web-admin.sh` / `build-all.sh`（前端 dist 部署到 nginx `html/{usmind,admin}`）。
 
 > 说明：构建脚本全部使用**相对路径**（基于脚本所在目录自动定位项目根、JDK、Maven、Node），整个项目拷到任意位置都能直接构建运行。
 
