@@ -2458,6 +2458,7 @@ async function buildFullSvg() {
       enableShortcutOnlyWhenMouseInSvg: false,
       openRealtimeRenderOnNodeTextEdit: false,
       attachmentIcon: { style: { size: 0 }, icon: '' },
+      errorHandler: (type, e) => console.error('[export] 导出资源处理失败(' + type + ')', e),
       rainbowLinesConfig: src.opt.rainbowLinesConfig,
       iconList: src.opt.iconList,
       // 离屏实例无懒加载，仅需 viewBox + 浅色文字转深
@@ -2487,10 +2488,44 @@ async function buildFullSvg() {
       inst.on('node_tree_render_end', fin)
       setTimeout(fin, 30000)
     })
-    const { str } = await inst.doExport.getSvgData()
-    return str
-  } finally {
-    try { if (inst && inst.destroy) inst.destroy() } catch (e) {}
+    let getRes = null
+    try {
+      getRes = await inst.doExport.getSvgData()
+    } catch (err) {
+      console.error('[export] 离屏 SVG 生成失败', err)
+      toast('离屏 SVG 生成失败: ' + (err && err.message ? err.message : String(err)), 'error')
+      return null
+    }
+    const { node, str } = getRes
+    // 把 foreignObject 内的 <video>/<audio> 替换为静态占位（文件名+图标），
+    // 否则视频/音频 URL 无法渲染进 SVG/PNG/PDF（黑块或加载失败），导致整张导出中断
+    let out = str
+    try {
+      let changed = false
+      node.find('foreignObject').each(function () {
+        const el = this.node
+        if (!el || !el.innerHTML) return
+        const placeholder = (sym, tag) => (m) => {
+          changed = true
+          const um = m.match(/(?:src=|poster=)\s*["']([^"']+)["']/)
+          const u = (um && um[1]) || ''
+          const nm = (u.split('/').pop() || tag).replace(/[?#].*$/, '')
+          return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#14161a;color:#e8eaed;font-size:13px;overflow:hidden;font-family:sans-serif;white-space:nowrap">' + sym + ' ' + nm + '</div>'
+        }
+        let html = el.innerHTML
+        const pv = placeholder('▶', '视频'), pa = placeholder('♪', '音频')
+        html = html.replace(/<video[\s\S]*?<\/video>/gi, pv)
+        html = html.replace(/<video[^>]*\/>/gi, pv)
+        html = html.replace(/<video[^>]*>/gi, pv)
+        html = html.replace(/<audio[\s\S]*?<\/audio>/gi, pa)
+        html = html.replace(/<audio[^>]*\/>/gi, pa)
+        html = html.replace(/<audio[^>]*>/gi, pa)
+        if (changed || html !== el.innerHTML) { el.innerHTML = html; changed = true }
+      })
+      if (changed) out = node.svg()
+    } catch (e) { console.error('[export] video/audio 占位替换失败', e) }
+    return out
+  } finally {    try { if (inst && inst.destroy) inst.destroy() } catch (e) {}
     try { tmp.remove() } catch (e) {}
   }
 }
