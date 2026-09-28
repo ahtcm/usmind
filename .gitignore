@@ -107,3 +107,6 @@ __pycache__/
 *.msi
 *.dmg
 *.pkg
+
+# Redis 本地数据文件（不应提交）
+dump.rdb
