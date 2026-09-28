@@ -678,6 +678,12 @@ async function createMind() {
             }
           }
         }
+        // 懒加载隐藏的节点（applyLazyView 设置 visibility:hidden）导出时必须全显，否则导出的
+        // SVG/PNG/PDF 只有当前视口附近的内容；节点其实都在 DOM 中，仅需把 hidden 改回 visible
+        svg.find('*').each(function () {
+          const st = this.attr('style')
+          if (st && /visibility:\s*hidden/.test(st)) this.attr('style', st.replace(/visibility:\s*hidden/g, 'visibility:visible'))
+        })
         // 浅色文字转深色：部分主题（如晨曦白）节点文字为白色，导出 SVG 后
         // 节点背景（CSS 渲染）不随 SVG 序列化，白字在浅色底上看不见，强制转深保证可读
         svg.find('text').each(function () {
