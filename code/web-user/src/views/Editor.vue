@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="editor-root">
     <!-- 顶部工具栏 -->
     <div id="toolbar" class="toolbar">
@@ -2723,7 +2723,7 @@ onMounted(async () => {
     }
   } else {
     // 新建
-    data = await mindmapApi.create({ name: '未命名' })
+    data = await mindmapApi.create({ name: '未命名', theme: themes.value[0].name })
     mindMapId.value = data.id
     data = await mindmapApi.get(data.id)
   }
