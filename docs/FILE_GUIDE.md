@@ -219,14 +219,15 @@
 
 ---
 
-## 四、发布与构建体系（`release\launcher-src` + `build-all.bat`）
+## 四、发布与构建体系（`code\launcher-src` + `script\build-all.bat`）
 
-三种发布形态（便携绿色版 / 单文件自解压版 / 在线安装版）的构建源码与产物说明：
+三种发布形态（便携绿色版 / 单文件自解压版 / 在线安装版）的构建源码与产物说明。源码全部位于 `code\launcher-src\`（launcher 子目录为 Java 启动器；根目录为 C# stub、PowerShell 分片脚本、logo 与 nginx 模板）：
 
 | 文件 | 作用 / 主要函数 |
 | --- | --- |
-| `build-all.bat`（项目根） | 一键重建三种发布形态（全相对路径）：① javac + jar + jlink + jpackage 组装便携版；② PowerShell 压缩便携版 + csc 编译自解压 stub + 拼接；③ `build_online.ps1` 生成分片 + csc 编译在线下载器 + 复制为 `USMIND-online.exe`。任一环节失败 `goto :err` 提示并退出 |
-| `launcher/Main.java` | 便携版 Java 启动器（jpackage 生成 `USMIND.exe`）：`main`（初始化 → 启动 MySQL→Redis→nginx→后端 → `waitReady(240)` → 打开浏览器 → 回车优雅停机）、`locateRoot`（定位程序目录）、`startMysql`（首次 `--initialize-insecure` + 导入 init.sql）、`startRedis` / `startNginx` / `startBackend`、`stopAll`（顺序停机）、`waitReady`（健康检查，首次初始化需 ≥240s）、`openBrowser`、`--smoke`（启动+健康检查后自动停止，供构建验证） |
+| `script\build-portable.bat` | 一键构建便携绿色版：javac 编译启动器 → jlink 精简 JRE → jpackage 生成 `USMIND.exe`（带 logo）→ 复制 mysql/redis/nginx/后端 jar/init.sql → 构建两个前端并部署到 `components\nginx\html\{usmind,admin}`。支持 `-s` 静默参数（跳过末尾 pause）。全部相对路径（`SCRIPT_DIR` 定位项目根） |
+| `script\build-all.bat` | 一键重建三种发布形态（全相对路径）：① 调 `build-portable.bat` 流程组装便携版；② PowerShell 压缩便携版 + csc 编译自解压 stub + 拼接；③ `build_online.ps1` 生成分片 + csc 编译在线下载器 + 复制为 `USMIND-online.exe`。任一环节失败 `goto :err` 提示并退出 |
+| `launcher/Main.java` | 便携版 Java 启动器（jpackage 生成 `USMIND.exe`）：`main`（初始化 → 启动 MySQL→Redis→nginx→后端 → `waitReady` → 打开浏览器 → 回车优雅停机）、`ensureMysqlData`（首次 `--initialize-insecure` + 设密码 + 每次启动幂等导入 `init.sql`）、`startMysql` / `startRedis` / `startNginx` / `startBackend`、`stopAll`（优雅 → 强制 → `taskkill /F /T` 进程树，末尾 `killUsmindFamily` 按 `ProcessHandle` 枚举清理残留并重试 3 次，排除自身 JVM）、`waitReady`（80 与 8899 均健康才返回）、`openBrowser`、`--smoke`（启动+健康检查后自动停止，供构建验证） |
 | `selfextract.cs` | 自解压版 C# stub：`Main`（`--extract-only` 仅解压 / 定位 exe 内嵌 zip 起点 → 解压到 `%LOCALAPPDATA%\USMIND` → 启动 USMIND.exe）、`LocateZipStart`（从 exe 尾部扫描 EOCD 定位 zip 偏移，SubStream 只读子流） |
 | `Installer.cs` | 在线安装版 C# WinForms 下载器：`Main`（解析参数 `--dir` / 已安装直接启动 / 读内嵌 `Installer.manifest` 分片清单）、`DoInstall`（后台线程：逐组件下载分片 → 拼接 zip → 解压组装 → 启动）、`DownloadPart`（WebClient 下载单分片 + 进度事件）、`BaseUrl`（默认 jsDelivr `@v1`，`USMIND_BASE_URL` 环境变量覆盖）、`BuildUI` / `UpdateProgress` / `SetStatus`（进度条 UI，跨线程 BeginInvoke） |
 | `build_online.ps1` | 分片生成脚本：从 `usmind-portable` 提取 6 组件（core→`USMIND.exe`+`app`、jre→`runtime`、mysql/redis/nginx→`components\*`、backend→jar+init.sql）→ `Compress-Dir` 压缩 → `Split-Zip` 按 20MB 切分 → 输出 `release\online-dist\` + 写 `manifest.json`（`[{comp, dir, parts:[{file,size}]}]`） |
@@ -241,3 +242,4 @@
 | `start-web-user.bat` / `start-web-admin.bat` | 单独构建并部署前端到 release（开发热更入口） |
 | `init-db.bat` | 执行 `sql\init.sql` 建库建表（首次初始化） |
 | `build-backend.bat` / `build-web-user.bat` / `build-web-admin.bat` | 构建后端 jar / 用户端 / 管理后台 |
+| `build-portable.bat` / `build-all.bat` | 构建便携绿色版 / 一键重建三种发布形态（见「四、发布与构建体系」） |

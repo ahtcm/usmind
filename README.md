@@ -125,9 +125,10 @@ usmind/
 │   ├── USMIND-setup.exe   # ② 单文件自解压版（zip 内嵌 exe）
 │   ├── USMIND-online.exe  # ③ 在线安装器（16KB，CDN 实时拉取环境）
 │   ├── online-dist/       # 在线版环境分片（22 片 + manifest.json，推送 GitHub @v1 经 jsDelivr 分发）
-│   └── launcher-src/      # 发布形态构建源码（Main.java / selfextract.cs / Installer.cs / build_online.ps1）
-├── build-all.bat          # 一键构建三种发布形态（全相对路径）
-├── script/                # 一键脚本（启动/停止/构建/初始化数据库等，全部相对路径）
+│   （release 为构建产物，git 忽略；launcher 构建源码在 code\launcher-src\）
+├── script/                  # 一键脚本（启动/停止/构建/初始化数据库等，全部相对路径）
+│   ├── build-portable.bat    # 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 前端构建）
+│   ├── build-all.bat         # 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
 ├── sql/                   # 数据库脚本
 │   ├── init.sql           # 建库建表（含种子数据）
 │   └── usmind_db_backup_*.sql / usmind-backup-*.json  # 备份文件
@@ -173,6 +174,8 @@ usmind/
 | 在线安装版 | `release\USMIND-online.exe` | 16KB | 从国内 CDN 实时下载环境（可视化进度条），装好后自动启动 |
 
 > 在线版原理：安装器内置分片清单，从 `cdn.jsdelivr.net/gh/ahtcm/usmind@v1/release/online-dist`（GitHub 公开仓库 v1 标签，jsDelivr 国内加速节点）下载 22 个分片 → 拼接解压 → 组装为便携版目录 → 启动。已安装（目标目录存在 `USMIND.exe`）则直接启动，跳过下载。可用环境变量 `USMIND_BASE_URL` 覆盖下载源；可用 `--dir <目录>` 指定安装目录（默认 `%LOCALAPPDATA%\USMIND-online`）。
+>
+> ⚠️ **当前状态**：分片已按需求从 GitHub 移除（不再托管 `online-dist`）。`script\build-all.bat` / `code\launcher-src\build_online.ps1` 仍可随时重新生成分片；若需继续使用在线版，请自行托管 `release\online-dist`（如推回 GitHub `@v1` 或私有对象存储）后重新构建安装器。
 
 ### 一键启动
 
@@ -202,6 +205,8 @@ script\init-db.bat          :: 执行 sql\init.sql 建库建表（已有数据�
 script\build-backend.bat    :: 构建后端 jar（mvn clean package -DskipTests，产物 code\backend\target\usmind-backend.jar）
 script\build-web-user.bat   :: 构建用户端并部署到 release\usmind
 script\build-web-admin.bat  :: 构建管理后台并部署到 release\admin
+script\build-portable.bat   :: 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 两个前端构建部署）
+script\build-all.bat        :: 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
 ```
 
 > 说明：构建脚本全部使用**相对路径**（基于脚本所在目录自动定位项目根、JDK、Maven、Node），整个项目拷到任意位置都能直接构建运行。
@@ -340,14 +345,17 @@ spring:
 
 ### 一键重建三种形态
 ```bat
-build-all.bat
+script\build-all.bat
 ```
-依次重建：便携版（javac + jlink + jpackage + 组件复制）→ 自解压版（zip + csc stub 拼接）→ 在线版（`build_online.ps1` 分片 + csc 下载器）。全部使用**相对路径**（`%~dp0` 定位项目根；csc 取 `%WINDIR%` 下 .NET Framework 编译器），项目整体拷到任意位置可直接重建。构建源码在 `release/launcher-src/`。
+依次重建：便携版（javac + jlink + jpackage + 组件复制）→ 自解压版（zip + csc stub 拼接）→ 在线版（`build_online.ps1` 分片 + csc 下载器）。全部使用**相对路径**（`SCRIPT_DIR` 定位项目根；csc 取 `%WINDIR%` 下 .NET Framework 编译器），项目整体拷到任意位置可直接重建。构建源码在 `code\launcher-src\`。
 
 ### 更新在线版分片（重新发布）
-1. `build_online.ps1` 重新生成 `online-dist`；
-2. `git add -f release/online-dist` + 提交（`release/` 被 .gitignore 忽略，需 `-f`）；
-3. 推送 GitHub develop，必要时更新 `v1` 标签（`git tag -f v1 && git push github v1 -f`）；
+> 现状：分片已从 GitHub 移除，不再托管。以下为**如需重新启用在线版**的操作步骤：
+1. `code\launcher-src\build_online.ps1` 重新生成 `release\online-dist`；
+2. 托管分片（二选一）：
+   - 推回 GitHub：`git add -f release/online-dist` + 提交（`release/` 被 .gitignore 忽略，需 `-f`）→ 推送 develop → 更新 `v1` 标签（`git tag -f v1 && git push github v1 -f`）；
+   - 或用 `USMIND_BASE_URL` 指向自建对象存储 / 静态托管；
+3. 用 `script\build-all.bat` 重新构建在线安装器；
 4. 注意 jsDelivr 对新文件/更新有缓存延迟（几分钟），旧 URL 立即生效、更新内容需等缓存刷新。
 
 ---
@@ -362,4 +370,4 @@ build-all.bat
 - **换机器后登录失败**：确认 MySQL 与 Redis 已启动、`init-db` 已执行、`application-dev.yml` 连接正确。
 - **在线版首次下载慢 / 卡住**：首次需下载约 371MB（国内 CDN，一般 5~15 分钟）；卡住多为网络波动，关闭后重开安装器会重新下载；也可改用便携版或自解压版。
 - **在线版更新后下载到旧环境**：jsDelivr 对分片有缓存延迟，刚推新分片后 5~30 分钟内可能拉到旧版，属正常现象。
-- **`build-all.bat` 构建失败**：确认 `.NET Framework 4.x` 已安装（csc 编译 C# 需要）；后端 jar 未构建时先 `script\build-backend.bat`。
+- **`script\build-all.bat` 构建失败**：确认 `.NET Framework 4.x` 已安装（csc 编译 C# 需要）；后端 jar 未构建时先 `script\build-backend.bat`。

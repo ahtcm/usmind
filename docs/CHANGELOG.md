@@ -1,5 +1,16 @@
 # USMIND 变更记录
 
+## 2026-09-28 · 启动器可靠性修复 + 构建脚本统一入 script\（6d16030）
+
+- **修复启动器"自杀 bug"**：`killUsmindFamily` 会把启动器自身的 JVM（路径含 `usmind-portable` 的 java.exe）当作残留 taskkill，进程树强杀导致启动器中途死亡、停止流程中断、服务残留。现改用 Java `ProcessHandle.allProcesses()` 原生枚举并排除自身进程，stopAll 末尾兜底清理重试 3 次；停止后端口/进程最终全部释放（MySQL/nginx 优雅关闭约 30s 属正常延迟）。
+- **修复数据库建表被跳过**：`ensureMysqlData` 仅判断"库存在"就跳过导入，导致业务表缺失、后端 `Table doesn't exist` 启动失败。现改为每次启动幂等导入 `init.sql`（全部 `CREATE TABLE IF NOT EXISTS`），后端可正常启动。
+- **构建脚本统一移入 `script\` 目录**：`build-portable.bat` / `build-all.bat` 从项目根移入 `script\`，路径定位与其他脚本统一（`SCRIPT_DIR` 相对定位）；修复移动引入的 `ROOT=%CD%\` 尾斜杠问题（否则 `%ROOT%release` 拼接缺分隔符）。
+- **清理误跟踪**：`release/usmind-portable/components/nginx/conf/nginx.conf` 取消 git 跟踪（release 整体忽略，构建时由模板 `code\launcher-src\nginx-portable.conf` 重新生成，含 `pid` 指令保证 `nginx -s stop` 生效）。
+- **提交 `code/logo.ico`**：网页与 exe 统一 logo（与 `code\launcher-src\logo.ico` 相同）。
+- **在线版分片从 GitHub 移除**：`release/online-dist` 不再托管（commit a620e31），`code\launcher-src\build_online.ps1` 保留，可随时重新生成；如需继续使用在线版需自行托管分片后重新构建安装器。
+- **验证**：`script\build-portable.bat -s` 全流程构建 exit 0；干净环境下 `USMIND.exe --smoke` = `[SMOKE] OK` + 停止后无任何残留。
+
+
 ## 2026-09-28 · v1 正式发布（三种发布形态 + 一键构建 + CDN 在线分发）
 
 - **新增 `build-all.bat`**：一键重建三种发布形态，全部相对路径（`%~dp0` 定位项目根，csc 用 `%WINDIR%`）。
