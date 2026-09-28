@@ -653,8 +653,18 @@ async function createMind() {
     iconList: [
       { type: 'number', list: Array.from({length:10},(_,i)=>({name:String(i+1),icon:numSvg(i+1)})) },
       { type: 'emoji', list: FALLBACK_EMOJI.map(e=>({name:e,icon:emojiSvg(e)})) }
-    ]
-  })
+    ],
+
+    // 导出时给克隆 SVG 加 viewBox：超大画布（如全展开的万级节点）无 viewBox 时，
+    // 查看器/浏览器按 1:1 只显示左上角一小块，加 viewBox 后可完整 fit 显示全部内容
+    handleBeingExportSvg: (svg) => {
+      try {
+        const w = parseFloat(svg.attr('width')) || 0
+        const h = parseFloat(svg.attr('height')) || 0
+        if (w && h && !svg.attr('viewBox')) svg.attr('viewBox', '0 0 ' + w + ' ' + h)
+      } catch (e) { /* 忽略，保持默认导出 */ }
+      return svg
+    }  })
   bindMindEvents()
   const t0name = doc.theme || themes.value[0].name
   ;[400, 1200].forEach((d) => setTimeout(() => { try { applyThemeFonts(t0name) } catch (e) {} }, d))
