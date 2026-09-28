@@ -44,6 +44,8 @@ if exist "%RELEASE%\_jp" rmdir /s /q "%RELEASE%\_jp"
 if errorlevel 1 goto :err
 copy /y "%RELEASE%\_jp\USMIND\USMIND.exe" "%PORTABLE%\USMIND.exe" >nul
 if errorlevel 1 goto :err
+copy /y "%RELEASE%\_jp\USMIND\app\USMIND.cfg" "%PORTABLE%\app\USMIND.cfg" >nul
+if errorlevel 1 goto :err
 rmdir /s /q "%RELEASE%\_jp"
 
 echo   -- 复制组件 (mysql/redis/nginx/backend/init.sql) --
