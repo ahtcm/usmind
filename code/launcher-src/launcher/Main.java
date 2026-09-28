@@ -666,8 +666,14 @@ public class Main {
                 if (!mysqlProc.waitFor(3, TimeUnit.SECONDS)) taskkill(mysqlProc.pid());
             }
         }
-        // 最终兜底：清理 USMIND 家族残留（便携版 + 安装版）
-        killUsmindFamily();
+        // 最终兜底：清理 USMIND 家族残留（便携版 + 安装版），重试 3 次确保杀干净
+        for (int k = 0; k < 3; k++) {
+            killUsmindFamily();
+            boolean anyLeft = portOpen("127.0.0.1", 3306) || portOpen("127.0.0.1", 6379)
+                    || httpOk("http://127.0.0.1:8866/") || httpOk("http://127.0.0.1:8899/");
+            if (!anyLeft) break;
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+        }
     }
 
     /** 强制结束某 PID 及其子进程树 */
@@ -679,22 +685,28 @@ public class Main {
     }
 
     /** 清理 USMIND 家族残留进程（便携版 usmind-portable + 安装版 %LOCALAPPDATA%\USMIND / USMIND-online），
-     *  避免端口占用导致启动失败；不触碰开发环境（tools 路径）进程 */
+     *  避免端口占用导致启动失败；不触碰开发环境（tools 路径）进程。
+     *  使用 ProcessHandle 枚举（比 PowerShell 快且可靠），按进程树强杀 */
     static void killUsmindFamily() {
+        int killed = 0;
         try {
-            String ps = "Get-CimInstance Win32_Process | Where-Object { ($_.Name -in 'nginx.exe','java.exe','mysqld.exe','redis-server.exe') -and (($_.ExecutablePath -like '*usmind-portable*') -or ($_.ExecutablePath -like '*AppData\\Local\\USMIND*')) } | ForEach-Object { $_.ProcessId }";
-            Process p = new ProcessBuilder("powershell", "-NoProfile", "-Command", ps)
-                    .redirectErrorStream(true).start();
-            p.waitFor(15, TimeUnit.SECONDS);
-            String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int killed = 0;
-            for (String line : out.split("\\r?\\n")) {
-                String pid = line.trim();
-                if (pid.matches("\\d+")) { taskkill(Long.parseLong(pid)); killed++; }
+            long self = ProcessHandle.current().pid();
+            for (ProcessHandle ph : ProcessHandle.allProcesses().toList()) {
+                if (ph.pid() == self) continue; // 绝不清理自己（JVM 进程），否则自杀
+                String cmd = ph.info().command().orElse("");
+                if (cmd.isEmpty()) continue;
+                String lc = cmd.toLowerCase();
+                boolean isTarget = lc.contains("usmind-portable") || lc.contains("appdata\\local\\usmind");
+                boolean isSvc = lc.endsWith("nginx.exe") || lc.endsWith("java.exe")
+                        || lc.endsWith("mysqld.exe") || lc.endsWith("redis-server.exe");
+                if (isTarget && isSvc) {
+                    taskkill(ph.pid());
+                    killed++;
+                }
             }
-            if (killed > 0) guiMsg("已清理 " + killed + " 个残留的 USMIND 服务进程");
             Thread.sleep(1500);
         } catch (Exception ignored) {}
+        if (killed > 0) System.err.println("[CLEAN] 已清理 " + killed + " 个残留的 USMIND 服务进程");
     }
 
     // =====================================================
@@ -727,11 +739,12 @@ public class Main {
             runMysql(mysql, null, "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root'; " +
                     "CREATE DATABASE IF NOT EXISTS usmind_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
         }
-        String hasDb = runMysqlQuery(mysql, "-proot", "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='usmind_db'");
-        if (!"1".equals(hasDb)) {
-            guiMsg("数据库 usmind_db 不存在，导入表结构…");
-            File initSql = new File(components, "init.sql");
-            if (initSql.exists()) runMysql(mysql, "-proot", "source " + initSql.getAbsolutePath().replace("\\", "/"));
+        // 每次启动都幂等导入表结构（init.sql 全部使用 IF NOT EXISTS，重复执行安全）
+        // 修复：仅判断"库存在"会跳过建表，导致业务表缺失、后端启动失败
+        File initSql = new File(components, "init.sql");
+        if (initSql.exists()) {
+            guiMsg("校验表结构（幂等导入 init.sql）…");
+            runMysql(mysql, "-proot", "source " + initSql.getAbsolutePath().replace("\\", "/"));
         }
         String hasCol = runMysqlQuery(mysql, "-proot",
                 "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='usmind_db' AND TABLE_NAME='mind_map' AND COLUMN_NAME='manual_styles'");
@@ -795,7 +808,7 @@ public class Main {
     //  Smoke 模式（构建验证）
     // =====================================================
     static void runSmoke() throws Exception {
-        System.out.println("== USMIND SMOKE ==");
+        System.err.println("== USMIND SMOKE ==");
         try {
             killUsmindFamily();
             ensureMysqlData();
@@ -803,11 +816,11 @@ public class Main {
             startNginx();
             startBackend();
             boolean ok = waitReady(120);
-            System.out.println(ok ? "[SMOKE] OK" : "[SMOKE] FAIL");
+            System.err.println(ok ? "[SMOKE] OK" : "[SMOKE] FAIL");
             stopAll();
             System.exit(ok ? 0 : 1);
         } catch (Exception e) {
-            System.out.println("[SMOKE] FAIL: " + e.getMessage());
+            System.err.println("[SMOKE] FAIL: " + e.getMessage());
             try { stopAll(); } catch (Exception ignored) {}
             System.exit(1);
         }

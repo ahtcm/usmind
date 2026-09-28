@@ -7,7 +7,7 @@ USE usmind_db;
 
 -- ---------- 用户表 ----------
 DROP TABLE IF EXISTS sys_user;
-CREATE TABLE sys_user (
+CREATE TABLE IF NOT EXISTS sys_user (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
   username      VARCHAR(64)  NOT NULL UNIQUE COMMENT '登录账号',
   password      VARCHAR(128) NOT NULL COMMENT 'BCrypt加密密码',
@@ -29,7 +29,7 @@ INSERT INTO sys_user (username, password, nickname, role) VALUES
 
 -- ---------- 图表 ----------
 DROP TABLE IF EXISTS mind_map;
-CREATE TABLE mind_map (
+CREATE TABLE IF NOT EXISTS mind_map (
   id             BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id        BIGINT       NOT NULL COMMENT '所属用户',
   name           VARCHAR(256) DEFAULT '未命名' COMMENT '导图名称',
@@ -50,7 +50,7 @@ CREATE TABLE mind_map (
 
 -- ---------- OSS配置表 ----------
 DROP TABLE IF EXISTS oss_config;
-CREATE TABLE oss_config (
+CREATE TABLE IF NOT EXISTS oss_config (
   id           BIGINT AUTO_INCREMENT PRIMARY KEY,
   name         VARCHAR(64)  NOT NULL COMMENT '配置名称',
   type         VARCHAR(16)  NOT NULL COMMENT '类型: aliyun/tencent/qiniu/minio/local',
@@ -71,7 +71,7 @@ INSERT INTO oss_config (name, type, is_active) VALUES ('本地存储', 'local', 
 
 -- ---------- 文件资源表 ----------
 DROP TABLE IF EXISTS file_resource;
-CREATE TABLE file_resource (
+CREATE TABLE IF NOT EXISTS file_resource (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id       BIGINT       NOT NULL COMMENT '上传用户',
   mind_map_id   BIGINT       DEFAULT 0 COMMENT '关联导图ID',

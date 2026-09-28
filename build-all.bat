@@ -1,13 +1,12 @@
 @echo off
 setlocal EnableDelayedExpansion
-chcp 65001 >nul
-title USMIND ä¸€é”®æ„å»ºï¼ˆä¾¿æºç‰ˆ / è‡ªè§£å‹ç‰ˆ / åœ¨çº¿ç‰ˆï¼‰
+title USMIND Ò»¼ü¹¹½¨£¨±ãĞ¯°æ / ×Ô½âÑ¹°æ / ÔÚÏß°æ£©
 cd /d "%~dp0"
 
 set "ROOT=%~dp0"
 set "RELEASE=%ROOT%release"
 set "TOOLS=%ROOT%tools"
-set "JDK=%TOOLS%jdk-17.0.2"
+set "JDK=%TOOLS%\jdk-17.0.2"
 set "JAVAC=%JDK%\bin\javac.exe"
 set "JAR=%JDK%\bin\jar.exe"
 set "JLINK=%JDK%\bin\jlink.exe"
@@ -17,18 +16,18 @@ set "SRC=%ROOT%code\launcher-src"
 set "BUILD_OUT=%RELEASE%\launcher-out"
 
 if not exist "%CSC%" (
-  echo [é”™è¯¯] æœªæ‰¾åˆ° .NET Framework csc.exeï¼Œè¯·ç¡®è®¤å·²å®‰è£… .NET Framework 4.x
+  echo [´íÎó] Î´ÕÒµ½ .NET Framework csc.exe£¬ÇëÈ·ÈÏÒÑ°²×° .NET Framework 4.x
   pause & exit /b 1
 )
 
-:: ================= [1/3] ä¾¿æºç»¿è‰²ç‰ˆ =================
+:: ================= [1/3] ±ãĞ¯ÂÌÉ«°æ =================
 echo.
-echo ============ [1/3] ä¾¿æºç»¿è‰²ç‰ˆ usmind-portable ============
+echo ============ [1/3] ±ãĞ¯ÂÌÉ«°æ usmind-portable ============
 set "PORTABLE=%RELEASE%\usmind-portable"
 if exist "%PORTABLE%" rmdir /s /q "%PORTABLE%"
 mkdir "%PORTABLE%\components" "%PORTABLE%\data" "%PORTABLE%\app" 2>nul
 
-echo   -- ç¼–è¯‘å¯åŠ¨å™¨ (Main.java) --
+echo   -- ±àÒëÆô¶¯Æ÷ (Main.java) --
 if exist "%BUILD_OUT%" rmdir /s /q "%BUILD_OUT%"
 mkdir "%BUILD_OUT%\classes"
 "%JAVAC%" -encoding UTF-8 -d "%BUILD_OUT%\classes" "%SRC%\launcher\Main.java"
@@ -39,11 +38,11 @@ if errorlevel 1 goto :err
 copy /y "%BUILD_OUT%\launcher.jar" "%PORTABLE%\app\launcher.jar" >nul
 if errorlevel 1 goto :err
 
-echo   -- ç”Ÿæˆç²¾ç®€ JRE (jlink) --
+echo   -- Éú³É¾«¼ò JRE (jlink) --
 "%JLINK%" --add-modules java.base,java.compiler,java.datatransfer,java.xml,java.prefs,java.desktop,java.instrument,java.logging,java.management,java.security.sasl,java.naming,java.net.http,java.rmi,java.scripting,java.security.jgss,java.transaction.xa,java.sql,jdk.charsets,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.httpserver,jdk.jfr,jdk.unsupported --strip-debug --no-header-files --no-man-pages --compress=2 --output "%PORTABLE%\runtime"
 if errorlevel 1 goto :err
 
-echo   -- ç”Ÿæˆ USMIND.exe (jpackage) --
+echo   -- Éú³É USMIND.exe (jpackage) --
 copy /y "%SRC%\logo.ico" "%PORTABLE%\logo.ico" >nul
 if errorlevel 1 goto :err
 if exist "%RELEASE%\_app" rmdir /s /q "%RELEASE%\_app"
@@ -60,7 +59,7 @@ if errorlevel 1 goto :err
 rmdir /s /q "%RELEASE%\_jp"
 rmdir /s /q "%RELEASE%\_app"
 
-echo   -- å¤åˆ¶ç»„ä»¶ (mysql/redis/nginx/backend/init.sql) --
+echo   -- ¸´ÖÆ×é¼ş (mysql/redis/nginx/backend/init.sql) --
 xcopy /e /i /y /q "%TOOLS%\mysql-8.0.36-winx64" "%PORTABLE%\components\mysql" >nul
 if errorlevel 1 goto :err
 if exist "%PORTABLE%\components\mysql\data" rmdir /s /q "%PORTABLE%\components\mysql\data"
@@ -75,7 +74,7 @@ if errorlevel 1 goto :err
 copy /y "%ROOT%sql\init.sql" "%PORTABLE%\components\" >nul
 if errorlevel 1 goto :err
 
-echo   -- æ„å»ºå¹¶éƒ¨ç½²å‰ç«¯ (web-user / web-admin) --
+echo   -- ¹¹½¨²¢²¿ÊğÇ°¶Ë (web-user / web-admin) --
 set "NPM=%TOOLS%\nodejs\npm.cmd"
 set "PATH=%TOOLS%\nodejs;%PATH%"
 pushd "%ROOT%code\web-user"
@@ -97,53 +96,53 @@ mkdir "%PORTABLE%\components\nginx\html\admin"
 xcopy /e /i /y /q "%ROOT%code\web-admin\dist\*" "%PORTABLE%\components\nginx\html\admin\" >nul
 if errorlevel 1 goto :err
 
-echo   [å®Œæˆ] ä¾¿æºç‰ˆ: %PORTABLE%
+echo   [Íê³É] ±ãĞ¯°æ: %PORTABLE%
 
-:: ================= [2/3] å•æ–‡ä»¶è‡ªè§£å‹ç‰ˆ =================
+:: ================= [2/3] µ¥ÎÄ¼ş×Ô½âÑ¹°æ =================
 echo.
-echo ============ [2/3] å•æ–‡ä»¶è‡ªè§£å‹ç‰ˆ USMIND-setup.exe ============
-echo   -- å‹ç¼©ä¾¿æºç‰ˆ (Optimal, è€—æ—¶è¾ƒé•¿) --
+echo ============ [2/3] µ¥ÎÄ¼ş×Ô½âÑ¹°æ USMIND-setup.exe ============
+echo   -- Ñ¹Ëõ±ãĞ¯°æ (Optimal, ºÄÊ±½Ï³¤) --
 if exist "%RELEASE%\_setup.zip" del "%RELEASE%\_setup.zip"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory('%PORTABLE%', '%RELEASE%\_setup.zip', [System.IO.Compression.CompressionLevel]::Optimal, $false)"
 if errorlevel 1 goto :err
 
-echo   -- ç¼–è¯‘è‡ªè§£å‹ stub --
+echo   -- ±àÒë×Ô½âÑ¹ stub --
 "%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-setup-stub.exe" /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\selfextract.cs"
 if errorlevel 1 goto :err
 
-echo   -- æ‹¼æ¥ stub + zip --
+echo   -- Æ´½Ó stub + zip --
 copy /b "%BUILD_OUT%\USMIND-setup-stub.exe" + "%RELEASE%\_setup.zip" "%RELEASE%\USMIND-setup.exe" >nul
 if errorlevel 1 goto :err
 del "%RELEASE%\_setup.zip"
-echo   [å®Œæˆ] è‡ªè§£å‹ç‰ˆ: %RELEASE%\USMIND-setup.exe
+echo   [Íê³É] ×Ô½âÑ¹°æ: %RELEASE%\USMIND-setup.exe
 
-:: ================= [3/3] åœ¨çº¿å®‰è£…ç‰ˆ =================
+:: ================= [3/3] ÔÚÏß°²×°°æ =================
 echo.
-echo ============ [3/3] åœ¨çº¿å®‰è£…ç‰ˆ USMIND-online.exe ============
-echo   -- ç”Ÿæˆç¯å¢ƒåˆ†ç‰‡ (build_online.ps1) --
+echo ============ [3/3] ÔÚÏß°²×°°æ USMIND-online.exe ============
+echo   -- Éú³É»·¾³·ÖÆ¬ (build_online.ps1) --
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC%\build_online.ps1"
 if errorlevel 1 goto :err
 
-echo   -- ç¼–è¯‘åœ¨çº¿ä¸‹è½½å™¨ (Installer.cs) --
+echo   -- ±àÒëÔÚÏßÏÂÔØÆ÷ (Installer.cs) --
 "%CSC%" /nologo /target:winexe /out:"%BUILD_OUT%\USMIND-online-stub.exe" /res:"%RELEASE%\online-dist\manifest.json",Installer.manifest /r:System.Web.Extensions.dll /r:System.Windows.Forms.dll /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "%SRC%\Installer.cs"
 if errorlevel 1 goto :err
 
 copy /y "%BUILD_OUT%\USMIND-online-stub.exe" "%RELEASE%\USMIND-online.exe" >nul
 if errorlevel 1 goto :err
-echo   [å®Œæˆ] åœ¨çº¿ç‰ˆ: %RELEASE%\USMIND-online.exe
+echo   [Íê³É] ÔÚÏß°æ: %RELEASE%\USMIND-online.exe
 
 echo.
 echo ============================================
-echo   å…¨éƒ¨æ„å»ºå®Œæˆ
-echo   - ä¾¿æºç‰ˆ   : %RELEASE%\usmind-portable\USMIND.exe
-echo   - è‡ªè§£å‹ç‰ˆ : %RELEASE%\USMIND-setup.exe
-echo   - åœ¨çº¿ç‰ˆ   : %RELEASE%\USMIND-online.exe
+echo   È«²¿¹¹½¨Íê³É
+echo   - ±ãĞ¯°æ   : %RELEASE%\usmind-portable\USMIND.exe
+echo   - ×Ô½âÑ¹°æ : %RELEASE%\USMIND-setup.exe
+echo   - ÔÚÏß°æ   : %RELEASE%\USMIND-online.exe
 echo ============================================
-pause
+if /i not "%1"=="-s" pause
 exit /b 0
 
 :err
 echo.
-echo [æ„å»ºå¤±è´¥] é”™è¯¯ç  %errorlevel%ï¼Œè¯·æ£€æŸ¥ä¸Šæ–¹è¾“å‡ºå®šä½é—®é¢˜
-pause
+echo [¹¹½¨Ê§°Ü] ´íÎóÂë %errorlevel%£¬Çë¼ì²éÉÏ·½Êä³ö¶¨Î»ÎÊÌâ
+if /i not "%1"=="-s" pause
 exit /b 1
