@@ -2446,24 +2446,39 @@ function liftFormulaSvg(svgStr) {
       const y = parseFloat(fo.getAttribute('y') || '0')
       const style = fo.getAttribute('style') || ''
       const svgs = Array.from(fo.querySelectorAll('svg'))
+      if (!svgs.length) return
+      // 注意：实测 SVG 图片模式中"每个公式一个独立 transform g"会整体不渲染，
+      // 而 fo 级共享 g（循环覆盖 transform）可正常渲染；因此采用共享 g 方案。
       const g = doc.createElementNS(NS, 'g')
-      g.setAttribute('transform', 'translate(' + x + ',' + y + ')')
       if (style) g.setAttribute('style', style)
+      // MathJax svg 的 width 是 ex 单位；SVG 图片模式下 ex 无字体上下文会回退为
+      // 默认 16px×0.5，导致公式偏小。按 foreignObject 的 font-size 换算：1ex ≈ 0.5em
+      const fsMatch = style.match(/font-size:\s*([\d.]+)px/)
+      const fontSize = fsMatch ? parseFloat(fsMatch[1]) : 16
       svgs.forEach((sv) => {
-        const p = 'u' + i + '-'
-        const idEls = sv.querySelectorAll('[id]')
-        idEls.forEach((el) => {
-          const v = el.getAttribute('id')
-          if (v && v.indexOf(p) !== 0) el.setAttribute('id', p + v)
-        })
+        // 嵌套 SVG 里 <use> 的 href 会解析到外层文档（找不到 defs 导致公式空白），
+        // 因此 use 展开为 <path>，并移除 defs（同时消除跨公式 id 冲突）
         const uses = sv.querySelectorAll('use')
         uses.forEach((u) => {
-          const h = u.getAttribute('href')
-          if (h && h.charAt(0) === '#' && h.indexOf(p) !== 1) u.setAttribute('href', p + h.slice(1))
-          const xh = u.getAttributeNS(XLink, 'href')
-          if (xh && xh.charAt(0) === '#' && xh.indexOf(p) !== 1) u.setAttributeNS(XLink, 'xlink:href', p + xh.slice(1))
+          const ref = u.getAttributeNS(XLink, 'href') || u.getAttribute('href')
+          let target = null
+          if (ref && ref.charAt(0) === '#') target = doc.querySelector('[id="' + ref.slice(1) + '"]')
+          if (target) {
+            const p = doc.createElementNS(NS, 'path')
+            const d = target.getAttribute('d')
+            if (d) p.setAttribute('d', d)
+            const t = u.getAttribute('transform')
+            if (t) p.setAttribute('transform', t)
+            u.parentNode.replaceChild(p, u)
+          }
         })
-        g.appendChild(sv)
+        sv.querySelectorAll('defs').forEach((d) => d.remove())
+        const wAttr = sv.getAttribute('width')
+        const vb = (sv.getAttribute('viewBox') || '0 0 0 0').split(' ').map(Number)
+        const wPx = parseFloat(wAttr) * fontSize * 0.5
+        const scale = vb[2] ? wPx / vb[2] : 1
+        g.setAttribute('transform', 'translate(' + x + ',' + y + ') scale(' + scale + ') translate(' + (-vb[0]) + ',' + (-vb[1]) + ')')
+        while (sv.firstChild) g.appendChild(sv.firstChild)
       })
       fo.parentNode.replaceChild(g, fo)
     })
