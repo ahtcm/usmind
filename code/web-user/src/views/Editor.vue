@@ -2429,106 +2429,6 @@ function makeChunkSvg(svgStr, W, ch, y0, X, Y) {
     .replace(/height="[\d.]+"/, 'height="' + ch + '"')
     .replace(/viewBox="[^"]*"/, 'viewBox="' + vx + ' ' + vy + ' ' + W + ' ' + ch + '"')
 }
-// 方案2：数据驱动全量重建 SVG——用完整节点数据在离屏容器创建独立 MindMap 实例渲染，
-// 彻底绕开主画布懒加载（applyLazyView 用 visibility:hidden 隐藏视口外节点，导致导出只有
-// 视口附近内容）。离屏实例无懒加载、无缩放，getSvgData 得到全量内容且坐标正确。
-async function buildFullSvg() {
-  const src = mind.value
-  if (!src || !src.renderer || !src.renderer.root) return null
-  const full = src.getData(true)
-  if (!full || !full.root) return null
-  const tmp = document.createElement('div')
-  tmp.style.cssText = 'position:fixed;left:-99999px;top:0;width:1200px;height:800px;z-index:-1;pointer-events:none;visibility:visible'
-  document.body.appendChild(tmp)
-  let inst = null
-  try {
-    inst = new MindMap({
-      el: tmp,
-      data: full.root,
-      layout: full.layout || 'logicalStructure',
-      theme: (full.theme && full.theme.template) || src.opt.theme || 'default',
-      themeConfig: (full.theme && full.theme.config) || src.opt.themeConfig || null,
-      textAutoWrapWidth: 99999,
-      mousewheelAction: 'zoom',
-      defaultInsertSecondLevelNodeText: '新主题',
-      defaultInsertBelowSecondLevelNodeText: '新主题',
-      useLeftKeySelectionRightKeyDrag: false,
-      isLimitMindMapInCanvas: false,
-      isLimitMindMapInCanvasWhenHasScrollbar: false,
-      enableShortcutOnlyWhenMouseInSvg: false,
-      openRealtimeRenderOnNodeTextEdit: false,
-      attachmentIcon: { style: { size: 0 }, icon: '' },
-      errorHandler: (type, e) => console.error('[export] 导出资源处理失败(' + type + ')', e),
-      rainbowLinesConfig: src.opt.rainbowLinesConfig,
-      iconList: src.opt.iconList,
-      // 离屏实例无懒加载，仅需 viewBox + 浅色文字转深
-      handleBeingExportSvg: (svg) => {
-        try {
-          const w = parseFloat(svg.attr('width')) || 0
-          const h = parseFloat(svg.attr('height')) || 0
-          if (w && h) svg.attr('viewBox', '0 0 ' + w + ' ' + h)
-          svg.find('text').each(function () {
-            const el = this
-            const fill = el.attr('fill')
-            if (!fill) return
-            const m = String(fill).match(/^#([0-9a-fA-F]{6})$/)
-            if (m) {
-              const r = parseInt(m[1].slice(0, 2), 16), g = parseInt(m[1].slice(2, 4), 16), b = parseInt(m[1].slice(4, 6), 16)
-              if ((0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.7) el.attr('fill', '#333333')
-            }
-          })
-        } catch (e) {}
-        return svg
-      }
-    })
-    // 等待离屏渲染完成（可能多次触发，取第一次；30s 兜底）
-    await new Promise((res) => {
-      let done = false
-      const fin = () => { if (!done) { done = true; res(true) } }
-      inst.on('node_tree_render_end', fin)
-      setTimeout(fin, 30000)
-    })
-    let getRes = null
-    try {
-      getRes = await inst.doExport.getSvgData()
-    } catch (err) {
-      console.error('[export] 离屏 SVG 生成失败', err)
-      toast('离屏 SVG 生成失败: ' + (err && err.message ? err.message : String(err)), 'error')
-      return null
-    }
-    const { node, str } = getRes
-    // 把 foreignObject 内的 <video>/<audio> 替换为静态占位（文件名+图标），
-    // 否则视频/音频 URL 无法渲染进 SVG/PNG/PDF（黑块或加载失败），导致整张导出中断
-    let out = str
-    try {
-      let changed = false
-      node.find('foreignObject').each(function () {
-        const el = this.node
-        if (!el || !el.innerHTML) return
-        const placeholder = (sym, tag) => (m) => {
-          changed = true
-          const um = m.match(/(?:src=|poster=)\s*["']([^"']+)["']/)
-          const u = (um && um[1]) || ''
-          const nm = (u.split('/').pop() || tag).replace(/[?#].*$/, '')
-          return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#14161a;color:#e8eaed;font-size:13px;overflow:hidden;font-family:sans-serif;white-space:nowrap">' + sym + ' ' + nm + '</div>'
-        }
-        let html = el.innerHTML
-        const pv = placeholder('▶', '视频'), pa = placeholder('♪', '音频')
-        html = html.replace(/<video[\s\S]*?<\/video>/gi, pv)
-        html = html.replace(/<video[^>]*\/>/gi, pv)
-        html = html.replace(/<video[^>]*>/gi, pv)
-        html = html.replace(/<audio[\s\S]*?<\/audio>/gi, pa)
-        html = html.replace(/<audio[^>]*\/>/gi, pa)
-        html = html.replace(/<audio[^>]*>/gi, pa)
-        if (changed || html !== el.innerHTML) { el.innerHTML = html; changed = true }
-      })
-      if (changed) out = node.svg()
-    } catch (e) { console.error('[export] video/audio 占位替换失败', e) }
-    return out
-  } finally {    try { if (inst && inst.destroy) inst.destroy() } catch (e) {}
-    try { tmp.remove() } catch (e) {}
-  }
-}
 function loadImg(url) {
   const img = new Image()
   return new Promise((res, rej) => {
@@ -2547,8 +2447,7 @@ function loadImg(url) {
 async function exportChunkedImages(type) {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
-  const str = await buildFullSvg()
-  if (!str) { toast('画布数据生成失败', 'error'); return }
+  const { str } = await mind.value.doExport.getSvgData()
   const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
@@ -2592,8 +2491,7 @@ async function exportChunkedImages(type) {
 async function exportChunkedPdf() {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
-  const str = await buildFullSvg()
-  if (!str) { toast('画布数据生成失败', 'error'); return }
+  const { str } = await mind.value.doExport.getSvgData()
   const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
@@ -2638,15 +2536,7 @@ async function runExport(type) {
     } else {
       const name = docName.value || '思维导图'
       toast('正在导出 ' + type.toUpperCase() + ' ...')
-      if (type === 'svg') {
-        // SVG 走数据驱动重建，避免懒加载导致内容缺失
-        const str = await buildFullSvg()
-        if (!str) { toast('画布数据生成失败', 'error'); return }
-        const blob = new Blob([str], { type: 'image/svg+xml' })
-        downloadBlob(blob, name + '.svg')
-      } else {
-        await mind.value.doExport.export(type, true, name)
-      }
+      await mind.value.doExport.export(type, true, name)
       toast('导出完成')
     }
   } catch (e) {
