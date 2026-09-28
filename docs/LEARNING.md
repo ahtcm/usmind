@@ -9,13 +9,13 @@
 **目标**：能看到界面、能登录、能建导图。
 
 1. 确认 `tools/` 完整（jdk-17 / mysql / redis / nginx / maven / nodejs）。
-2. 执行 `script\start-all.bat`（MySQL → Redis → 后端 8899 → nginx）。
+2. 执行 `script\bat\start-all.bat`（MySQL → Redis → 后端 8899 → nginx）。
 3. 打开 http://127.0.0.1:8866（用户端）、http://127.0.0.1:8867（后台，`admin/admin123`）。
-4. 数据库已存在（`sql\init.sql` 或已导入的备份）时直接可用；新机器先 `script\init-db.bat`。
+4. 数据库已存在（`sql\init.sql` 或已导入的备份）时直接可用；新机器先 `script\bat\init-db.bat`。
 
 **验证**：后台能看到统计数据；用户端能新建导图、刷新不丢。
 
-**要弄懂**：`script/start-all.bat` 里每个服务的启动顺序；nginx 四个 server 分别干什么（见 README）。
+**要弄懂**：`script/bat/start-all.bat` 里每个服务的启动顺序；nginx 四个 server 分别干什么（见 README）。
 
 ---
 

@@ -127,8 +127,18 @@ usmind/
 │   ├── online-dist/       # 在线版环境分片（22 片 + manifest.json，推送 GitHub @v1 经 jsDelivr 分发）
 │   （release 为构建产物，git 忽略；launcher 构建源码在 code\launcher-src\）
 ├── script/                  # 一键脚本（启动/停止/构建/初始化数据库等，全部相对路径）
-│   ├── build-portable.bat    # 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 前端构建）
-│   ├── build-all.bat         # 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
+│   ├── bat/                 # Windows 批处理（start-all.bat / stop-all.bat / build-*.bat 等 15 个）
+│   │   ├── start-all.bat    # 一键启动（MySQL → Redis → 后端 8899 → 构建两个前端）
+│   │   ├── stop-all.bat     # 全部停止
+│   │   ├── build-portable.bat  # 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 前端构建）
+│   │   ├── build-all.bat    # 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
+│   │   └── ...              # 其余见 docs\FILE_GUIDE.md「脚本体系」
+│   └── shell/               # Linux shell 等价物（作用同 bat，环境放 tools/ 命名一致）
+│       ├── start-all.sh     # 一键启动（Linux）
+│       ├── stop-all.sh      # 全部停止（Linux）
+│       ├── build-all.sh     # 一键构建（后端 jar + 两个前端部署到 nginx html）
+│       ├── init-db.sh       # 初始化数据库（Linux）
+│       └── ...              # start-mysql / start-redis / start-nginx / start-backend 等
 ├── sql/                   # 数据库脚本
 │   ├── init.sql           # 建库建表（含种子数据）
 │   └── usmind_db_backup_*.sql / usmind-backup-*.json  # 备份文件
@@ -175,7 +185,7 @@ usmind/
 
 > 在线版原理：安装器内置分片清单，从 `cdn.jsdelivr.net/gh/ahtcm/usmind@v1/release/online-dist`（GitHub 公开仓库 v1 标签，jsDelivr 国内加速节点）下载 22 个分片 → 拼接解压 → 组装为便携版目录 → 启动。已安装（目标目录存在 `USMIND.exe`）则直接启动，跳过下载。可用环境变量 `USMIND_BASE_URL` 覆盖下载源；可用 `--dir <目录>` 指定安装目录（默认 `%LOCALAPPDATA%\USMIND-online`）。
 >
-> ⚠️ **当前状态**：分片已按需求从 GitHub 移除（不再托管 `online-dist`）。`script\build-all.bat` / `code\launcher-src\build_online.ps1` 仍可随时重新生成分片；若需继续使用在线版，请自行托管 `release\online-dist`（如推回 GitHub `@v1` 或私有对象存储）后重新构建安装器。
+> ⚠️ **当前状态**：分片已按需求从 GitHub 移除（不再托管 `online-dist`）。`script\bat\build-all.bat` / `code\launcher-src\build_online.ps1` 仍可随时重新生成分片；若需继续使用在线版，请自行托管 `release\online-dist`（如推回 GitHub `@v1` 或私有对象存储）后重新构建安装器。
 
 ### 一键启动
 
@@ -184,9 +194,9 @@ usmind/
 
 ### 一键启动
 ```bat
-script\start-all.bat        :: 依次启动 MySQL → Redis → 后端(8899) → nginx(80/8866/8867)
-script\stop-all.bat         :: 全部停止
-script\delete-all.bat       :: 清理数据与日志（慎用）
+script\bat\start-all.bat        :: 依次启动 MySQL → Redis → 后端(8899) → nginx(80/8866/8867)
+script\bat\stop-all.bat         :: 全部停止
+script\bat\delete-all.bat       :: 清理数据与日志（慎用）
 ```
 
 各服务也可单独启停：`start-mysql / start-redis / start-backend / start-nginx / start-web-user / start-web-admin`。
@@ -197,16 +207,16 @@ script\delete-all.bat       :: 清理数据与日志（慎用）
 
 ### 首次初始化数据库
 ```bat
-script\init-db.bat          :: 执行 sql\init.sql 建库建表（已有数据可跳过）
+script\bat\init-db.bat          :: 执行 sql\init.sql 建库建表（已有数据可跳过）
 ```
 
 ### 构建
 ```bat
-script\build-backend.bat    :: 构建后端 jar（mvn clean package -DskipTests，产物 code\backend\target\usmind-backend.jar）
-script\build-web-user.bat   :: 构建用户端并部署到 release\usmind
-script\build-web-admin.bat  :: 构建管理后台并部署到 release\admin
-script\build-portable.bat   :: 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 两个前端构建部署）
-script\build-all.bat        :: 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
+script\bat\build-backend.bat    :: 构建后端 jar（mvn clean package -DskipTests，产物 code\backend\target\usmind-backend.jar）
+script\bat\build-web-user.bat   :: 构建用户端并部署到 release\usmind
+script\bat\build-web-admin.bat  :: 构建管理后台并部署到 release\admin
+script\bat\build-portable.bat   :: 构建便携绿色版（javac + jlink + jpackage + 组件复制 + 两个前端构建部署）
+script\bat\build-all.bat        :: 一键重建三种发布形态（便携版 / 自解压版 / 在线版）
 ```
 
 > 说明：构建脚本全部使用**相对路径**（基于脚本所在目录自动定位项目根、JDK、Maven、Node），整个项目拷到任意位置都能直接构建运行。
@@ -250,8 +260,8 @@ spring:
 ### 方式一：整机搬移（绿色版）
 1. 拷贝整个 `usmind` 目录到新机器任意位置（如 `D:\usmind`）。
 2. 确保无环境依赖（JDK / MySQL / Redis / nginx 都在 `tools/` 内）。
-3. 运行 `script\start-all.bat`。
-4. 如数据不随目录搬移，先 `script\init-db.bat` 建库，再恢复备份（见下）。
+3. 运行 `script\bat\start-all.bat`。
+4. 如数据不随目录搬移，先 `script\bat\init-db.bat` 建库，再恢复备份（见下）。
 
 ### 方式二：数据迁移（数据库 + 资源）
 1. **数据库**：使用 `sql/usmind_db_backup_*.sql` 全量备份（含建库、7 张表结构与数据）：
@@ -345,7 +355,7 @@ spring:
 
 ### 一键重建三种形态
 ```bat
-script\build-all.bat
+script\bat\build-all.bat
 ```
 依次重建：便携版（javac + jlink + jpackage + 组件复制）→ 自解压版（zip + csc stub 拼接）→ 在线版（`build_online.ps1` 分片 + csc 下载器）。全部使用**相对路径**（`SCRIPT_DIR` 定位项目根；csc 取 `%WINDIR%` 下 .NET Framework 编译器），项目整体拷到任意位置可直接重建。构建源码在 `code\launcher-src\`。
 
@@ -355,14 +365,14 @@ script\build-all.bat
 2. 托管分片（二选一）：
    - 推回 GitHub：`git add -f release/online-dist` + 提交（`release/` 被 .gitignore 忽略，需 `-f`）→ 推送 develop → 更新 `v1` 标签（`git tag -f v1 && git push github v1 -f`）；
    - 或用 `USMIND_BASE_URL` 指向自建对象存储 / 静态托管；
-3. 用 `script\build-all.bat` 重新构建在线安装器；
+3. 用 `script\bat\build-all.bat` 重新构建在线安装器；
 4. 注意 jsDelivr 对新文件/更新有缓存延迟（几分钟），旧 URL 立即生效、更新内容需等缓存刷新。
 
 ---
 
 ## 十、常见问题
 
-- **后端构建失败「jar 被锁」**：后端运行中会锁住 `target/*.jar`，先 `script\stop-backend.bat` 再构建（构建脚本失败时也会提示）。
+- **后端构建失败「jar 被锁」**：后端运行中会锁住 `target/*.jar`，先 `script\bat\stop-all.bat` 再构建（构建脚本失败时也会提示）。
 - **前端改了不生效**：浏览器 `Ctrl+F5` 强刷（nginx 对 js/css 强缓存 30 天，`index.html` 不缓存）。
 - **分享页打不开 / 只显示 JSON**：确认走的是 `/share/{token}` 路由且后端在线；分享页免登录只读。
 - **上传的文件打不开**：确认 nginx `/uploads/` 反代/别名正确；附件在线预览依赖预览服务配置。
@@ -370,4 +380,4 @@ script\build-all.bat
 - **换机器后登录失败**：确认 MySQL 与 Redis 已启动、`init-db` 已执行、`application-dev.yml` 连接正确。
 - **在线版首次下载慢 / 卡住**：首次需下载约 371MB（国内 CDN，一般 5~15 分钟）；卡住多为网络波动，关闭后重开安装器会重新下载；也可改用便携版或自解压版。
 - **在线版更新后下载到旧环境**：jsDelivr 对分片有缓存延迟，刚推新分片后 5~30 分钟内可能拉到旧版，属正常现象。
-- **`script\build-all.bat` 构建失败**：确认 `.NET Framework 4.x` 已安装（csc 编译 C# 需要）；后端 jar 未构建时先 `script\build-backend.bat`。
+- **`script\bat\build-all.bat` 构建失败**：确认 `.NET Framework 4.x` 已安装（csc 编译 C# 需要）；后端 jar 未构建时先 `script\bat\build-backend.bat`。

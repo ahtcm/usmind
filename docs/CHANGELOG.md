@@ -1,4 +1,10 @@
-# USMIND 变更记录
+﻿# USMIND 变更记录
+
+## 2026-09-28 · 脚本体系重组：bat 移入 script\bat + 新增 Linux shell
+
+- **Windows 批处理全部移入 `script\bat\`**：15 个 bat（start-all / stop-all / delete-all / init-db / start-{mysql,redis,nginx,backend,web-user,web-admin} / build-{backend,web-user,web-admin,portable,all}）从 `script\` 根移入 `script\bat\`；所有脚本的项目根定位从 `cd /d "%SCRIPT_DIR%.."` 改为 `cd /d "%SCRIPT_DIR%..\.."`（bat 在 script\bat，上两级即项目根），同目录兄弟调用（start-all → start-*.bat）不受影响。
+- **新增 Linux shell 等价物 `script\shell\`**：14 个 .sh（start-all / stop-all / delete-all / init-db / start-{mysql,redis,nginx,backend,web-user,web-admin} / build-{backend,web-user,web-admin,all}），功能与 bat 一一对应；环境目录约定与 Windows 一致放 `tools\`（jdk-17.0.2 / apache-maven-3.9.6 / nodejs / mysql-* / redis-* / nginx-*，版本目录名自动探测），后端 `java -jar target/usmind-backend.jar --spring.profiles.active=dev --file.upload-dir=<ROOT>/uploads`，前端 dist 构建后部署到 `tools/nginx-*/html/{usmind,admin}`；`build-all.sh` 不含便携版（服务器部署不需要 jpackage 便携包）。
+- **README / docs 脚本路径同步更新**：`script\xxx.bat` → `script\bat\xxx.bat`；目录树补充 `script\bat` / `script\shell` 结构。
 
 ## 2026-09-28 · 启动器可靠性修复 + 构建脚本统一入 script\（6d16030）
 
