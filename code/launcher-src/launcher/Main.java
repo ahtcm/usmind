@@ -169,6 +169,8 @@ public class Main {
 
         statusTimer = new javax.swing.Timer(1500, e -> refresh());
         statusTimer.start();
+        // 打开即自动启动全部服务（startAll 内部 busy 防重入，重复点击/调用安全）
+        SwingUtilities.invokeLater(() -> { try { startAll(); } catch (Exception ex) { guiMsg("自动启动失败: " + ex.getMessage()); } });
     }
 
     /** 自绘标题栏：logo 图标 + 标题 + 运行状态 + 最小化/关闭；支持鼠标拖动 */
