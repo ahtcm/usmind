@@ -467,6 +467,8 @@ public class Main {
         }
         new Thread(() -> {
             try {
+                // 先清理便携版残留孤儿进程（异常退出遗留的 nginx/java/mysql/redis），避免端口占用导致启动失败
+                killPortableStale();
                 ensureMysqlData();
                 startRedis();
                 startNginx();
@@ -506,6 +508,8 @@ public class Main {
         guiMsg("正在停止全部服务…");
         new Thread(() -> {
             try { stopAll(); } catch (Exception ignored) {}
+            // 兜底：清理所有便携版残留进程（含非本实例启动的孤儿）
+            killPortableStale();
             started = false;
             SwingUtilities.invokeLater(() -> {
                 statusDot.setForeground(RED);
@@ -603,31 +607,86 @@ public class Main {
     }
 
     static void stopAll() throws Exception {
-        if (backendProc != null) { backendProc.destroy(); backendProc.waitFor(10, TimeUnit.SECONDS); }
+        // 后端：优雅 -> 强制 -> taskkill 进程树兜底
+        if (backendProc != null) {
+            backendProc.destroy();
+            if (!backendProc.waitFor(5, TimeUnit.SECONDS)) {
+                backendProc.destroyForcibly();
+                if (!backendProc.waitFor(5, TimeUnit.SECONDS)) {
+                    taskkill(backendProc.pid());
+                }
+            }
+        }
+        // Nginx：优先 -s stop（依赖 nginx.pid），未生效则按 master 进程树强制
         if (nginxProc != null) {
+            boolean stopped = false;
             try {
                 File nginxDir = new File(components, "nginx");
-                new ProcessBuilder(new File(nginxDir, "nginx.exe").getAbsolutePath(),
+                Process q = new ProcessBuilder(new File(nginxDir, "nginx.exe").getAbsolutePath(),
                         "-p", nginxDir.getAbsolutePath(), "-s", "stop")
-                        .directory(nginxDir).start().waitFor(8, TimeUnit.SECONDS);
+                        .directory(nginxDir).redirectErrorStream(true).start();
+                q.waitFor(8, TimeUnit.SECONDS);
+                stopped = !httpOk("http://127.0.0.1:8866/");
             } catch (Exception ignored) {}
+            if (!stopped) taskkill(nginxProc.pid());
         }
+        // Redis：优雅 shutdown，未生效则强制
         if (redisProc != null) {
+            boolean stopped = false;
             try {
                 File redisDir = new File(components, "redis");
-                new ProcessBuilder(new File(redisDir, "redis-cli.exe").getAbsolutePath(), "shutdown")
-                        .directory(redisDir).start().waitFor(5, TimeUnit.SECONDS);
+                Process q = new ProcessBuilder(new File(redisDir, "redis-cli.exe").getAbsolutePath(), "shutdown")
+                        .directory(redisDir).start();
+                q.waitFor(5, TimeUnit.SECONDS);
+                stopped = !portOpen("127.0.0.1", 6379);
             } catch (Exception ignored) {}
-            redisProc.destroy();
+            if (!stopped) {
+                redisProc.destroy();
+                if (!redisProc.waitFor(3, TimeUnit.SECONDS)) taskkill(redisProc.pid());
+            }
         }
+        // MySQL：mysqladmin shutdown，未生效则强制
         if (mysqlProc != null) {
+            boolean stopped = false;
             try {
                 File bin = new File(components, "mysql/bin");
-                new ProcessBuilder(new File(bin, "mysqladmin.exe").getAbsolutePath(),
-                        "-uroot", "-proot", "shutdown").start().waitFor(15, TimeUnit.SECONDS);
+                Process q = new ProcessBuilder(new File(bin, "mysqladmin.exe").getAbsolutePath(),
+                        "-uroot", "-proot", "shutdown").start();
+                q.waitFor(15, TimeUnit.SECONDS);
+                Thread.sleep(4000); // 等待 mysqld 刷盘退出
+                stopped = !portOpen("127.0.0.1", 3306);
             } catch (Exception ignored) {}
-            mysqlProc.destroy();
+            if (!stopped) {
+                mysqlProc.destroy();
+                if (!mysqlProc.waitFor(3, TimeUnit.SECONDS)) taskkill(mysqlProc.pid());
+            }
         }
+        // 最终兜底：清理便携版残留
+        killPortableStale();
+    }
+
+    /** 强制结束某 PID 及其子进程树 */
+    static void taskkill(long pid) {
+        try {
+            new ProcessBuilder("taskkill", "/F", "/T", "/PID", String.valueOf(pid))
+                    .redirectErrorStream(true).start().waitFor(8, TimeUnit.SECONDS);
+        } catch (Exception ignored) {}
+    }
+
+    /** 清理便携版残留进程（异常退出留下的孤儿 nginx/java/mysql/redis），避免端口占用 */
+    static void killPortableStale() {
+        try {
+            String ps = "Get-CimInstance Win32_Process | Where-Object { ($_.Name -in 'nginx.exe','java.exe','mysqld.exe','redis-server.exe') -and ($_.ExecutablePath -like '*usmind-portable*') } | ForEach-Object { $_.ProcessId }";
+            Process p = new ProcessBuilder("powershell", "-NoProfile", "-Command", ps)
+                    .redirectErrorStream(true).start();
+            p.waitFor(15, TimeUnit.SECONDS);
+            String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            for (String line : out.split("\\r?\\n")) {
+                String pid = line.trim();
+                if (pid.matches("\\d+")) taskkill(Long.parseLong(pid));
+            }
+            Thread.sleep(1500);
+        } catch (Exception ignored) {}
     }
 
     // =====================================================
@@ -730,6 +789,7 @@ public class Main {
     static void runSmoke() throws Exception {
         System.out.println("== USMIND SMOKE ==");
         try {
+            killPortableStale();
             ensureMysqlData();
             startRedis();
             startNginx();
