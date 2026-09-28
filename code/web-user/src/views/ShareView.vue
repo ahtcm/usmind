@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="share-root">
     <!-- 密码弹窗 -->
     <div v-if="needPwd" class="pwd-mask">
@@ -197,9 +197,10 @@ async function loadShare() {
       })
     }
     mind.value.on('scale', s => { zoomPct.value = Math.round(s*100) + '%' })
-    mind.value.on('node_tree_render_end', () => { pageLoading.value = false; try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {} })
+    // 与编辑页一致：不注入节点右上角附件图标（simple-mind-map 附件节点自带标签可点击打开）
+    mind.value.on('node_tree_render_end', () => { pageLoading.value = false; try { fixAttachNodeTexts() } catch (e) {} })
     if (!window.__attIconTimer) {
-      window.__attIconTimer = setInterval(() => { try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {} }, 700)
+      window.__attIconTimer = setInterval(() => { try { fixAttachNodeTexts() } catch (e) {} }, 700)
     }
     mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
   } catch (e) {
