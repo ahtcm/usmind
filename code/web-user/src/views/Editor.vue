@@ -2429,6 +2429,50 @@ function makeChunkSvg(svgStr, W, ch, y0, X, Y) {
     .replace(/height="[\d.]+"/, 'height="' + ch + '"')
     .replace(/viewBox="[^"]*"/, 'viewBox="' + vx + ' ' + vy + ' ' + W + ' ' + ch + '"')
 }
+// 导出前处理：把 foreignObject 里的 MathJax 公式 SVG 提升到 SVG 原生层。
+// Chrome 对含 foreignObject 的 SVG 绘制到 canvas 后会判定 canvas 被污染（Tainted canvases may not be exported），
+// 导致分块导出的 toDataURL 失败。公式节点（richText）用 foreignObject 承载 HTML 公式，
+// 这里把其中内联的 <svg> 提升为 <g> 下的嵌套 SVG，并唯一化 defs/use 的 id 引用，避免跨公式冲突。
+function liftFormulaSvg(svgStr) {
+  const NS = 'http://www.w3.org/2000/svg'
+  const XLink = 'http://www.w3.org/1999/xlink'
+  try {
+    const doc = new DOMParser().parseFromString(svgStr, 'image/svg+xml')
+    if (doc.querySelector('parsererror')) return svgStr
+    const fos = Array.from(doc.querySelectorAll('foreignObject'))
+    if (!fos.length) return svgStr
+    fos.forEach((fo, i) => {
+      const x = parseFloat(fo.getAttribute('x') || '0')
+      const y = parseFloat(fo.getAttribute('y') || '0')
+      const style = fo.getAttribute('style') || ''
+      const svgs = Array.from(fo.querySelectorAll('svg'))
+      const g = doc.createElementNS(NS, 'g')
+      g.setAttribute('transform', 'translate(' + x + ',' + y + ')')
+      if (style) g.setAttribute('style', style)
+      svgs.forEach((sv) => {
+        const p = 'u' + i + '-'
+        const idEls = sv.querySelectorAll('[id]')
+        idEls.forEach((el) => {
+          const v = el.getAttribute('id')
+          if (v && v.indexOf(p) !== 0) el.setAttribute('id', p + v)
+        })
+        const uses = sv.querySelectorAll('use')
+        uses.forEach((u) => {
+          const h = u.getAttribute('href')
+          if (h && h.charAt(0) === '#' && h.indexOf(p) !== 1) u.setAttribute('href', p + h.slice(1))
+          const xh = u.getAttributeNS(XLink, 'href')
+          if (xh && xh.charAt(0) === '#' && xh.indexOf(p) !== 1) u.setAttributeNS(XLink, 'xlink:href', p + xh.slice(1))
+        })
+        g.appendChild(sv)
+      })
+      fo.parentNode.replaceChild(g, fo)
+    })
+    return new XMLSerializer().serializeToString(doc)
+  } catch (e) {
+    console.warn('公式 SVG 提升失败，回退原样导出: ', e)
+    return svgStr
+  }
+}
 function loadImg(url) {
   const img = new Image()
   return new Promise((res, rej) => {
@@ -2447,7 +2491,8 @@ function loadImg(url) {
 async function exportChunkedImages(type) {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
-  const { str } = await mind.value.doExport.getSvgData()
+  const { str: strRaw } = await mind.value.doExport.getSvgData()
+  const str = liftFormulaSvg(strRaw)
   const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
@@ -2491,7 +2536,8 @@ async function exportChunkedImages(type) {
 async function exportChunkedPdf() {
   const name = docName.value || '思维导图'
   toast('正在生成画布数据...')
-  const { str } = await mind.value.doExport.getSvgData()
+  const { str: strRaw } = await mind.value.doExport.getSvgData()
+  const str = liftFormulaSvg(strRaw)
   const { W, H, X, Y } = parseSvgSize(str)
   if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
