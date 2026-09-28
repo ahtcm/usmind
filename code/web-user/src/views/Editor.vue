@@ -663,6 +663,21 @@ async function createMind() {
         const w = parseFloat(svg.attr('width')) || 0
         const h = parseFloat(svg.attr('height')) || 0
         if (w && h && !svg.attr('viewBox')) svg.attr('viewBox', '0 0 ' + w + ' ' + h)
+        // 浅色文字转深色：部分主题（如晨曦白）节点文字为白色，导出 SVG 后
+        // 节点背景（CSS 渲染）不随 SVG 序列化，白字在浅色底上看不见，强制转深保证可读
+        svg.find('text').each(function () {
+          const el = this
+          const fill = el.attr('fill')
+          if (!fill) return
+          const m = String(fill).match(/^#([0-9a-fA-F]{6})$/)
+          if (m) {
+            const r = parseInt(m[1].slice(0, 2), 16)
+            const g = parseInt(m[1].slice(2, 4), 16)
+            const b = parseInt(m[1].slice(4, 6), 16)
+            const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+            if (lum > 0.7) el.attr('fill', '#333333')
+          }
+        })
       } catch (e) { /* 忽略，保持默认导出 */ }
       return svg
     }  })
@@ -2412,7 +2427,6 @@ async function exportChunkedImages(type) {
     const chunkSvg = makeChunkSvg(str, W, ch, y0)
     const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
     const img = await loadImg(url)
-    URL.revokeObjectURL(url)
     const canvas = document.createElement('canvas')
     canvas.width = W
     canvas.height = ch
@@ -2420,6 +2434,7 @@ async function exportChunkedImages(type) {
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, W, ch)
     ctx.drawImage(img, 0, 0)
+    URL.revokeObjectURL(url)
     parts.push(canvas.toDataURL(isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined))
     canvas.width = 1
     canvas.height = 1
@@ -2454,7 +2469,6 @@ async function exportChunkedPdf() {
     const chunkSvg = makeChunkSvg(str, W, ch, y0)
     const url = URL.createObjectURL(new Blob([chunkSvg], { type: 'image/svg+xml' }))
     const img = await loadImg(url)
-    URL.revokeObjectURL(url)
     const canvas = document.createElement('canvas')
     canvas.width = W
     canvas.height = ch
@@ -2462,6 +2476,7 @@ async function exportChunkedPdf() {
     ctx.fillStyle = bg
     ctx.fillRect(0, 0, W, ch)
     ctx.drawImage(img, 0, 0)
+    URL.revokeObjectURL(url)
     const b64 = canvas.toDataURL('image/png').split(',')[1]
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
     const pngImage = await pdfDoc.embedPng(bytes)
