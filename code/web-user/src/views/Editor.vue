@@ -2425,7 +2425,15 @@ function makeChunkSvg(svgStr, W, ch, y0, X, Y) {
 }
 function loadImg(url) {
   const img = new Image()
-  return new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+  return new Promise((res, rej) => {
+    img.onload = () => {
+      // SVG 作为图片源时，onload 触发不代表内部节点/渐变已绘制完成，
+      // 等两帧再绘制，避免 drawImage 拿到未渲染完成的图像
+      requestAnimationFrame(() => requestAnimationFrame(() => res(img)))
+    }
+    img.onerror = rej
+    img.src = url
+  })
 }
 
 // 分块导出图片（PNG/JPG/JPEG）：超大画布按块切割打包 zip；小图直接导出单张
