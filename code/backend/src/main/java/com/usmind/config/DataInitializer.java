@@ -69,7 +69,8 @@ public class DataInitializer implements CommandLineRunner {
                 "ALTER TABLE sys_user ADD COLUMN source VARCHAR(16) DEFAULT 'local'",
                 "ALTER TABLE sys_user ADD COLUMN openid_wechat VARCHAR(128) DEFAULT ''",
                 "ALTER TABLE sys_user ADD COLUMN openid_qq VARCHAR(128) DEFAULT ''",
-                "ALTER TABLE sys_user ADD COLUMN last_login_at DATETIME NULL"
+                "ALTER TABLE sys_user ADD COLUMN last_login_at DATETIME NULL",
+                "ALTER TABLE sys_user ADD COLUMN avatar VARCHAR(512) DEFAULT ''"
             };
             for (String a : alters) {
                 try { jdbcTemplate.execute(a); } catch (Exception ignored) {}

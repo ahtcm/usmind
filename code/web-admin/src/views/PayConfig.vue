@@ -26,6 +26,25 @@
     </el-card>
 
     <el-card shadow="never" class="cfg-card">
+      <template #header><b>微信登录</b><span class="card-tip">默认关闭；在微信开放平台开通「网站应用」后填写 AppID/Secret，用户端即可扫码登录</span></template>
+      <el-form label-width="150px" label-position="left">
+        <el-form-item label="启用微信登录">
+          <el-switch v-model="form.wechatLoginEnabled" />
+        </el-form-item>
+        <el-form-item label="AppID">
+          <el-input v-model="form.wechatLoginAppId" placeholder="开放平台网站应用 AppID" />
+        </el-form-item>
+        <el-form-item label="AppSecret">
+          <el-input v-model="form.wechatLoginSecret" show-password placeholder="网站应用密钥" />
+        </el-form-item>
+        <el-form-item label="回调地址">
+          <el-input v-model="form.wechatLoginRedirectUri" placeholder="http://域名/login" />
+          <span class="field-hint">微信扫码后跳转的地址，填登录页（须与开放平台配置一致）</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="cfg-card">
       <template #header><b>注册验证码</b><span class="card-tip">图形验证码默认开启；短信验证码默认关闭，接入服务商后开启</span></template>
       <el-form label-width="150px" label-position="left">
         <el-form-item label="图形验证码">
@@ -91,6 +110,8 @@ const saving = ref(false)
 const form = reactive({
   wechatPayEnabled: false,
   wechatMchId: '', wechatAppId: '', wechatApiKey: '', wechatPrivateKey: '', wechatNotifyUrl: '',
+  wechatLoginEnabled: false,
+  wechatLoginAppId: '', wechatLoginSecret: '', wechatLoginRedirectUri: '',
   authCaptchaEnabled: true,
   authSmsEnabled: false,
   smsProvider: '', smsAccessKeyId: '', smsAccessKeySecret: '', smsSignName: '', smsTemplateCode: '',
@@ -108,6 +129,10 @@ onMounted(async () => {
       wechatApiKey: d.wechatApiKey || '',
       wechatPrivateKey: d.wechatPrivateKey || '',
       wechatNotifyUrl: d.wechatNotifyUrl || '',
+      wechatLoginEnabled: !!d.wechatLoginEnabled,
+      wechatLoginAppId: d.wechatLoginAppId || '',
+      wechatLoginSecret: d.wechatLoginSecret || '',
+      wechatLoginRedirectUri: d.wechatLoginRedirectUri || '',
       authCaptchaEnabled: !!d.authCaptchaEnabled,
       authSmsEnabled: !!d.authSmsEnabled,
       smsProvider: d.smsProvider || '',
@@ -133,6 +158,10 @@ async function save() {
       wechatApiKey: form.wechatApiKey,
       wechatPrivateKey: form.wechatPrivateKey,
       wechatNotifyUrl: form.wechatNotifyUrl,
+      wechatLoginEnabled: form.wechatLoginEnabled ? 1 : 0,
+      wechatLoginAppId: form.wechatLoginAppId,
+      wechatLoginSecret: form.wechatLoginSecret,
+      wechatLoginRedirectUri: form.wechatLoginRedirectUri,
       authCaptchaEnabled: form.authCaptchaEnabled ? 1 : 0,
       authSmsEnabled: form.authSmsEnabled ? 1 : 0,
       smsProvider: form.smsProvider,

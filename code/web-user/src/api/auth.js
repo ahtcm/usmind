@@ -8,5 +8,7 @@ export const authApi = {
   changePassword: (data) => request.put('/auth/password', data),
   captcha: () => request.get('/auth/captcha'),
   sendCode: (data) => request.post('/auth/send-code', data),
+  wechatUrl: () => request.get('/auth/wechat/url'),
+  wechatCallback: (code, state) => request.get('/auth/wechat/callback', { params: { code, state } }),
   updateProfile: (data) => request.put('/user/profile', data)
 }

@@ -59,6 +59,17 @@ public class AuthController {
         return Result.ok(Map.of("id", id, "username", req.getUsername()));
     }
 
+    @GetMapping("/wechat/url")
+    public Result<Map<String, Object>> wechatUrl() {
+        return Result.ok(authService.wechatUrl());
+    }
+
+    @GetMapping("/wechat/callback")
+    public Result<Map<String, Object>> wechatCallback(@RequestParam("code") String code,
+                                                      @RequestParam("state") String state) {
+        return Result.ok(authService.wechatCallback(code, state));
+    }
+
     @GetMapping("/info")
     public Result<Map<String, Object>> info() {
         return Result.ok(authService.info(SecurityUtil.currentUserId()));

@@ -18,8 +18,15 @@
       </div>
 
       <div class="uc-field">
-        <label>头像 URL</label>
-        <input v-model="form.avatar" type="text" placeholder="图片地址（留空则用首字母头像）" />
+        <label>头像</label>
+        <div class="uc-avatar-row">
+          <label class="uc-avatar-upload" :class="{ 'has-img': form.avatar }">
+            <img v-if="form.avatar" :src="form.avatar" alt="avatar" />
+            <span v-else>＋ 上传</span>
+            <input type="file" accept="image/*" @change="onAvatarPick" />
+          </label>
+          <span class="uc-tip">支持 jpg/png，≤2MB</span>
+        </div>
       </div>
       <div class="uc-field">
         <label>昵称</label>
@@ -46,6 +53,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import request from '../api/request'
 import { authApi } from '../api/auth'
 import { memberApi } from '../api/member'
 import { useUserStore } from '../stores/user'
@@ -88,6 +96,22 @@ async function save() {
     saving.value = false
   }
 }
+
+async function onAvatarPick(e) {
+  const f = e.target.files && e.target.files[0]
+  if (!f) return
+  if (!/^image\//.test(f.type)) { err.value = '仅支持图片文件'; return }
+  if (f.size > 2 * 1024 * 1024) { err.value = '头像不能超过 2MB'; return }
+  err.value = ''
+  try {
+    const fd = new FormData()
+    fd.append('file', f)
+    const up = await request.post('/file/upload-avatar', fd)
+    form.value.avatar = up.url || ''
+  } catch (e2) {
+    err.value = (e2 && e2.message) || '头像上传失败'
+  }
+}
 </script>
 
 <style scoped>
@@ -98,6 +122,11 @@ async function save() {
 .uc-avatar { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #4f6ef7, #6a5cf6); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 6px 18px rgba(79,110,247,.35); }
 .uc-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .uc-avatar-text { font-size: 22px; font-weight: 700; color: #fff; }
+.uc-avatar-upload { width: 56px; height: 56px; border-radius: 50%; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: rgba(255,255,255,.06); flex-shrink: 0; }
+.uc-avatar-upload img { width: 100%; height: 100%; object-fit: cover; }
+.uc-avatar-upload span { font-size: 12px; color: var(--text-dim); }
+.uc-avatar-upload input { display: none; }
+.uc-tip { font-size: 12px; color: var(--text-dim); }
 .uc-name { font-size: 16px; font-weight: 600; }
 .uc-vip { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
 .uc-vip.vip { color: #f0b429; }

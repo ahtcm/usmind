@@ -43,6 +43,15 @@ public class FileController {
         return Result.ok(fileService.upload(SecurityUtil.currentUserId(), file, mindMapId));
     }
 
+    @PostMapping("/upload-avatar")
+    public Result<Map<String, Object>> uploadAvatar(@RequestParam("file") MultipartFile file) throws Exception {
+        if (file == null || file.isEmpty()) throw new BusinessException(400, "请选择图片");
+        String ct = file.getContentType();
+        if (ct == null || !ct.startsWith("image/")) throw new BusinessException(400, "仅支持图片文件");
+        if (file.getSize() > 2 * 1024 * 1024) throw new BusinessException(400, "头像图片不能超过 2MB");
+        return Result.ok(fileService.upload(0L, file, null));
+    }
+
     @PutMapping("/content")
     public Result<Void> updateContent(@RequestBody Map<String, String> body) {
         fileService.updateContentByUrl(body.get("url"), body.get("content"));

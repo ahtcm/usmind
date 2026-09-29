@@ -12,4 +12,5 @@ public class RegisterRequest {
     private String captchaUuid;
     private String captchaCode;
     private String smsCode;
+    private String avatar;
 }

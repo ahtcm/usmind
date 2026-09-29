@@ -29,6 +29,10 @@ public class AdminPayConfigController {
         m.put("wechatApiKey", settingsService.get("wechatApiKey", ""));
         m.put("wechatPrivateKey", settingsService.get("wechatPrivateKey", ""));
         m.put("wechatNotifyUrl", settingsService.get("wechatNotifyUrl", ""));
+        m.put("wechatLoginEnabled", settingsService.getInt("wechatLoginEnabled", 0));
+        m.put("wechatLoginAppId", settingsService.get("wechatLoginAppId", ""));
+        m.put("wechatLoginSecret", settingsService.get("wechatLoginSecret", ""));
+        m.put("wechatLoginRedirectUri", settingsService.get("wechatLoginRedirectUri", ""));
         m.put("authCaptchaEnabled", settingsService.getInt("authCaptchaEnabled", 1));
         m.put("authSmsEnabled", settingsService.getInt("authSmsEnabled", 0));
         m.put("smsProvider", settingsService.get("smsProvider", ""));

@@ -12,5 +12,7 @@ public interface AuthService {
     Map<String, Object> info(Long userId);
     void updateProfile(Long userId, Map<String, Object> body);
     void logout(String token);
+    Map<String, Object> wechatUrl();
+    Map<String, Object> wechatCallback(String code, String state);
     void changePassword(Long userId, String oldPassword, String newPassword);
 }
