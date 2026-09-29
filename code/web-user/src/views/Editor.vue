@@ -436,21 +436,27 @@ const styleBorderColor = ref('#ffffff')
 const bgColor = ref('#16181d')
 const pageLoading = ref(false)
 const exportLoading = ref(false)
+const exporting = ref(false)
 const exportTip = ref('')
 const exportProgress = ref(0)
 function showExportLoading(total, kind) {
   exportLoading.value = true
   exportProgress.value = 0
   exportTip.value = '正在生成画布数据...'
+  // 兜底：异常未关闭时最多展示 10 分钟后自关，避免遮罩卡死
+  clearTimeout(exportLoadingTimer)
+  exportLoadingTimer = setTimeout(() => { if (exportLoading.value) hideExportLoading() }, 600000)
 }
 function updateExportLoading(done, total, label) {
   exportProgress.value = total > 0 ? Math.round(done / total * 100) : 100
   exportTip.value = label || ''
 }
 function hideExportLoading() {
+  clearTimeout(exportLoadingTimer)
   exportLoading.value = false
   exportTip.value = ''
 }
+let exportLoadingTimer = null
 let loadingToken = 0
 let loadingTimer = null
 let loadingStart = 0
@@ -2663,17 +2669,15 @@ async function renderChunkByHtml(svgStr, W, ch, y0, X, Y, bg) {
 // 不依赖全量大图 Image 解码（浏览器对大 SVG 有高度截断），改为逐块生成小 SVG 渲染
 async function exportChunkedImages(type) {
   const name = docName.value || '思维导图'
-  toast('正在生成画布数据...')
   const { str: strRaw } = await mind.value.doExport.getSvgData()
   const { W, H, X, Y } = parseSvgSize(strRaw)
-  if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
+  if (!W || !H) { hideExportLoading(); toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
   const CHUNK = 5000
   const chunks = Math.max(1, Math.ceil(H / CHUNK))
   const isJpg = type === 'jpg' || type === 'jpeg'
   const ext = isJpg ? 'jpg' : 'png'
   const parts = []
-  showExportLoading(chunks, ext)
   for (let i = 0; i < chunks; i++) {
     const y0 = i * CHUNK
     const ch = Math.min(CHUNK, H - y0)
@@ -2700,15 +2704,13 @@ async function exportChunkedImages(type) {
 // 分页导出 PDF：超大画布自动分页，每页一块内容
 async function exportChunkedPdf() {
   const name = docName.value || '思维导图'
-  toast('正在生成画布数据...')
   const { str: strRaw } = await mind.value.doExport.getSvgData()
   const { W, H, X, Y } = parseSvgSize(strRaw)
-  if (!W || !H) { toast('画布尺寸解析失败', 'error'); return }
+  if (!W || !H) { hideExportLoading(); toast('画布尺寸解析失败', 'error'); return }
   const bg = (mind.value.themeConfig && mind.value.themeConfig.backgroundColor) || '#ffffff'
   const CHUNK = 5000
   const chunks = Math.max(1, Math.ceil(H / CHUNK))
   const pdfDoc = await PDFDocument.create()
-  showExportLoading(chunks, 'pdf')
   for (let i = 0; i < chunks; i++) {
     const y0 = i * CHUNK
     const ch = Math.min(CHUNK, H - y0)
@@ -2729,19 +2731,25 @@ async function exportChunkedPdf() {
 async function runExport(type) {
   exportOpen.value = false
   if (!mind.value) { toast('请先进入画布', 'error'); return }
+  if (exporting.value) { toast('正在导出中，请稍候...', 'warn'); return }
+  exporting.value = true
+  showExportLoading(0, '')
   try {
     if (type === 'png' || type === 'jpg' || type === 'jpeg') {
       await exportChunkedImages(type)
     } else if (type === 'pdf') {
       await exportChunkedPdf()
     } else {
+      updateExportLoading(0, 1, '正在导出 ' + type.toUpperCase() + ' 文件...')
       const name = docName.value || '思维导图'
-      toast('正在导出 ' + type.toUpperCase() + ' ...')
       await mind.value.doExport.export(type, true, name)
-      toast('导出完成')
+      updateExportLoading(1, 1, '导出完成')
     }
   } catch (e) {
+    hideExportLoading()
     toast('导出失败: ' + e.message, 'error')
+  } finally {
+    exporting.value = false
   }
 }
 async function exportUsmind() {
