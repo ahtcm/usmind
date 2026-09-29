@@ -3,6 +3,13 @@
     <div class="member-box">
       <h2>会员中心</h2>
 
+      <div v-if="!memberEnabled" class="member-off">
+        <div class="mo-icon">🔒</div>
+        <div class="mo-text">会员功能暂未开放</div>
+        <button class="ghost-btn" @click="router.push('/maps')">返回导图列表</button>
+      </div>
+
+      <template v-else>
       <div class="member-status" :class="{ vip: isVip }">
         <template v-if="isVip">
           <div class="ms-badge">VIP</div>
@@ -45,6 +52,7 @@
         <button class="ghost-btn" @click="router.push('/maps')">返回导图列表</button>
       </div>
       <div v-if="err" class="member-err">{{ err }}</div>
+      </template>
     </div>
   </div>
 </template>
@@ -65,6 +73,7 @@ const paying = ref(false)
 const payCodeUrl = ref('')
 const payHint = ref('')
 const wechatPayEnabled = ref(false)
+const memberEnabled = ref(true)
 const err = ref('')
 
 const nickname = computed(() => userStore.user?.nickname || userStore.user?.username || '')
@@ -82,6 +91,7 @@ onMounted(async () => {
   } catch (e) { /* 忽略 */ }
   try {
     const c = await configApi.client()
+    memberEnabled.value = c.memberEnabled !== false
     wechatPayEnabled.value = !!c.feature?.wechatPayEnabled
     if (!wechatPayEnabled.value) payHint.value = '微信支付暂未开放，请联系管理员开通'
   } catch (e) { /* 忽略 */ }
@@ -161,4 +171,7 @@ function pollStatus(outTradeNo) {
 .ghost-btn { background: rgba(255,255,255,.08); border: none; color: var(--text); border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; }
 .ghost-btn:hover { background: rgba(255,255,255,.14); }
 .member-err { color: #f26d6d; font-size: 13px; text-align: center; margin-top: 12px; }
+.member-off { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 0 28px; }
+.mo-icon { font-size: 40px; opacity: .8; }
+.mo-text { font-size: 15px; color: var(--text-dim); }
 </style>

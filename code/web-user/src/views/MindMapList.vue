@@ -15,7 +15,7 @@
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
               个人信息
             </div>
-            <div class="drop-item" @click="goMember">
+            <div class="drop-item" @click="goMember" v-if="memberEnabled">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .8-4.5 4.3 1 6.4-5.5-3-5.5 3 1-6.4L3 8.8 9 8z"/></svg>
               会员中心
             </div>
@@ -47,6 +47,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { mindmapApi } from '../api/mindmap'
+import { configApi } from '../api/member'
 import { toast, showConfirm, showPrompt } from '../utils/modal'
 import { useUserStore } from '../stores/user'
 
@@ -54,8 +55,16 @@ const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
 const menuOpen = ref(false)
+const memberEnabled = ref(true)
 
-onMounted(loadList)
+onMounted(() => { loadList(); loadMemberEnabled() })
+
+async function loadMemberEnabled() {
+  try {
+    const c = await configApi.client()
+    memberEnabled.value = c.memberEnabled !== false
+  } catch (e) { /* 忽略 */ }
+}
 
 async function loadList() {
   try {

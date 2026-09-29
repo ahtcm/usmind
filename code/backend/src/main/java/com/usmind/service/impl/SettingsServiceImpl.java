@@ -171,6 +171,7 @@ public class SettingsServiceImpl implements SettingsService {
         m.put("aiModel", get("aiModel", ""));
         m.put("aiEndpoint", get("aiEndpoint", ""));
         m.put("attachTextColor", get("attachTextColor", "#e53935"));
+        m.put("memberEnabled", getInt("memberEnabled", 1));
         m.put("wechatLoginEnabled", getInt("wechatLoginEnabled", 0));
         m.put("wechatLoginAppId", get("wechatLoginAppId", ""));
         m.put("wechatLoginSecret", get("wechatLoginSecret", ""));
@@ -226,6 +227,7 @@ public class SettingsServiceImpl implements SettingsService {
             "uploadFreeCount", "uploadFreeMaxMb", "uploadVipCount", "uploadVipMaxMb",
             "mindmapFreeCount", "mindmapVipCount",
             "wechatPayEnabled", "authCaptchaEnabled", "authSmsEnabled",
+            "memberEnabled",
             "wechatLoginEnabled", "wechatLoginAppId", "wechatLoginSecret", "wechatLoginRedirectUri",
             "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds"
         };

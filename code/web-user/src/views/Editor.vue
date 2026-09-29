@@ -3036,9 +3036,10 @@ function onPaste(e) {
   insertFileToNode(node, f)
 }
 
-let memberFeature = { memberThemeIds: '', memberExportFormats: '', memberLevel: 0 }
+let memberFeature = { memberThemeIds: '', memberExportFormats: '', memberLevel: 0, enabled: true }
 function checkMemberFeature(kind, value) {
   const cfg = memberFeature
+  if (!cfg.enabled) return true // 会员功能总开关关闭：全部开放
   if (kind === 'theme') {
     if (!cfg.memberThemeIds) return true
     const ids = String(cfg.memberThemeIds).split(',').map(x => x.trim())
@@ -3057,6 +3058,7 @@ async function loadMemberFeature() {
   try {
     const c = await configApi.client()
     const f = c.feature || {}
+    memberFeature.enabled = c.memberEnabled !== false
     memberFeature.memberThemeIds = f.memberThemeIds || ''
     memberFeature.memberExportFormats = f.memberExportFormats || ''
     try {
