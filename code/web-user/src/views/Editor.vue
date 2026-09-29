@@ -313,6 +313,13 @@
     </div>
   </div>
 
+  <!-- 协作实时更新提示气泡 -->
+  <div v-if="collabToast.show" class="collab-toast">
+    <span class="collab-toast-text">{{ collabToast.text }}</span>
+    <button class="math-btn math-btn-primary math-btn-sm" @click="applyCollabUpdate">立即加载</button>
+    <button class="math-btn math-btn-sm" @click="collabToast.show = false">忽略</button>
+  </div>
+
   <div v-if="shareDialog" class="share-mask" @click.self="shareDialog = false">
     <div class="share-box">
       <div class="share-title">分享导图</div>
@@ -1036,7 +1043,7 @@ async function forceSave() {
 }
 
 /** 冲突后：加载最新内容 */
-async function loadLatest() {
+async function loadLatest(silent = false) {
   conflictDialog.value = false
   try {
     const fresh = await mindmapApi.get(mindMapId.value)
@@ -1055,7 +1062,7 @@ async function loadLatest() {
     }
     curVersion.value = fresh.version || 0
     await loadDoc()
-    toast('已加载最新内容')
+    if (!silent) toast('已加载最新内容')
   } catch (e) {
     toast('加载最新失败: ' + e.message, 'error')
   }
@@ -1128,6 +1135,7 @@ async function loadDoc() {
   }
   applyBranchRainbow()
   markSaved()
+  clearTimeout(autoSaveTimer)
 }
 
 async function switchCanvas(i) {
@@ -3116,6 +3124,72 @@ async function onImportFile(e) {
 }
 const curVersion = ref(0)
 const conflictDialog = ref(false)
+// ---- 协作实时同步（WebSocket） ----
+const collabToast = reactive({ show: false, text: '', version: 0 })
+let ws = null
+let wsReconnectTimer = null
+let wsSubscribed = false
+
+function connectWs() {
+  if (ws) { try { ws.close() } catch (e) {} ws = null }
+  if (!mindMapId.value) return
+  const token = localStorage.getItem('usmind.token') || ''
+  if (!token) return
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://'
+  try {
+    ws = new WebSocket(proto + location.host + '/ws?token=' + encodeURIComponent(token))
+  } catch (e) { scheduleWsReconnect(); return }
+  ws.onopen = () => {
+    if (mindMapId.value) {
+      ws.send(JSON.stringify({ type: 'subscribe', mindMapId: String(mindMapId.value) }))
+      wsSubscribed = true
+    }
+  }
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data)
+      if (msg.event !== 'mindmap_updated') return
+      if (String(msg.mindMapId) !== String(mindMapId.value)) return
+      let myUid = 0
+      try { myUid = Number((JSON.parse(localStorage.getItem('usmind.user') || '{}')).id) || 0 } catch (e) { myUid = 0 }
+      if (myUid && Number(msg.updatedBy) === myUid) return
+      const v = Number(msg.version)
+      if (!v || v <= curVersion.value) return
+      if (dirty.value) {
+        collabToast.text = (msg.updatedByName || '协作成员') + ' 已更新该导图（v' + v + '）'
+        collabToast.version = v
+        collabToast.show = true
+      } else {
+        loadLatest(true)
+      }
+    } catch (e) { /* 忽略解析错误 */ }
+  }
+  ws.onclose = () => { ws = null; wsSubscribed = false; scheduleWsReconnect() }
+  ws.onerror = () => { try { ws.close() } catch (e) {} }
+}
+
+function scheduleWsReconnect() {
+  if (wsReconnectTimer) clearTimeout(wsReconnectTimer)
+  if (!mindMapId.value) return
+  wsReconnectTimer = setTimeout(() => { if (mindMapId.value) connectWs() }, 5000)
+}
+
+function applyCollabUpdate() {
+  collabToast.show = false
+  loadLatest()
+}
+
+function disconnectWs() {
+  if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null }
+  if (ws) {
+    try {
+      if (mindMapId.value) ws.send(JSON.stringify({ type: 'unsubscribe', mindMapId: String(mindMapId.value) }))
+    } catch (e) {}
+    try { ws.close() } catch (e) {}
+    ws = null
+  }
+  wsSubscribed = false
+}
 const shareDialog = ref(false)
 const shareLink = ref('')
 const sharePwd = ref('')
@@ -3444,6 +3518,10 @@ onMounted(async () => {
   document.addEventListener('click', onDocClick)
   document.addEventListener('paste', onPaste)
   startCommentPoll()
+  connectWs()
+  markSaved()
+  clearTimeout(autoSaveTimer)
+  setTimeout(() => { markSaved(); clearTimeout(autoSaveTimer) }, 2500)
 })
 
 function onDocClick(e) {
@@ -3451,6 +3529,7 @@ function onDocClick(e) {
 }
 
 onBeforeUnmount(() => {
+  disconnectWs()
   document.removeEventListener('mousemove', onBarDragMove)
   document.removeEventListener('mouseup', onBarDragEnd)
   if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler)
@@ -3605,6 +3684,24 @@ onBeforeUnmount(() => {
   .sb-h { bottom: 48px; width: 80vw; }
   .sb-v { right: 6px; }
 }
+.collab-toast {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgba(30, 34, 42, 0.95);
+  border: 1px solid rgba(255, 200, 87, 0.35);
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  max-width: 90vw;
+}
+.collab-toast-text { font-size: 13px; color: #f5d98b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.math-btn-sm { padding: 3px 10px; font-size: 12px; }
 </style>
 
 <style>

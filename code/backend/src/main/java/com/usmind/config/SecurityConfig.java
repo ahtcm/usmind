@@ -85,6 +85,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/preview-config").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/preview/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // 其余 /api/**（含 /api/file/** 上传/删除/预览）必须登录
                         .anyRequest().authenticated()

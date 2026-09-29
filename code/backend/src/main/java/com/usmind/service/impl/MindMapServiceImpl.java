@@ -26,6 +26,7 @@ public class MindMapServiceImpl implements MindMapService {
     private final com.usmind.mapper.SysUserMapper sysUserMapper;
     private final com.usmind.service.SettingsService settingsService;
     private final com.usmind.service.OrgService orgService;
+    private final com.usmind.ws.MindMapWsHandler mindMapWsHandler;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MindMapServiceImpl(MindMapMapper mindMapMapper,
@@ -33,13 +34,15 @@ public class MindMapServiceImpl implements MindMapService {
                               com.usmind.mapper.OrgCollabMapper orgCollabMapper,
                               com.usmind.mapper.SysUserMapper sysUserMapper,
                               com.usmind.service.SettingsService settingsService,
-                              com.usmind.service.OrgService orgService) {
+                              com.usmind.service.OrgService orgService,
+                              com.usmind.ws.MindMapWsHandler mindMapWsHandler) {
         this.mindMapMapper = mindMapMapper;
         this.orgMemberMapper = orgMemberMapper;
         this.orgCollabMapper = orgCollabMapper;
         this.sysUserMapper = sysUserMapper;
         this.settingsService = settingsService;
         this.orgService = orgService;
+        this.mindMapWsHandler = mindMapWsHandler;
     }
 
     /** 是否拥有该导图的读写权限：属主本人，或所属机构协作成员 */
@@ -167,6 +170,22 @@ public class MindMapServiceImpl implements MindMapService {
         if (req.getManualStyles() != null) m.setManualStyles(toJson(req.getManualStyles()));
         m.setVersion(cur + 1);
         mindMapMapper.updateById(m);
+        // 协作实时同步：广播变更通知（前端据此自动加载最新 / 弹更新提示）
+        try {
+            String updater = "";
+            com.usmind.entity.SysUser u = sysUserMapper.selectById(userId);
+            if (u != null && u.getNickname() != null) updater = u.getNickname();
+            Map<String, Object> msg = new HashMap<>();
+            msg.put("event", "mindmap_updated");
+            msg.put("mindMapId", id);
+            msg.put("version", m.getVersion());
+            msg.put("updatedBy", userId);
+            msg.put("updatedByName", updater);
+            msg.put("ts", System.currentTimeMillis());
+            mindMapWsHandler.broadcast(String.valueOf(id), objectMapper.writeValueAsString(msg));
+        } catch (Exception e) {
+            // 广播失败不影响保存
+        }
         return m.getVersion();
     }
 
