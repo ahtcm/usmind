@@ -977,6 +977,10 @@ function bindMindEvents() {
   mind.value.on('node_dragend', () => mapEl.value.classList.remove('no-anim'))
   mind.value.on('node_text_edit_change', (ev) => { mapEl.value.classList.add('no-anim'); pushNodeChange(ev && ev.node, ev && ev.text) })
 mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNodeLock() })
+  // 结构类命令（创建/删除/移动/粘贴节点）执行后立即保存：让协作端秒级收到广播，无需等自动保存周期
+  mind.value.on('afterExecCommand', (name) => {
+    if (STRUCT_CHANGE_CMDS.indexOf(name) >= 0) scheduleStructureSave()
+  })
   // 编辑框聚焦/失焦切换快速入口
   const onEditFocusIn = (e) => {
     if (e.target && e.target.classList && e.target.classList.contains('smm-node-edit-wrap')) {
@@ -1116,6 +1120,19 @@ function scheduleAutoSave() {
   autoSaveTimer = setTimeout(() => { if (dirty.value) saveDoc() }, Math.max(3, autoSaveInterval.value) * 1000)
 }
 
+// 结构类命令：创建/删除/移动/粘贴节点——执行后立即保存（500ms 防抖），协作端实时感知结构变化
+const STRUCT_CHANGE_CMDS = [
+  'INSERT_NODE', 'INSERT_CHILD_NODE', 'INSERT_MULTI_NODE', 'INSERT_MULTI_CHILD_NODE', 'INSERT_PARENT_NODE',
+  'REMOVE_NODE', 'REMOVE_CURRENT_NODE', 'PASTE_NODE', 'CUT_NODE', 'MOVE_NODE', 'UP_NODE', 'DOWN_NODE',
+  'MOVE_UP_ONE_LEVEL', 'MOVE_DOWN_ONE_LEVEL'
+]
+function scheduleStructureSave() {
+  if (!autoSaveEnabled.value) return
+  if (!dirty.value) return
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => { if (dirty.value) saveDoc() }, 500)
+}
+
 // 旧 KaTeX 公式数据迁移为 MathJax SVG（foreignObject 内 KaTeX 多行矩阵会行重叠塌陷）
 async function migrateDocMath(doc) {
   const root = doc && doc.data && doc.data.root
@@ -1154,11 +1171,14 @@ async function migrateDocMath(doc) {
 
 async function loadDoc(keepView = false) {
   const tk = ++loadingToken
-  pageLoading.value = true
-  loadingStart = Date.now()
-  clearTimeout(loadingTimer)
-  loadingTimer = setTimeout(() => { if (loadingToken === tk) hideLoading(tk) }, 8000)
-  if (mapEl.value) mapEl.value.classList.add('map-loading')
+  // 静默加载（协作广播触发）不显示 loading 遮罩，避免整树重建时闪烁
+  if (!keepView) {
+    pageLoading.value = true
+    loadingStart = Date.now()
+    clearTimeout(loadingTimer)
+    loadingTimer = setTimeout(() => { if (loadingToken === tk) hideLoading(tk) }, 8000)
+    if (mapEl.value) mapEl.value.classList.add('map-loading')
+  }
   await nextTick()
   const doc = canvasTabs.value[docIndex.value]
   manualStyled = new Set(doc.manualStyles || [])
@@ -1174,11 +1194,17 @@ async function loadDoc(keepView = false) {
     suppressDirtyUntil = Date.now() + 8000
     try { mind.value.setData(docRoot) } catch (e) { console.error('setData失败', e) }
     if (keepView) {
-      if (keepTransform) { try { mind.value.view.setTransformData(keepTransform) } catch (e) {} }
+      // 协作静默加载：保留当前视图位置，不强制居中（否则导图会跳位）
+      if (keepTransform) {
+        try { mind.value.view.setTransformData(keepTransform) } catch (e) {}
+        // setData 内部可能异步重置 transform，延迟再恢复一次保证视图不跳动
+        ;[300, 900].forEach((d) => setTimeout(() => { try { mind.value.view.setTransformData(keepTransform) } catch (e) {} }, d))
+      }
+      ;[200, 600].forEach((d) => setTimeout(() => { try { updateScrollbars() } catch (e) {} }, d))
     } else {
       mind.value.view.fit()
+      ;[300, 900, 1800].forEach((d) => setTimeout(() => { try { centerRoot(); updateScrollbars() } catch (e) {} }, d))
     }
-    ;[300, 900, 1800].forEach((d) => setTimeout(() => { try { centerRoot(); updateScrollbars() } catch (e) {} }, d))
     if (doc.layout) { mind.value.setLayout(doc.layout); layoutKey.value = LAYOUT_REV[doc.layout] || 'r' }
     mind.value.setTheme(doc.theme)
     ;[400, 1200].forEach((d) => setTimeout(() => { try { applyThemeFonts(doc.theme) } catch (e) {} }, d))
