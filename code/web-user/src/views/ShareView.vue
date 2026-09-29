@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
 .share-bg-color { position: absolute; inset: 0; }
 .share-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
 .share-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
-#map { position: relative; height: 100%; width: 100%; background: transparent !important; }
+#map { position: relative; height: 100%; width: 100%; background: transparent !important; touch-action: none; -ms-touch-action: none; }
 
 /* ===== 节点评论面板 ===== */
 .cmt-panel { position: fixed; top: 74px; right: 18px; bottom: 86px; width: 320px; max-width: calc(100vw - 36px); background: rgba(23, 26, 32, .88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.09); border-radius: 14px; box-shadow: 0 14px 44px rgba(0,0,0,.4); display: flex; flex-direction: column; overflow: hidden; z-index: 300; color: #e8eaf2; font-size: 13px; }
