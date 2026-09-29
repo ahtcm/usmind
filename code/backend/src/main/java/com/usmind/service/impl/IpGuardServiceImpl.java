@@ -53,6 +53,12 @@ public class IpGuardServiceImpl implements IpGuardService {
         }
     }
 
+    @Override
+    public void banIp(String ip) {
+        if (ip == null || ip.isBlank()) return;
+        autoBlack(ip);
+    }
+
     private void autoBlack(String ip) {
         int blackSeconds = settingsService.getInt("ipAutoBlackSeconds", 3600);
         try {

@@ -109,6 +109,9 @@ public class SettingsServiceImpl implements SettingsService {
         putDefaultIfAbsent("ipRateLimit", "60");
         putDefaultIfAbsent("ipRateWindow", "60");
         putDefaultIfAbsent("ipAutoBlackSeconds", "3600");
+        // 评论限频（分享评论/作者回复共用）：超限自动拉黑 IP
+        putDefaultIfAbsent("commentRateLimit", "5");
+        putDefaultIfAbsent("commentRateWindow", "60");
         putDefaultIfAbsent("aiModel", "gpt-3.5-turbo");
         putDefaultIfAbsent("aiEndpoint", "");
         // 附件节点文件名默认文字色（后台主题/项目配置可改）
@@ -229,7 +232,7 @@ public class SettingsServiceImpl implements SettingsService {
             "wechatPayEnabled", "authCaptchaEnabled", "authSmsEnabled",
             "memberEnabled",
             "wechatLoginEnabled", "wechatLoginAppId", "wechatLoginSecret", "wechatLoginRedirectUri",
-            "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds"
+            "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds", "commentRateLimit", "commentRateWindow"
         };
         for (String k : memberKeys) {
             if (body.containsKey(k) && body.get(k) != null) {

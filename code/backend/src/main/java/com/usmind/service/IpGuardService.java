@@ -10,4 +10,7 @@ public interface IpGuardService {
     boolean ipInWhite(String ip);
 
     boolean userInWhite(Long userId);
+
+    /** 手动拉黑 IP（如评论超频），立即写入 Redis 快速生效 + ip_rule 表持久化 */
+    void banIp(String ip);
 }

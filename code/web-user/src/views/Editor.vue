@@ -241,6 +241,8 @@
         <button data-act="collapse" @click="ctxAct('collapse')">折叠</button>
         <button data-act="expand" @click="ctxAct('expand')">展开</button>
         <div class="ctx-sep"></div>
+        <button data-act="comments" @click="ctxAct('comments')">查看评论</button>
+        <div class="ctx-sep"></div>
         <button data-act="del" class="ctx-danger" @click="ctxAct('del')">删除节点</button>
       </template>
     </div>
@@ -266,7 +268,38 @@
     </div>
   </div>
 
-  <!-- 分享链接弹窗 -->
+
+    <!-- 节点评论面板（作者端） -->
+    <div v-if="cmtPanel.open" class="cmt-panel">
+      <div class="cmt-header">
+        <span class="cmt-title">💬 {{ cmtPanel.nodeName || '节点' }}</span>
+        <button class="cmt-close" @click="closeCmtPanel">×</button>
+      </div>
+      <div class="cmt-list">
+        <div v-if="!cmtPanel.list.length" class="cmt-empty">还没有评论</div>
+        <div v-for="c in cmtPanel.list" :key="c.id" class="cmt-item" :class="{ 'cmt-author': c.isAuthor === 1 }">
+          <div class="cmt-head">
+            <b>{{ c.userName }}</b>
+            <span v-if="c.isAuthor === 1" class="cmt-author-tag">我</span>
+            <span class="cmt-time">{{ fmtCmtTime(c.createdAt) }}</span>
+          </div>
+          <div class="cmt-body">{{ c.content }}</div>
+          <div class="cmt-foot">
+            <button class="cmt-reply" @click="setCmtReply(c)">{{ cmtPanel.replyTo && cmtPanel.replyTo.id === c.id ? '取消回复' : '回复' }}</button>
+          </div>
+          <div v-if="cmtPanel.replyTo && cmtPanel.replyTo.id === c.id" class="cmt-quick">
+            <input v-model="cmtPanel.input" maxlength="128" :placeholder="'回复 ' + c.userName + '…'" @keyup.enter="submitAuthorReply" />
+            <button @click="submitAuthorReply">发送</button>
+          </div>
+        </div>
+      </div>
+      <div class="cmt-tip">
+        <template v-if="cmtPanel.cmtErr"><span class="cmt-err">{{ cmtPanel.cmtErr }}</span></template>
+        <template v-else>共 {{ cmtPanel.list.length }} 条评论 ｜ 有新评论的节点会闪烁提示</template>
+      </div>
+    </div>
+
+    <!-- 分享链接弹窗 -->
   <div v-if="shareDialog" class="share-mask" @click.self="shareDialog = false">
     <div class="share-box">
       <div class="share-title">分享导图</div>
@@ -323,6 +356,7 @@ import { THEMES } from '../utils/theme.js'
 import { fetchThemes } from '../api/themes'
 import { fetchPreviewConfig } from '../api/previewConfig'
 import { mindmapApi } from '../api/mindmap'
+import { commentApi } from '../api/comment'
 import { fetchIcons } from '../api/icons'
 import { uploadMedia } from '../utils/mediastore'
 import { aiApi } from '../api/ai'
@@ -764,7 +798,7 @@ function bindMindEvents() {
     if (br) br.disabled = cur >= total-1
   })
   mind.value.on('node_contextmenu', (e, node) => { e.preventDefault(); if (node && node.nodeData) showCtxMenu(e, node) })
-  mind.value.on('node_click', () => hideCtxMenu())
+  mind.value.on('node_click', (node) => { hideCtxMenu(); onNodeClickComment(node) })
   // Ctrl+Enter：节点编辑框内手动换行（Enter 由库确认编辑）
   const onCtrlEnterKeydown = (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -886,7 +920,7 @@ mind.value.on('hide_text_edit', () => textEditActive.value = false)
   }
   document.addEventListener('focusin', onEditFocusIn)
   document.addEventListener('focusout', onEditFocusOut)
-  mind.value.on('node_tree_render_end', () => { try { updateScrollbars() } catch (e) {}; clearTimeout(loadingTimer); if (!mind.value.editNodeClassList || !mind.value.editNodeClassList.length) mapEl.value.classList.remove('no-anim'); if (loadingToken > 0) hideLoading(loadingToken); applyLazyView(); try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {} })
+  mind.value.on('node_tree_render_end', () => { try { updateScrollbars() } catch (e) {}; clearTimeout(loadingTimer); if (!mind.value.editNodeClassList || !mind.value.editNodeClassList.length) mapEl.value.classList.remove('no-anim'); if (loadingToken > 0) hideLoading(loadingToken); applyLazyView(); try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {}; try { applyCommentFlash() } catch (e) {} })
   mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
   // 轮询注入附件图标（不依赖 render_end 时序）
   if (window.__attIconTimer) clearInterval(window.__attIconTimer)
@@ -1920,6 +1954,9 @@ function ctxAct(act) {
       c.remove()
     })
     c.click()
+  } else if (act === 'comments') {
+    hideCtxMenu()
+    openCmtPanel(node)
   } else if (act === 'collapse') {
     mind.value.execCommand('SET_NODE_EXPAND', node, false)
   } else if (act === 'expand') {
@@ -3087,6 +3124,129 @@ async function loadMemberFeature() {
   } catch (e) { /* 忽略 */ }
 }
 
+
+// ===== 节点评论（作者端：轮询未读 + 闪烁 + 查看/回复 + 已读）=====
+const cmtPanel = reactive({ open:false, nodeId:'', nodeName:'', list:[], input:'', replyTo:null, cmtErr:'' })
+const unreadNodes = reactive({})
+let cmtAfterId = 0
+let cmtTimer = null
+let cmtLoading = false
+
+function nodeElOf(uid) {
+  if (!mind.value || !mind.value.renderer) return null
+  const n = (mind.value.renderer.nodeCache || {})[uid]
+  return (n && n.group) ? (n.group.node || n.group) : null
+}
+function applyCommentFlash() {
+  if (!mind.value || !mind.value.renderer) return
+  try {
+    document.querySelectorAll('.cmt-flash').forEach(el => el.classList.remove('cmt-flash'))
+    Object.keys(unreadNodes).forEach(uid => {
+      const cnt = unreadNodes[uid]
+      if (!cnt) return
+      const gEl = nodeElOf(uid)
+      if (!gEl) return
+      const rect = gEl.querySelector('rect')
+      if (rect) rect.classList.add('cmt-flash')
+      let badge = gEl.querySelector('.cmt-badge-fo')
+      if (!badge) {
+        const NS = 'http://www.w3.org/2000/svg'
+        badge = document.createElementNS(NS, 'foreignObject')
+        badge.setAttribute('class', 'cmt-badge-fo')
+        const div = document.createElement('div')
+        div.className = 'cmt-badge-div'
+        badge.appendChild(div)
+        gEl.appendChild(badge)
+      }
+      const div = badge.querySelector('.cmt-badge-div')
+      div.textContent = cnt > 99 ? '99+' : cnt
+      let bb = null
+      try { bb = (rect || gEl).getBBox ? (rect || gEl).getBBox() : null } catch (e) {}
+      const bx = bb ? Math.max(0, bb.x + bb.width - 6) : 0
+      badge.setAttribute('x', bx)
+      badge.setAttribute('y', bb ? Math.max(0, bb.y - 15) : 0)
+      badge.setAttribute('width', '22')
+      badge.setAttribute('height', '18')
+    })
+  } catch (e) {}
+}
+function syncCommentFlash() {
+  nextTick(() => { try { applyCommentFlash() } catch (e) {} })
+}
+async function refreshCmtList() {
+  if (!mindMapId.value || !cmtPanel.open) return
+  try {
+    const r = await commentApi.listByMindMap(mindMapId.value, 0)
+    cmtPanel.list = (Array.isArray(r.comments) ? r.comments : []).filter(c => c.nodeId === cmtPanel.nodeId)
+  } catch (e) { cmtPanel.cmtErr = e.message || '加载评论失败' }
+}
+async function openCmtPanel(node) {
+  const uid = node && node.getData ? node.getData('uid') : null
+  if (!uid) return
+  cmtPanel.nodeId = uid
+  cmtPanel.nodeName = String(node.getData('text') || node.getData('attachmentName') || '').slice(0, 24) || '节点'
+  cmtPanel.open = true
+  cmtPanel.replyTo = null
+  cmtPanel.input = ''
+  cmtPanel.cmtErr = ''
+  await refreshCmtList()
+}
+function closeCmtPanel() { cmtPanel.open = false; cmtPanel.replyTo = null; cmtPanel.input = '' }
+async function onNodeClickComment(node) {
+  if (!node || !node.getData) return
+  const uid = node.getData('uid')
+  if (!uid) return
+  if (unreadNodes[uid]) {
+    delete unreadNodes[uid]
+    applyCommentFlash()
+    try { await commentApi.markRead(mindMapId.value, uid) } catch (e) {}
+    openCmtPanel(node)
+  }
+}
+function setCmtReply(c) {
+  cmtPanel.replyTo = (cmtPanel.replyTo && cmtPanel.replyTo.id === c.id) ? null : c
+  cmtPanel.input = ''
+}
+async function submitAuthorReply() {
+  const content = (cmtPanel.input || '').trim()
+  if (!content) return
+  if (content.length > 128) { cmtPanel.cmtErr = '回复最多 128 字'; return }
+  const target = cmtPanel.replyTo
+  if (!target) { cmtPanel.cmtErr = '请先选择要回复的评论'; return }
+  cmtPanel.cmtErr = ''
+  try {
+    const c = await commentApi.reply(mindMapId.value, target.id, content)
+    cmtPanel.list.push(c)
+    cmtPanel.input = ''
+    cmtPanel.replyTo = null
+  } catch (e) { cmtPanel.cmtErr = e.message || '回复失败（可能评论过于频繁）' }
+}
+function startCommentPoll() {
+  if (!mindMapId.value || cmtTimer) return
+  cmtTimer = setInterval(async () => {
+    if (cmtLoading) return
+    cmtLoading = true
+    try {
+      const r = await commentApi.listByMindMap(mindMapId.value, cmtAfterId)
+      const news = Array.isArray(r.comments) ? r.comments : []
+      if (news.length) news.forEach(c => { if (c.id > cmtAfterId) cmtAfterId = c.id })
+      if (cmtPanel.open && news.some(c => c.nodeId === cmtPanel.nodeId)) refreshCmtList()
+      if (r.unread && typeof r.unread === 'object') {
+        Object.keys(r.unread).forEach(k => { if (!r.unread[k]) delete unreadNodes[k]; else unreadNodes[k] = r.unread[k] })
+        syncCommentFlash()
+      }
+    } catch (e) {} finally { cmtLoading = false }
+  }, 5000)
+}
+
+function fmtCmtTime(s) {
+  if (!s) return ''
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return String(s).slice(0, 16).replace('T', ' ')
+  const p = n => (n < 10 ? '0' + n : '' + n)
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
+}
+
 // 初始化
 onMounted(async () => {
   window.addEventListener('resize', () => { updateCanvasBgSize(); updateScrollbars(); nextTick(checkBarOverflow) })
@@ -3187,6 +3347,7 @@ onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
   document.addEventListener('click', onDocClick)
   document.addEventListener('paste', onPaste)
+  startCommentPoll()
 })
 
 function onDocClick(e) {
@@ -3202,12 +3363,47 @@ onBeforeUnmount(() => {
   document.removeEventListener('focusout', onEditFocusOut)
   document.removeEventListener('paste', onPaste)
   if (window.__attIconTimer) { clearInterval(window.__attIconTimer); window.__attIconTimer = null }
+  if (cmtTimer) { clearInterval(cmtTimer); cmtTimer = null }
   if (mind.value) { try { mind.value.dispose && mind.value.dispose() } catch(e){} }
 })
 </script>
 
 <style scoped>
 .editor-root { position: relative; height: 100%; width: 100%; }
+
+/* ===== 节点评论面板 + 未读闪烁 ===== */
+.cmt-panel { position: fixed; top: 74px; right: 18px; bottom: 86px; width: 320px; max-width: calc(100vw - 36px); background: rgba(23, 26, 32, .88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.09); border-radius: 14px; box-shadow: 0 14px 44px rgba(0,0,0,.4); display: flex; flex-direction: column; overflow: hidden; z-index: 300; color: #e8eaf2; font-size: 13px; }
+.cmt-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.cmt-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmt-close { border: 0; background: none; color: #aab; font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.cmt-close:hover { background: rgba(255,255,255,.12); color: #fff; }
+.cmt-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cmt-empty { text-align: center; color: #8890a3; padding: 26px 0; }
+.cmt-item { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; padding: 8px 10px; }
+.cmt-item.cmt-author { border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .07); }
+.cmt-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cmt-head b { color: #f5f7ff; font-size: 13px; }
+.cmt-author-tag { font-size: 11px; color: #fff; background: #f59e0b; border-radius: 4px; padding: 1px 5px; }
+.cmt-time { margin-left: auto; color: #7c8399; font-size: 11px; white-space: nowrap; }
+.cmt-body { color: #cdd3e3; line-height: 1.55; word-break: break-word; }
+.cmt-foot { margin-top: 4px; }
+.cmt-reply { border: 0; background: none; color: #7aa2f7; cursor: pointer; font-size: 12px; padding: 0; }
+.cmt-reply:hover { text-decoration: underline; }
+.cmt-quick { display: flex; gap: 6px; margin-top: 6px; }
+.cmt-quick input { flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #eef; border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none; }
+.cmt-quick input:focus { border-color: rgba(122, 162, 247, .6); }
+.cmt-quick button { border: 0; background: #4A5CF7; color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.cmt-quick button:hover { background: #3a4ae0; }
+.cmt-tip { padding: 10px 12px; color: #7c8399; font-size: 11px; text-align: center; border-top: 1px solid rgba(255,255,255,.08); }
+.cmt-err { color: #f87171; }
+.cmt-list::-webkit-scrollbar { width: 5px; }
+.cmt-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+.cmt-list::-webkit-scrollbar-track { background: transparent; }
+/* 未读节点闪烁 + 角标 */
+.cmt-flash { animation: cmtBlink 1.1s ease-in-out infinite; }
+@keyframes cmtBlink { 0%, 100% { filter: none; } 50% { filter: brightness(1.45) drop-shadow(0 0 7px rgba(122, 162, 247, .75)); } }
+.cmt-badge-fo { pointer-events: none; }
+.cmt-badge-div { min-width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: #e53935; border-radius: 9px; padding: 0 4px; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .canvas-bg { position: absolute; inset: 0; overflow: hidden; }
 .canvas-bg-color { position: absolute; inset: 0; }
 .canvas-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }

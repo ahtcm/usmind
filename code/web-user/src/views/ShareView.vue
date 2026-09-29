@@ -5,6 +5,7 @@
       <div class="pwd-box">
         <h3>此分享需要密码</h3>
         <input type="password" v-model="pwd" placeholder="输入访问密码" @keyup.enter="loadShare" />
+        <input type="text" v-model="nick" maxlength="32" placeholder="输入你的昵称（必填，用于评论）" @keyup.enter="loadShare" />
         <button @click="loadShare">查看导图</button>
         <div v-if="pwdErr" class="err">{{ pwdErr }}</div>
       </div>
@@ -37,6 +38,37 @@
           </span>
           <button @click="zoomFit">⤢</button>
         </div>
+      </div>
+
+      <!-- 节点评论面板 -->
+      <div v-if="cmtOpen" class="cmt-panel">
+        <div class="cmt-header">
+          <span class="cmt-title" title="当前节点的评论">💬 {{ cmtNodeName || '节点' }}</span>
+          <button class="cmt-close" @click="closeCmt">×</button>
+        </div>
+        <div class="cmt-list">
+          <div v-if="!cmtList.length" class="cmt-empty">还没有评论，来抢沙发~</div>
+          <div v-for="c in cmtList" :key="c.id" class="cmt-item" :class="{ 'cmt-author': c.isAuthor === 1 }">
+            <div class="cmt-head">
+              <b>{{ c.userName }}</b>
+              <span v-if="c.isAuthor === 1" class="cmt-author-tag">作者</span>
+              <span class="cmt-time">{{ fmtTime(c.createdAt) }}</span>
+            </div>
+            <div class="cmt-body">{{ c.content }}</div>
+            <div class="cmt-foot">
+              <button class="cmt-reply" @click="setReply(c)">回复</button>
+            </div>
+            <div v-if="replyTo && replyTo.id === c.id" class="cmt-quick">
+              <input v-model="cmtInput" maxlength="128" :placeholder="'回复 ' + c.userName + '…'" @keyup.enter="submitCmt(true)" />
+              <button @click="submitCmt(true)">发送</button>
+            </div>
+          </div>
+        </div>
+        <div class="cmt-input">
+          <input v-model="cmtInput" maxlength="128" :placeholder="replyTo ? '回复 ' + replyTo.userName + '…' : '写评论（128字内）…'" @keyup.enter="submitCmt(false)" />
+          <button @click="submitCmt(false)">发送</button>
+        </div>
+        <div class="cmt-tip">昵称：{{ nick || '未设置' }} ｜ 评论 {{ cmtList.length }} 条<template v-if="cmtErr"> ｜ <span class="cmt-err">{{ cmtErr }}</span></template></div>
       </div>
     </template>
   </div>
@@ -73,6 +105,7 @@ import { THEMES } from '../utils/theme.js'
 import { fetchThemes } from '../api/themes'
 import { fetchPreviewConfig } from '../api/previewConfig'
 import { mindmapApi } from '../api/mindmap'
+import { commentApi } from '../api/comment'
 
 MindMap.usePlugin(Drag)
 MindMap.usePlugin(Select)
@@ -85,6 +118,7 @@ const mapEl = ref(null)
 const mind = ref(null)
 const needPwd = ref(false)
 const pwd = ref('')
+const nick = ref('')
 const pwdErr = ref('')
 const shareName = ref('')
 const zoomPct = ref('100%')
@@ -94,6 +128,15 @@ const bgVideoVal = ref('')
 const bgOpacityVal = ref(1)
 let remoteThemes = []
 const pageLoading = ref(true)
+
+// ===== 评论 =====
+const cmtOpen = ref(false)
+const cmtNodeId = ref('')
+const cmtNodeName = ref('')
+const cmtList = ref([])
+const cmtInput = ref('')
+const replyTo = ref(null)
+const sharePwd = ref('') // 当前分享访问密码（提交评论/拉评论时携带）
 
 function themeConfigOf(name) {
   const all = [...THEMES, ...remoteThemes]
@@ -134,12 +177,20 @@ const previewModes = ref({ ...CODE_MODE_DEFAULT })
 const attachTextColor = ref('#e53935')
 const textPreviewExts = ref([...TEXT_EXT_DEFAULT])
 async function loadShare() {
+  // 密码模式：昵称强制必填（用于评论）
+  if (needPwd.value && !(nick.value || '').trim()) {
+    pwdErr.value = '请先填写昵称（评论需要）'
+    return
+  }
   pageLoading.value = true
   pwdErr.value = ''
   try { const r = await fetchThemes(); if (Array.isArray(r)) { remoteThemes = r.map(t => ({ name: t.name, config: t.config || {} })); remoteThemes.forEach(t => { try { MindMap.defineTheme(t.name, t.config) } catch(e){} }) } } catch (e) {}
   try {
     const data = await mindmapApi.getShare(route.params.token, pwd.value || undefined)
     shareName.value = data.name || '分享导图'
+    sharePwd.value = pwd.value || ''
+    const savedNick = (nick.value || '').trim()
+    if (savedNick) { nick.value = savedNick; try { localStorage.setItem('usmind_share_nick', savedNick) } catch (e) {} }
     needPwd.value = false // 密码通过：先切到导图视图，让 map 容器渲染
     // 后端 data/viewData 为 JSON 字符串，需解析
     let docData = data.data
@@ -203,6 +254,8 @@ async function loadShare() {
       window.__attIconTimer = setInterval(() => { try { fixAttachNodeTexts() } catch (e) {} }, 700)
     }
     mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
+    // 点击节点 → 打开评论面板（readOnly 下节点仍可点击）
+    mind.value.on('node_click', (node) => { if (node && node.getData) openCmt(node) })
   } catch (e) {
     if (e.message && e.message.indexOf('密码') >= 0) {
       needPwd.value = true
@@ -516,9 +569,66 @@ function zoomIn() { mind.value && mind.value.view.enlarge() }
 function zoomOut() { mind.value && mind.value.view.narrow() }
 function zoomFit() { mind.value && mind.value.view.fit() }
 
+// ===== 评论 =====
+const cmtErr = ref('')
+function openCmt(node) {
+  const uid = node.getData('uid')
+  if (!uid) return
+  cmtNodeId.value = uid
+  const t = node.getData('text') || node.getData('attachmentName') || ''
+  cmtNodeName.value = String(t).slice(0, 24) || '节点'
+  cmtOpen.value = true
+  replyTo.value = null
+  cmtInput.value = ''
+  refreshCmt()
+}
+function closeCmt() { cmtOpen.value = false; replyTo.value = null; cmtInput.value = '' }
+function setReply(c) {
+  replyTo.value = (replyTo.value && replyTo.value.id === c.id) ? null : c
+  cmtInput.value = ''
+}
+async function refreshCmt() {
+  cmtErr.value = ''
+  try {
+    const list = await commentApi.listShare(route.params.token, sharePwd.value)
+    cmtList.value = (Array.isArray(list) ? list : []).filter(c => c.nodeId === cmtNodeId.value)
+  } catch (e) {
+    cmtErr.value = e.message || '加载评论失败'
+  }
+}
+async function submitCmt(isReply) {
+  const content = (cmtInput.value || '').trim()
+  if (!content) return
+  if (content.length > 128) { cmtErr.value = '评论最多 128 字'; return }
+  const nickName = (nick.value || '').trim() || (localStorage.getItem('usmind_share_nick') || '匿名访客')
+  cmtErr.value = ''
+  try {
+    await commentApi.addShare(route.params.token, {
+      nodeId: cmtNodeId.value,
+      parentId: isReply && replyTo.value ? replyTo.value.id : null,
+      nick: nickName,
+      content,
+      password: sharePwd.value || undefined
+    })
+    cmtInput.value = ''
+    if (isReply) replyTo.value = null
+    await refreshCmt()
+  } catch (e) {
+    cmtErr.value = e.message || '发送失败（可能评论过于频繁，稍后再试）'
+  }
+}
+function fmtTime(s) {
+  if (!s) return ''
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return String(s).slice(0, 16).replace('T', ' ')
+  const p = n => (n < 10 ? '0' + n : '' + n)
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
+}
+
 onMounted(async () => {
   needPwd.value = false
   pwd.value = ''
+  try { const saved = localStorage.getItem('usmind_share_nick'); if (saved) nick.value = saved } catch (e) {}
   window.addEventListener('resize', updateBgSize)
   // 拉取后台预览/高亮类型配置
   try {
@@ -571,6 +681,36 @@ onBeforeUnmount(() => {
 .share-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
 .share-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
 #map { position: relative; height: 100%; width: 100%; background: transparent !important; }
+
+/* ===== 节点评论面板 ===== */
+.cmt-panel { position: fixed; top: 74px; right: 18px; bottom: 86px; width: 320px; max-width: calc(100vw - 36px); background: rgba(23, 26, 32, .88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.09); border-radius: 14px; box-shadow: 0 14px 44px rgba(0,0,0,.4); display: flex; flex-direction: column; overflow: hidden; z-index: 300; color: #e8eaf2; font-size: 13px; }
+.cmt-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.cmt-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmt-close { border: 0; background: none; color: #aab; font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.cmt-close:hover { background: rgba(255,255,255,.12); color: #fff; }
+.cmt-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.cmt-empty { text-align: center; color: #8890a3; padding: 26px 0; }
+.cmt-item { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; padding: 8px 10px; }
+.cmt-item.cmt-author { border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .07); }
+.cmt-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cmt-head b { color: #f5f7ff; font-size: 13px; }
+.cmt-author-tag { font-size: 11px; color: #fff; background: #f59e0b; border-radius: 4px; padding: 1px 5px; }
+.cmt-time { margin-left: auto; color: #7c8399; font-size: 11px; white-space: nowrap; }
+.cmt-body { color: #cdd3e3; line-height: 1.55; word-break: break-word; }
+.cmt-foot { margin-top: 4px; }
+.cmt-reply { border: 0; background: none; color: #7aa2f7; cursor: pointer; font-size: 12px; padding: 0; }
+.cmt-reply:hover { text-decoration: underline; }
+.cmt-quick { display: flex; gap: 6px; margin-top: 6px; }
+.cmt-quick input, .cmt-input input { flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #eef; border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none; }
+.cmt-quick input:focus, .cmt-input input:focus { border-color: rgba(122, 162, 247, .6); }
+.cmt-quick button, .cmt-input button { border: 0; background: #4A5CF7; color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.cmt-quick button:hover, .cmt-input button:hover { background: #3a4ae0; }
+.cmt-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.08); }
+.cmt-tip { padding: 0 12px 10px; color: #7c8399; font-size: 11px; text-align: center; }
+.cmt-err { color: #f87171; }
+.cmt-list::-webkit-scrollbar { width: 5px; }
+.cmt-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+.cmt-list::-webkit-scrollbar-track { background: transparent; }
 </style>
 
 <style>
