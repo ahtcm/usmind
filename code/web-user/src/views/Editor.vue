@@ -2439,20 +2439,39 @@ function liftFormulaSvg(svgStr) {
   try {
     const doc = new DOMParser().parseFromString(svgStr, 'image/svg+xml')
     if (doc.querySelector('parsererror')) return svgStr
+    const root = doc.documentElement
     const fos = Array.from(doc.querySelectorAll('foreignObject'))
     if (!fos.length) return svgStr
-    fos.forEach((fo, i) => {
+    fos.forEach((fo) => {
       const x = parseFloat(fo.getAttribute('x') || '0')
       const y = parseFloat(fo.getAttribute('y') || '0')
       const style = fo.getAttribute('style') || ''
       const svgs = Array.from(fo.querySelectorAll('svg'))
       if (!svgs.length) return
-      // 注意：实测 SVG 图片模式中"每个公式一个独立 transform g"会整体不渲染，
-      // 而 fo 级共享 g（循环覆盖 transform）可正常渲染；因此采用共享 g 方案。
-      const g = doc.createElementNS(NS, 'g')
-      if (style) g.setAttribute('style', style)
-      // MathJax svg 的 width 是 ex 单位；SVG 图片模式下 ex 无字体上下文会回退为
-      // 默认 16px×0.5，导致公式偏小。按 foreignObject 的 font-size 换算：1ex ≈ 0.5em
+      // 累积祖先 transform 链（foreignObject 自身 x/y 常为 0，节点位置在祖先链上）
+      const ancestors = []
+      let el = fo.parentNode
+      while (el && el.nodeName !== 'svg') {
+        const at = el.getAttribute('transform')
+        if (at) ancestors.unshift(at)
+        el = el.parentNode
+      }
+      // 把矩阵链应用到 (x, y)，得到公式在画布中的绝对坐标
+      let px = x
+      let py = y
+      ancestors.forEach((t) => {
+        const i = t.indexOf('matrix(')
+        if (i >= 0) {
+          const j = t.indexOf(')', i)
+          const p = t.slice(i + 7, j).split(',').map(Number)
+          const nx = p[0] * px + p[2] * py + p[4]
+          const ny = p[1] * px + p[3] * py + p[5]
+          px = nx
+          py = ny
+        }
+      })
+      // MathJax svg 的 width 是 ex 单位；SVG 图片模式下 ex 无字体上下文，
+      // 按 foreignObject 的 font-size 换算：1ex ≈ 0.5em
       const fsMatch = style.match(/font-size:\s*([\d.]+)px/)
       const fontSize = fsMatch ? parseFloat(fsMatch[1]) : 16
       svgs.forEach((sv) => {
@@ -2474,13 +2493,18 @@ function liftFormulaSvg(svgStr) {
         })
         sv.querySelectorAll('defs').forEach((d) => d.remove())
         const wAttr = sv.getAttribute('width')
-        const vb = (sv.getAttribute('viewBox') || '0 0 0 0').split(' ').map(Number)
-        const wPx = parseFloat(wAttr) * fontSize * 0.5
-        const scale = vb[2] ? wPx / vb[2] : 1
-        g.setAttribute('transform', 'translate(' + x + ',' + y + ') scale(' + scale + ') translate(' + (-vb[0]) + ',' + (-vb[1]) + ')')
-        while (sv.firstChild) g.appendChild(sv.firstChild)
+        const hAttr = sv.getAttribute('height')
+        if (wAttr && wAttr.indexOf('ex') >= 0) sv.setAttribute('width', (parseFloat(wAttr) * fontSize * 0.5) + 'px')
+        if (hAttr && hAttr.indexOf('ex') >= 0) sv.setAttribute('height', (parseFloat(hAttr) * fontSize * 0.5) + 'px')
+        // 关键：实测 SVG 图片模式中嵌套 <svg> 只要祖先链存在任何 transform
+        // （matrix/translate/scale，含单位矩阵）均不渲染。因此把公式 svg 提升到
+        // 根 svg 的直接子级（无 transform 祖先），用 x/y 绝对定位。
+        sv.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+        sv.setAttribute('x', px)
+        sv.setAttribute('y', py)
+        root.appendChild(sv)
       })
-      fo.parentNode.replaceChild(g, fo)
+      fo.remove()
     })
     return new XMLSerializer().serializeToString(doc)
   } catch (e) {
