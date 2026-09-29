@@ -24,11 +24,17 @@ public class PayController {
         return Result.ok(payService.createWechatOrder(SecurityUtil.currentUserId(), planId));
     }
 
-    /** 微信支付回调（放行，默认关闭时不处理） */
+    /** 微信支付回调（放行，默认关闭时不处理；开启后严格验签+解密） */
     @PostMapping("/wechat/notify")
     public String notify(@RequestBody String body,
                          @RequestHeader(value = "Wechatpay-Timestamp", required = false) String ts,
-                         @RequestHeader(value = "Wechatpay-Signature", required = false) String sig) {
-        return payService.handleWechatNotify(body, Map.of("timestamp", ts == null ? "" : ts, "signature", sig == null ? "" : sig));
+                         @RequestHeader(value = "Wechatpay-Nonce", required = false) String nonce,
+                         @RequestHeader(value = "Wechatpay-Signature", required = false) String sig,
+                         @RequestHeader(value = "Wechatpay-Serial", required = false) String serial) {
+        return payService.handleWechatNotify(body, Map.of(
+                "timestamp", ts == null ? "" : ts,
+                "nonce", nonce == null ? "" : nonce,
+                "signature", sig == null ? "" : sig,
+                "serial", serial == null ? "" : serial));
     }
 }

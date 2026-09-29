@@ -56,11 +56,34 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public Map<String, Object> login(LoginRequest req) {
+        String username = req.getUsername() == null ? "" : req.getUsername().trim();
+        // 登录失败锁定（防暴力破解，Redis 计数，后台可配置阈值与时长）
+        String lockKey = "login:lock:" + username.toLowerCase();
+        String locked = redisTemplate.opsForValue().get(lockKey);
+        if (locked != null) {
+            throw new BusinessException(429, "登录失败次数过多，账号已临时锁定，请稍后再试");
+        }
         SysUser u = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, req.getUsername()));
+                .eq(SysUser::getUsername, username));
         if (u == null || !passwordEncoder.matches(req.getPassword(), u.getPassword())) {
+            int limit = settingsService.getInt("loginFailLimit", 5);
+            int lockMinutes = settingsService.getInt("loginLockMinutes", 15);
+            String failKey = "login:fail:" + username.toLowerCase();
+            Long count = redisTemplate.opsForValue().increment(failKey);
+            if (count == null) count = 1L;
+            if (count == 1) {
+                redisTemplate.expire(failKey, 1, java.util.concurrent.TimeUnit.HOURS);
+            }
+            if (count >= limit) {
+                redisTemplate.opsForValue().set(lockKey, "1", lockMinutes, java.util.concurrent.TimeUnit.MINUTES);
+                redisTemplate.delete(failKey);
+                throw new BusinessException(429, "登录失败次数过多，账号已锁定 " + lockMinutes + " 分钟");
+            }
             throw new BusinessException(401, "用户名或密码错误");
         }
+        // 登录成功：清除失败计数与锁定
+        redisTemplate.delete("login:fail:" + username.toLowerCase());
+        redisTemplate.delete(lockKey);
         if (u.getStatus() != null && u.getStatus() == 0) {
             throw new BusinessException(403, "账号已被禁用");
         }

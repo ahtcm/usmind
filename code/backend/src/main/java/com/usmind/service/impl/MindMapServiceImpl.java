@@ -140,7 +140,10 @@ public class MindMapServiceImpl implements MindMapService {
             m.setShareToken(UUID.randomUUID().toString().replace("-", ""));
         }
         m.setIsShared(1);
-        m.setSharePassword(password == null ? "" : password);
+        // 分享密码加盐哈希存储（BCrypt），不再明文落库
+        String pwd = password == null ? "" : password;
+        m.setSharePassword(pwd.isEmpty() ? ""
+                : new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(pwd));
         mindMapMapper.updateById(m);
         Map<String, Object> data = new HashMap<>();
         data.put("shareToken", m.getShareToken());
@@ -166,8 +169,23 @@ public class MindMapServiceImpl implements MindMapService {
                 .eq(MindMap::getIsShared, 1)
                 .last("LIMIT 1"));
         if (m == null) throw new BusinessException(404, "分享不存在或已取消");
-        if (StringUtils.hasText(m.getSharePassword())) {
-            if (!m.getSharePassword().equals(password)) {
+        String stored = m.getSharePassword();
+        if (StringUtils.hasText(stored)) {
+            boolean ok;
+            if (stored.startsWith("$2")) {
+                // 新格式：BCrypt 哈希校验
+                ok = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                        .matches(password == null ? "" : password, stored);
+            } else {
+                // 兼容存量明文数据：命中后自动升级为哈希
+                ok = stored.equals(password);
+                if (ok) {
+                    m.setSharePassword(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
+                            .encode(password == null ? "" : password));
+                    mindMapMapper.updateById(m);
+                }
+            }
+            if (!ok) {
                 throw new BusinessException(403, "需要分享密码");
             }
         }

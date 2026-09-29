@@ -21,7 +21,8 @@ const routes = [
       { path: 'icons', name: 'Icons', component: () => import('@/views/Icons.vue'), meta: { title: '图标库', requireAdmin: true } },
       { path: 'settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { title: '系统设置', requireAdmin: true } },
       { path: 'project-config', name: 'ProjectConfig', component: () => import('@/views/ProjectConfig.vue'), meta: { title: '项目配置', requireAdmin: true } },
-      { path: 'data-backup', name: 'DataBackup', component: () => import('@/views/DataBackup.vue'), meta: { title: '数据备份', requireAdmin: true } }
+      { path: 'data-backup', name: 'DataBackup', component: () => import('@/views/DataBackup.vue'), meta: { title: '数据备份', requireAdmin: true } },
+      { path: 'logs', name: 'Logs', component: () => import('@/views/Logs.vue'), meta: { title: '请求日志', requireAdmin: true } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }

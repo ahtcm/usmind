@@ -39,9 +39,10 @@
         <div class="topbar-right">
           <el-dropdown @command="handleCommand">
             <span class="user-info">
-              <el-avatar :size="32" :src="userStore.user?.avatar">
+              <el-avatar :size="32" :src="userStore.user?.avatar" @click.stop="avatarInput.click()" title="点击上传头像">
                 {{ avatarText }}
               </el-avatar>
+              <input ref="avatarInput" type="file" accept="image/*" hidden @change="onAvatarPick" />
               <span v-if="!isMobile" class="username">{{ userStore.user?.nickname || userStore.user?.username }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
@@ -113,7 +114,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh, Medal, Key, Lock } from '@element-plus/icons-vue'
+import request from '@/api/request'
+import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh, Medal, Key, Lock, List } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -121,6 +123,7 @@ const userStore = useUserStore()
 
 const collapsed = ref(false)
 const drawerVisible = ref(false)
+const avatarInput = ref(null)
 const isMobile = ref(false)
 
 const menus = [
@@ -137,7 +140,8 @@ const menus = [
   { path: '/icons', label: '图标库', icon: Star },
   { path: '/settings', label: '系统设置', icon: Setting },
   { path: '/project-config', label: '项目配置', icon: Tools },
-  { path: '/data-backup', label: '数据备份', icon: Refresh }
+  { path: '/data-backup', label: '数据备份', icon: Refresh },
+  { path: '/logs', label: '请求日志', icon: List }
 ]
 
 const activeMenu = computed(() => route.path)
@@ -173,6 +177,24 @@ const pwdRules = {
       trigger: 'blur'
     }
   ]
+}
+
+async function onAvatarPick(e) {
+  const f = e.target && e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!f) return
+  if (!f.type.startsWith('image/')) { ElMessage.warning('请选择图片文件'); return }
+  if (f.size > 2 * 1024 * 1024) { ElMessage.warning('头像不能超过 2MB'); return }
+  const fd = new FormData()
+  fd.append('file', f)
+  try {
+    const up = await request.post('/file/upload-avatar', fd)
+    userStore.user = { ...userStore.user, avatar: up.url || '' }
+    localStorage.setItem('usmind_admin_user', JSON.stringify(userStore.user))
+    ElMessage.success('头像已更新')
+  } catch (e2) {
+    ElMessage.error((e2 && e2.message) || '头像上传失败')
+  }
 }
 
 function handleCommand(cmd) {

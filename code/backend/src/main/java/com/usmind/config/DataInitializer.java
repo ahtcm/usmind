@@ -54,10 +54,49 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         initMemberTables();
+        initRequestLogTable();
         initAdmin();
         initLocalOss();
         initThemes();
         initIcons();
+    }
+
+    private void initRequestLogTable() {
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS request_log (" +
+                " id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                " user_id BIGINT," +
+                " username VARCHAR(64) DEFAULT ''," +
+                " method VARCHAR(10) DEFAULT ''," +
+                " path VARCHAR(255) DEFAULT ''," +
+                " query VARCHAR(500) DEFAULT ''," +
+                " status_code INT DEFAULT 0," +
+                " success TINYINT DEFAULT 1," +
+                " level VARCHAR(10) DEFAULT 'info'," +
+                " ip VARCHAR(64) DEFAULT ''," +
+                " ua VARCHAR(300) DEFAULT ''," +
+                " cost_ms INT DEFAULT 0," +
+                " error_msg VARCHAR(1000) DEFAULT ''," +
+                " source VARCHAR(10) DEFAULT 'backend'," +
+                " detail TEXT," +
+                " request_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                " INDEX idx_log_req_at (request_at)," +
+                " INDEX idx_log_path (path)," +
+                " INDEX idx_log_user (user_id)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='请求日志表'");
+            // 旧库补列（存在则跳过）
+            String[] alters = {
+                "ALTER TABLE request_log ADD COLUMN req_headers TEXT",
+                "ALTER TABLE request_log ADD COLUMN req_body TEXT",
+                "ALTER TABLE request_log ADD COLUMN resp_body TEXT"
+            };
+            for (String a : alters) {
+                try { jdbcTemplate.execute(a); } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            log.warn("初始化请求日志表失败: {}", e.getMessage());
+        }
     }
 
     private void initMemberTables() {
@@ -123,6 +162,7 @@ public class DataInitializer implements CommandLineRunner {
         SysUser admin = userMapper.selectOne(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, "admin"));
         if (admin == null) {
+            // 仅首次创建默认管理员；此后绝不再重置密码（防止用户改密后被覆盖回默认口令）
             SysUser u = new SysUser();
             u.setUsername("admin");
             u.setPassword(passwordEncoder.encode("admin123"));
@@ -130,13 +170,13 @@ public class DataInitializer implements CommandLineRunner {
             u.setRole("ADMIN");
             u.setStatus(1);
             userMapper.insert(u);
-            log.info("已创建默认管理员 admin/admin123");
-        } else if (!passwordEncoder.matches("admin123", admin.getPassword())) {
-            admin.setPassword(passwordEncoder.encode("admin123"));
+            log.warn("已创建默认管理员 admin/admin123，请立即登录后台修改密码");
+        } else if (admin.getRole() == null || !"ADMIN".equals(admin.getRole()) || admin.getStatus() == null || admin.getStatus() != 1) {
+            // 仅修正角色/启用状态，不动密码
             admin.setRole("ADMIN");
             admin.setStatus(1);
             userMapper.updateById(admin);
-            log.info("已重置 admin 密码为 admin123");
+            log.info("已修正 admin 角色/启用状态");
         }
     }
 

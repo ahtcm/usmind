@@ -5,11 +5,12 @@
       <div class="user-area">
         <div class="avatar-menu" @mouseenter="menuOpen = true" @mouseleave="menuOpen = false">
           <div class="avatar-trigger">
-            <div class="avatar" v-if="userStore.user?.avatar"><img :src="userStore.user.avatar" alt="avatar" /></div>
-            <div class="avatar avatar-text" v-else>{{ (userStore.user?.nickname || userStore.user?.username || 'U').slice(0, 1).toUpperCase() }}</div>
+            <div class="avatar" v-if="userStore.user?.avatar" @click.stop="avatarInput.click()" title="点击上传头像"><img :src="userStore.user.avatar" alt="avatar" /></div>
+            <div class="avatar avatar-text" v-else @click.stop="avatarInput.click()" title="点击上传头像">{{ (userStore.user?.nickname || userStore.user?.username || 'U').slice(0, 1).toUpperCase() }}</div>
             <span class="user-name">{{ userStore.user?.nickname || userStore.user?.username || '' }}</span>
             <span class="caret">▾</span>
           </div>
+          <input ref="avatarInput" type="file" accept="image/*" hidden @change="onAvatarPick" />
           <div class="avatar-drop" v-if="menuOpen">
             <div class="drop-item" @click="goProfile">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -47,6 +48,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { mindmapApi } from '../api/mindmap'
+import request from '../api/request'
 import { configApi } from '../api/member'
 import { toast, showConfirm, showPrompt } from '../utils/modal'
 import { useUserStore } from '../stores/user'
@@ -55,6 +57,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
 const menuOpen = ref(false)
+const avatarInput = ref(null)
 const memberEnabled = ref(true)
 
 onMounted(() => { loadList(); loadMemberEnabled() })
@@ -126,6 +129,23 @@ function goProfile() {
 function goMember() {
   menuOpen.value = false
   router.push('/member')
+}
+
+async function onAvatarPick(e) {
+  const f = e.target && e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!f) return
+  if (!f.type.startsWith('image/')) { toast('请选择图片文件', 'error'); return }
+  if (f.size > 2 * 1024 * 1024) { toast('头像不能超过 2MB', 'error'); return }
+  const fd = new FormData()
+  fd.append('file', f)
+  try {
+    const up = await request.post('/file/upload-avatar', fd)
+    userStore.setUser({ ...userStore.user, avatar: up.url || '' })
+    toast('头像已更新')
+  } catch (e2) {
+    toast((e2 && e2.message) || '头像上传失败', 'error')
+  }
 }
 
 function onLogout() {

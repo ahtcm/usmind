@@ -18,14 +18,22 @@ mybatis-plus:
       logic-delete-field: null
 
 jwt:
-  secret: usmind-jwt-secret-key-2024-very-long-and-secure-enough-for-hs256
+  # 生产环境务必通过环境变量 USMIND_JWT_SECRET 配置（至少 32 字节随机串）；
+  # 留空或使用公开默认值时，系统会自动生成随机密钥并持久化到 data/jwt-secret.key
+  secret: ""
   expire: 86400000
 
 file:
   upload-dir: ./uploads
 
+ipguard:
+  # 本项目统一经 nginx 反向代理（nginx 已强制覆盖 X-Real-IP / X-Forwarded-For 为真实客户端 IP）。
+  # 直连后端 8899 时请求头一律不可信（IpGuardFilter 有内网代理来源校验兜底）。
+  trusted-proxy: true
+
 oss:
-  secret-cipher-key: usmind-oss-secret-key-2024
+  # 加密 OSS SecretKey 的 AES 密钥；生产环境通过环境变量 USMIND_OSS_CIPHER_KEY 配置
+  secret-cipher-key: ""
 
 preview:
   office-server:

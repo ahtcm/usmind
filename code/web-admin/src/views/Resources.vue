@@ -15,6 +15,7 @@
           </template>
         </el-input>
         <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
+        <el-button type="warning" :loading="cleaning" @click="handleCleanupOrphans">清理孤儿资源<el-tag v-if="orphan > 0" size="small" type="danger" style="margin-left:6px">{{ orphan }}</el-tag></el-button>
       </div>
 
       <el-table v-loading="loading" :data="tableData" border @selection-change="handleSelectionChange">
@@ -92,7 +93,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Document, Service } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getFileList, deleteFile, batchDeleteFiles } from '@/api/files'
+import { getFileList, deleteFile, batchDeleteFiles, getOrphanStats, cleanupOrphans } from '@/api/files'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -100,6 +101,8 @@ const total = ref(0)
 const query = reactive({ page: 1, size: 10, keyword: '' })
 const selectedIds = ref([])
 const preview = reactive({ visible: false, row: null })
+const orphan = ref(0)
+const cleaning = ref(false)
 
 function isImage(mime) { return (mime || '').startsWith('image/') }
 function isVideo(mime) { return (mime || '').startsWith('video/') }
@@ -138,6 +141,13 @@ async function loadData() {
   }
 }
 
+async function loadOrphan() {
+  try {
+    const d = await getOrphanStats()
+    orphan.value = d.orphan || 0
+  } catch (e) { /* 忽略 */ }
+}
+
 function handleSearch() {
   query.page = 1
   loadData()
@@ -150,8 +160,19 @@ function openPreview(row) {
 
 async function handleDelete(row) {
   await ElMessageBox.confirm(`确定删除资源「${row.originalName}」吗？删除后引用该资源的节点将无法显示。`, '删除确认', { type: 'warning' })
-  await deleteFile(row.id)
-  ElMessage.success('删除成功')
+  try {
+    await deleteFile(row.id, false)
+    ElMessage.success('删除成功')
+  } catch (e) {
+    const msg = (e && e.message) || ''
+    if (msg.includes('仍被')) {
+      await ElMessageBox.confirm(`${msg}\n确认强制删除？删除后引用该资源的节点将无法显示。`, '强制删除确认', { type: 'warning', confirmButtonText: '强制删除' })
+      await deleteFile(row.id, true)
+      ElMessage.success('已强制删除')
+    } else {
+      throw e
+    }
+  }
   loadData()
 }
 
@@ -161,13 +182,36 @@ function handleSelectionChange(rows) {
 
 async function handleBatchDelete() {
   await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个资源吗？删除后引用这些资源的节点将无法显示。`, '批量删除', { type: 'warning' })
-  await batchDeleteFiles(selectedIds.value)
-  ElMessage.success('批量删除成功')
+  try {
+    await batchDeleteFiles(selectedIds.value, false)
+    ElMessage.success('批量删除成功')
+  } catch (e) {
+    const msg = (e && e.message) || ''
+    if (msg.includes('仍被')) {
+      await ElMessageBox.confirm(`${msg}\n确认强制删除选中资源？删除后引用这些资源的节点将无法显示。`, '强制删除确认', { type: 'warning', confirmButtonText: '强制删除' })
+      await batchDeleteFiles(selectedIds.value, true)
+      ElMessage.success('已强制删除')
+    } else {
+      throw e
+    }
+  }
   selectedIds.value = []
   loadData()
 }
 
-onMounted(loadData)
+async function handleCleanupOrphans() {
+  await ElMessageBox.confirm(`将物理删除 ${orphan.value} 个不再被任何导图/头像引用的资源文件及记录，是否继续？`, '清理孤儿资源', { type: 'warning', confirmButtonText: '清理' })
+  cleaning.value = true
+  try {
+    const d = await cleanupOrphans()
+    ElMessage.success(`清理完成：删除 ${d.deleted} 个，保留（仍被引用）${d.kept} 个`)
+  } catch (e) { /* 拦截器已提示 */ }
+  finally { cleaning.value = false }
+  loadData()
+  loadOrphan()
+}
+
+onMounted(() => { loadData(); loadOrphan() })
 </script>
 
 <style scoped>

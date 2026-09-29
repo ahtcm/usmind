@@ -29,12 +29,14 @@ import java.util.Map;
 public class FileController {
 
     private final FileService fileService;
+    private final com.usmind.mapper.SysUserMapper sysUserMapper;
 
     @Value("${file.upload-dir:C:/Users/25750/Desktop/usmind/uploads}")
     private String uploadDir;
 
-    public FileController(FileService fileService) {
+    public FileController(FileService fileService, com.usmind.mapper.SysUserMapper sysUserMapper) {
         this.fileService = fileService;
+        this.sysUserMapper = sysUserMapper;
     }
 
     @PostMapping("/upload")
@@ -49,13 +51,31 @@ public class FileController {
         String ct = file.getContentType();
         if (ct == null || !ct.startsWith("image/")) throw new BusinessException(400, "仅支持图片文件");
         if (file.getSize() > 2 * 1024 * 1024) throw new BusinessException(400, "头像图片不能超过 2MB");
-        return Result.ok(fileService.upload(0L, file, null));
+        Long userId = SecurityUtil.currentUserId();
+        Map<String, Object> data = fileService.upload(userId, file, null);
+        // 上传成功即更新用户头像，无需再走"保存"
+        try {
+            com.usmind.entity.SysUser u = sysUserMapper.selectById(userId);
+            if (u != null && data.get("url") != null) {
+                u.setAvatar(String.valueOf(data.get("url")));
+                sysUserMapper.updateById(u);
+            }
+        } catch (Exception e) {
+            // 头像更新失败不影响上传结果
+        }
+        return Result.ok(data);
     }
 
     @PutMapping("/content")
     public Result<Void> updateContent(@RequestBody Map<String, String> body) {
         fileService.updateContentByUrl(body.get("url"), body.get("content"));
         return Result.ok();
+    }
+
+    /** 按URL删除资源（节点附件移除时调用）：仍被其他导图/头像引用则不删除，避免破坏其他引用 */
+    @PostMapping("/delete-by-url")
+    public Result<Map<String, Object>> deleteByUrl(@RequestBody Map<String, String> body) {
+        return Result.ok(fileService.deleteByUrl(body.get("url")));
     }
 
     @GetMapping("/{id}")

@@ -13,11 +13,19 @@
         <el-form-item label="AppID">
           <el-input v-model="form.wechatAppId" placeholder="小程序/公众号 AppID" />
         </el-form-item>
-        <el-form-item label="APIv3 密钥">
+        <el-form-item label="APIv3 密钥(下单用)">
           <el-input v-model="form.wechatApiKey" placeholder="32位密钥" show-password />
+        </el-form-item>
+        <el-form-item label="APIv3 密钥(回调解密)">
+          <el-input v-model="form.wechatApiV3Key" placeholder="32位密钥，用于解密支付回调" show-password />
+          <span class="field-hint">微信支付回调 resource 字段 AES-GCM 解密的密钥（APIv3 密钥）</span>
         </el-form-item>
         <el-form-item label="商户私钥">
           <el-input v-model="form.wechatPrivateKey" type="textarea" :rows="4" placeholder="-----BEGIN PRIVATE KEY----- ..." />
+        </el-form-item>
+        <el-form-item label="平台证书(验签用)">
+          <el-input v-model="form.wechatPlatformCert" type="textarea" :rows="4" placeholder="-----BEGIN CERTIFICATE----- ..." />
+          <span class="field-hint">微信支付平台证书公钥（PEM）。回调必须验签，未配置则拒绝一切回调，防止伪造支付通知</span>
         </el-form-item>
         <el-form-item label="回调地址">
           <el-input v-model="form.wechatNotifyUrl" placeholder="http://域名/api/pay/wechat/notify" />
@@ -109,7 +117,7 @@ import { getPayConfig, savePayConfig } from '@/api/members'
 const saving = ref(false)
 const form = reactive({
   wechatPayEnabled: false,
-  wechatMchId: '', wechatAppId: '', wechatApiKey: '', wechatPrivateKey: '', wechatNotifyUrl: '',
+  wechatMchId: '', wechatAppId: '', wechatApiKey: '', wechatApiV3Key: '', wechatPrivateKey: '', wechatPlatformCert: '', wechatNotifyUrl: '',
   wechatLoginEnabled: false,
   wechatLoginAppId: '', wechatLoginSecret: '', wechatLoginRedirectUri: '',
   authCaptchaEnabled: true,
@@ -127,7 +135,9 @@ onMounted(async () => {
       wechatMchId: d.wechatMchId || '',
       wechatAppId: d.wechatAppId || '',
       wechatApiKey: d.wechatApiKey || '',
+      wechatApiV3Key: d.wechatApiV3Key || '',
       wechatPrivateKey: d.wechatPrivateKey || '',
+      wechatPlatformCert: d.wechatPlatformCert || '',
       wechatNotifyUrl: d.wechatNotifyUrl || '',
       wechatLoginEnabled: !!d.wechatLoginEnabled,
       wechatLoginAppId: d.wechatLoginAppId || '',
@@ -156,7 +166,9 @@ async function save() {
       wechatMchId: form.wechatMchId,
       wechatAppId: form.wechatAppId,
       wechatApiKey: form.wechatApiKey,
+      wechatApiV3Key: form.wechatApiV3Key,
       wechatPrivateKey: form.wechatPrivateKey,
+      wechatPlatformCert: form.wechatPlatformCert,
       wechatNotifyUrl: form.wechatNotifyUrl,
       wechatLoginEnabled: form.wechatLoginEnabled ? 1 : 0,
       wechatLoginAppId: form.wechatLoginAppId,

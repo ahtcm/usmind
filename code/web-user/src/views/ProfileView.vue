@@ -4,30 +4,20 @@
       <h2>个人信息</h2>
 
       <div class="uc-avatar-row">
-        <div class="uc-avatar" v-if="userStore.user?.avatar">
-          <img :src="userStore.user.avatar" alt="avatar" />
+        <div class="uc-avatar clickable" :class="{ 'uc-avatar-text': !userStore.user?.avatar }" @click="avatarInput.click()" title="点击上传头像">
+          <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" alt="avatar" />
+          <span v-else>{{ (userStore.user?.nickname || userStore.user?.username || 'U').slice(0, 1).toUpperCase() }}</span>
         </div>
-        <div class="uc-avatar uc-avatar-text" v-else>{{ (userStore.user?.nickname || userStore.user?.username || 'U').slice(0, 1).toUpperCase() }}</div>
         <div class="uc-avatar-info">
           <div class="uc-name">{{ userStore.user?.nickname || userStore.user?.username }}</div>
           <div class="uc-vip" :class="{ vip: isVip }">
             <span v-if="isVip">会员 · 到期 {{ expireText }}</span>
             <span v-else>普通用户</span>
           </div>
+          <div class="uc-tip">点击头像上传（jpg/png，≤2MB）</div>
         </div>
       </div>
-
-      <div class="uc-field">
-        <label>头像</label>
-        <div class="uc-avatar-row">
-          <label class="uc-avatar-upload" :class="{ 'has-img': form.avatar }">
-            <img v-if="form.avatar" :src="form.avatar" alt="avatar" />
-            <span v-else>＋ 上传</span>
-            <input type="file" accept="image/*" @change="onAvatarPick" />
-          </label>
-          <span class="uc-tip">支持 jpg/png，≤2MB</span>
-        </div>
-      </div>
+      <input ref="avatarInput" type="file" accept="image/*" class="uc-hidden-input" @change="onAvatarPick" />
       <div class="uc-field">
         <label>昵称</label>
         <input v-model="form.nickname" type="text" placeholder="请输入昵称" />
@@ -61,7 +51,8 @@ import { toast } from '../utils/modal'
 
 const router = useRouter()
 const userStore = useUserStore()
-const form = ref({ nickname: '', phone: '', email: '', avatar: '' })
+const avatarInput = ref(null)
+const form = ref({ nickname: '', phone: '', email: '' })
 const member = ref(null)
 const saving = ref(false)
 const err = ref('')
@@ -71,7 +62,7 @@ const expireText = computed(() => (member.value && member.value.expire) ? member
 
 onMounted(async () => {
   const u = userStore.user || {}
-  form.value = { nickname: u.nickname || '', phone: u.phone || '', email: u.email || '', avatar: u.avatar || '' }
+  form.value = { nickname: u.nickname || '', phone: u.phone || '', email: u.email || '' }
   try {
     const d = await memberApi.info()
     member.value = d
@@ -86,7 +77,7 @@ async function save() {
       nickname: form.value.nickname,
       phone: form.value.phone,
       email: form.value.email,
-      avatar: form.value.avatar
+      avatar: (userStore.user && userStore.user.avatar) || ''
     })
     userStore.setUser({ ...userStore.user, ...u })
     toast('保存成功')
@@ -107,9 +98,13 @@ async function onAvatarPick(e) {
     const fd = new FormData()
     fd.append('file', f)
     const up = await request.post('/file/upload-avatar', fd)
-    form.value.avatar = up.url || ''
+    // 后端已直接更新用户头像，同步本地状态立即生效
+    userStore.setUser({ ...userStore.user, avatar: up.url || '' })
+    toast('头像已更新')
   } catch (e2) {
     err.value = (e2 && e2.message) || '头像上传失败'
+  } finally {
+    e.target.value = ''
   }
 }
 </script>
@@ -121,11 +116,10 @@ async function onAvatarPick(e) {
 .uc-avatar-row { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
 .uc-avatar { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #4f6ef7, #6a5cf6); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 6px 18px rgba(79,110,247,.35); }
 .uc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.uc-avatar.clickable { cursor: pointer; }
+.uc-avatar.clickable:hover { filter: brightness(1.12); }
 .uc-avatar-text { font-size: 22px; font-weight: 700; color: #fff; }
-.uc-avatar-upload { width: 56px; height: 56px; border-radius: 50%; border: 1px dashed var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; background: rgba(255,255,255,.06); flex-shrink: 0; }
-.uc-avatar-upload img { width: 100%; height: 100%; object-fit: cover; }
-.uc-avatar-upload span { font-size: 12px; color: var(--text-dim); }
-.uc-avatar-upload input { display: none; }
+.uc-hidden-input { display: none; }
 .uc-tip { font-size: 12px; color: var(--text-dim); }
 .uc-name { font-size: 16px; font-weight: 600; }
 .uc-vip { font-size: 12px; color: var(--text-dim); margin-top: 4px; }

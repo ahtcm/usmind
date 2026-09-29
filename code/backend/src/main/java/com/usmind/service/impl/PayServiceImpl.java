@@ -142,24 +142,91 @@ public class PayServiceImpl implements PayService {
         if (settingsService.getInt("wechatPayEnabled", 0) != 1) {
             return fail("支付未开启");
         }
-        // 【生产环境必须】使用微信支付平台证书验签 + AES-GCM 解密 resource 字段，再校验金额/商户号。
-        // 当前为可运行的最小闭环：解析出 out_trade_no 后查询订单并开通会员，方便本地联调；上线前请补齐官方验签。
+        // ===== 微信支付 v3 回调：严格验签 + AES-GCM 解密 + 金额/商户校验 =====
         try {
+            // 1. 验签
+            String timestamp = headers.getOrDefault("timestamp", "");
+            String nonce = headers.getOrDefault("nonce", "");
+            String signature = headers.getOrDefault("signature", "");
+            String serial = headers.getOrDefault("serial", "");
+            String platformCert = settingsService.get("wechatPlatformCert", "");
+            if (timestamp.isBlank() || nonce.isBlank() || signature.isBlank() || platformCert.isBlank()) {
+                log.warn("微信回调验签失败：缺少时间戳/随机串/签名/平台证书配置");
+                return fail("验签失败");
+            }
+            long ts;
+            try {
+                ts = Long.parseLong(timestamp);
+            } catch (NumberFormatException e) {
+                return fail("验签失败");
+            }
+            if (Math.abs(System.currentTimeMillis() / 1000 - ts) > 300) {
+                log.warn("微信回调时间戳超时: ts={}", timestamp);
+                return fail("验签失败");
+            }
+            String message = timestamp + "\n" + nonce + "\n" + body + "\n";
+            if (!verifyPlatformSignature(message, signature, platformCert)) {
+                log.warn("微信回调签名校验失败 serial={}", serial);
+                return fail("验签失败");
+            }
+
+            // 2. 解密 resource（AES-256-GCM，key = APIv3 密钥）
             Map<String, Object> m = objectMapper.readValue(body, Map.class);
-            String resource = String.valueOf(m.getOrDefault("resource", "{}"));
-            String outTradeNo = extractOutTradeNo(resource);
+            Object resourceObj = m.get("resource");
+            if (!(resourceObj instanceof Map)) {
+                return fail("回调数据格式错误");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resource = (Map<String, Object>) resourceObj;
+            String apiV3Key = settingsService.get("wechatApiV3Key", "");
+            if (apiV3Key.isBlank()) {
+                log.warn("微信回调缺少 APIv3 密钥配置");
+                return fail("验签失败");
+            }
+            String decrypted = decryptResource(resource, apiV3Key);
+            if (decrypted == null) {
+                log.warn("微信回调 resource 解密失败");
+                return fail("解密失败");
+            }
+            Map<String, Object> tx = objectMapper.readValue(decrypted, Map.class);
+
+            // 3. 业务校验：商户号、订单号、金额
+            String mchId = settingsService.get("wechatMchId", "");
+            String txMchId = String.valueOf(tx.getOrDefault("mchid", ""));
+            if (!mchId.equals(txMchId)) {
+                log.warn("微信回调商户号不匹配: expect={} got={}", mchId, txMchId);
+                return fail("商户号不匹配");
+            }
+            String outTradeNo = String.valueOf(tx.getOrDefault("out_trade_no", ""));
+            Object amountObj = tx.get("amount");
+            if (outTradeNo.isBlank() || !(amountObj instanceof Map)) {
+                return fail("回调数据不完整");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> amount = (Map<String, Object>) amountObj;
+            long totalFen = Long.parseLong(String.valueOf(amount.getOrDefault("total", "-1")));
+
             PayOrder order = orderMapper.selectOne(new LambdaQueryWrapper<PayOrder>()
                     .eq(PayOrder::getOutTradeNo, outTradeNo).last("LIMIT 1"));
-            if (order != null && "created".equals(order.getStatus())) {
+            if (order == null) {
+                log.warn("微信回调订单不存在: {}", outTradeNo);
+                return fail("订单不存在");
+            }
+            long expectFen = order.getAmount().multiply(new BigDecimal("100")).longValue();
+            if (totalFen != expectFen) {
+                log.warn("微信回调金额不匹配: expect={} got={}", expectFen, totalFen);
+                return fail("金额不匹配");
+            }
+            if ("created".equals(order.getStatus())) {
                 order.setStatus("paid");
-                order.setTransactionId(String.valueOf(System.currentTimeMillis()));
+                order.setTransactionId(String.valueOf(tx.getOrDefault("transaction_id", "")));
                 order.setPaidAt(LocalDateTime.now());
                 orderMapper.updateById(order);
                 MemberPlan plan = planMapper.selectById(order.getPlanId());
                 int days = plan != null && plan.getDays() != null ? plan.getDays() : 30;
                 int level = plan != null && plan.getLevel() != null ? plan.getLevel() : 1;
                 memberService.grant(order.getUserId(), level, days);
-                log.info("支付回调开通会员: userId={} level={} days={}", order.getUserId(), level, days);
+                log.info("微信回调验签通过，开通会员: userId={} level={} days={}", order.getUserId(), level, days);
             }
             return "<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>";
         } catch (Exception e) {
@@ -168,13 +235,52 @@ public class PayServiceImpl implements PayService {
         }
     }
 
-    private String extractOutTradeNo(String resource) {
-        // resource 为密文时需解密；此处兼容明文/测试场景，取 out_trade_no 字段
-        int i = resource.indexOf("out_trade_no");
-        if (i < 0) return "";
-        String sub = resource.substring(i + 13);
-        int j = sub.indexOf('"');
-        return sub.substring(0, j < 0 ? sub.length() : j).replace("\\", "");
+    /** 使用微信支付平台证书公钥验签 */
+    private boolean verifyPlatformSignature(String message, String signature, String platformCert) {
+        try {
+            byte[] certBytes = parsePem(platformCert);
+            java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
+            java.security.cert.X509Certificate cert = (java.security.cert.X509Certificate) cf.generateCertificate(new java.io.ByteArrayInputStream(certBytes));
+            Signature sig = Signature.getInstance("SHA256withRSA");
+            sig.initVerify(cert.getPublicKey());
+            sig.update(message.getBytes(StandardCharsets.UTF_8));
+            return sig.verify(Base64.getDecoder().decode(signature));
+        } catch (Exception e) {
+            log.warn("微信平台证书验签异常: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** 解密微信支付回调 resource（AES-256-GCM） */
+    private String decryptResource(Map<String, Object> resource, String apiV3Key) {
+        try {
+            String algorithm = String.valueOf(resource.getOrDefault("algorithm", ""));
+            if (!"AEAD_AES_256_GCM".equals(algorithm)) {
+                log.warn("不支持的加密算法: {}", algorithm);
+                return null;
+            }
+            byte[] key = apiV3Key.getBytes(StandardCharsets.UTF_8);
+            if (key.length != 32) {
+                key = java.util.Arrays.copyOfRange(java.util.Arrays.copyOf(key, 32), 0, 32);
+            }
+            byte[] nonce = Base64.getDecoder().decode(String.valueOf(resource.get("nonce")));
+            byte[] aad = String.valueOf(resource.getOrDefault("associated_data", "")).getBytes(StandardCharsets.UTF_8);
+            byte[] ciphertext = Base64.getDecoder().decode(String.valueOf(resource.get("ciphertext")));
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            javax.crypto.spec.GCMParameterSpec spec = new javax.crypto.spec.GCMParameterSpec(128, nonce);
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, new javax.crypto.spec.SecretKeySpec(key, "AES"), spec);
+            cipher.updateAAD(aad);
+            return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.warn("微信回调解密失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private byte[] parsePem(String pem) {
+        String cleaned = pem.replace("-----BEGIN CERTIFICATE-----", "").replace("-----END CERTIFICATE-----", "")
+                .replaceAll("\\s", "");
+        return Base64.getDecoder().decode(cleaned);
     }
 
     private String fail(String msg) {
