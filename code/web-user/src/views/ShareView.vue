@@ -256,6 +256,12 @@ async function loadShare() {
     mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
     // 点击节点 → 打开评论面板（readOnly 下节点仍可点击）
     mind.value.on('node_click', (node) => { if (node && node.getData) openCmt(node) })
+    // 只读画布平移/缩放（readOnly 下库禁用 Drag 插件，自实现：鼠标空白/节点按住拖动、触摸单指平移+双指缩放）
+    mapEl.value.addEventListener('mousedown', onMapMouseDown)
+    mapEl.value.addEventListener('touchstart', onMapTouchStart, { passive: false })
+    mapEl.value.addEventListener('touchmove', onMapTouchMove, { passive: false })
+    mapEl.value.addEventListener('touchend', onMapTouchEnd)
+    mapEl.value.addEventListener('touchcancel', onMapTouchEnd)
   } catch (e) {
     if (e.message && e.message.indexOf('密码') >= 0) {
       needPwd.value = true
@@ -625,6 +631,78 @@ function fmtTime(s) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes())
 }
 
+// ===== 只读画布平移/缩放 =====
+let panState = null
+let touchPan = null
+let pinch = null
+function getViewState() {
+  const vd = mind.value.view.getTransformData()
+  return (vd && vd.state) ? vd.state : vd
+}
+function setViewPan(nx, ny) {
+  const view = mind.value.view
+  const vd = view.getTransformData()
+  if (!vd || !vd.state) return
+  view.translateXY(nx - vd.state.x, ny - vd.state.y)
+}
+function isUiTarget(t) {
+  return !!(t && t.closest && (t.closest('.toolbar') || t.closest('.view-bar') || t.closest('.cmt-panel') || t.closest('.page-loading') || t.closest('.pwd-mask') || t.closest('#att-preview')))
+}
+function onMapMouseDown(e) {
+  if (e.button !== 0 || !mind.value || !mapEl.value) return
+  if (isUiTarget(e.target)) return
+  panState = { sx: e.clientX, sy: e.clientY, st: getViewState(), moved: false }
+  document.addEventListener('mousemove', onMapMouseMove)
+  document.addEventListener('mouseup', onMapMouseUp)
+}
+function onMapMouseMove(e) {
+  if (!panState || !mind.value) return
+  const dx = e.clientX - panState.sx, dy = e.clientY - panState.sy
+  if (!panState.moved && Math.abs(dx) + Math.abs(dy) > 6) panState.moved = true
+  if (panState.moved) { e.preventDefault(); try { setViewPan(panState.st.x + dx, panState.st.y + dy) } catch (e2) {} }
+}
+function onMapMouseUp() {
+  panState = null
+  document.removeEventListener('mousemove', onMapMouseMove)
+  document.removeEventListener('mouseup', onMapMouseUp)
+}
+function onMapTouchStart(e) {
+  if (e.touches.length >= 2) {
+    if (!mind.value) return
+    const t1 = e.touches[0], t2 = e.touches[1]
+    pinch = { dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY), scale: mind.value.view.scale }
+    touchPan = null
+    return
+  }
+  if (e.touches.length !== 1) return
+  if (isUiTarget(e.target)) return
+  touchPan = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, st: getViewState(), moved: false }
+}
+function onMapTouchMove(e) {
+  if (pinch && mind.value && e.touches.length >= 2) {
+    e.preventDefault(); e.stopPropagation()
+    const t1 = e.touches[0], t2 = e.touches[1]
+    const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+    let ns = pinch.scale * (dist / pinch.dist)
+    const opt = mind.value.opt || {}
+    const min = (opt.minZoomRatio || 20) / 100
+    const max = opt.maxZoomRatio === -1 ? 5 : ((opt.maxZoomRatio || 300) / 100)
+    ns = Math.max(min, Math.min(max, ns))
+    const rect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    const cx = (t1.clientX + t2.clientX) / 2 - (rect ? rect.left : 0)
+    const cy = (t1.clientY + t2.clientY) / 2 - (rect ? rect.top : 0)
+    try { mind.value.view.setScale(ns, cx, cy) } catch (e2) {}
+    return
+  }
+  if (!touchPan || !mind.value) return
+  if (e.touches.length !== 1) { touchPan = null; return }
+  const t = e.touches[0]
+  const dx = t.clientX - touchPan.sx, dy = t.clientY - touchPan.sy
+  if (!touchPan.moved && Math.abs(dx) + Math.abs(dy) > 6) touchPan.moved = true
+  if (touchPan.moved) { e.preventDefault(); e.stopPropagation(); try { setViewPan(touchPan.st.x + dx, touchPan.st.y + dy) } catch (e2) {} }
+}
+function onMapTouchEnd() { touchPan = null; pinch = null }
+
 onMounted(async () => {
   needPwd.value = false
   pwd.value = ''
@@ -642,6 +720,15 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateBgSize)
+  if (mapEl.value) {
+    mapEl.value.removeEventListener('mousedown', onMapMouseDown)
+    mapEl.value.removeEventListener('touchstart', onMapTouchStart)
+    mapEl.value.removeEventListener('touchmove', onMapTouchMove)
+    mapEl.value.removeEventListener('touchend', onMapTouchEnd)
+    mapEl.value.removeEventListener('touchcancel', onMapTouchEnd)
+  }
+  document.removeEventListener('mousemove', onMapMouseMove)
+  document.removeEventListener('mouseup', onMapMouseUp)
   if (window.__attIconTimer) { clearInterval(window.__attIconTimer); window.__attIconTimer = null }
   if (mind.value) { try { mind.value.dispose && mind.value.dispose() } catch(e){} }
 })

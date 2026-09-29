@@ -1333,7 +1333,9 @@ g.smm-line-container path { transition: d .25s cubic-bezier(.22,.61,.36,1); }
 .pwd-box input {
   width: 100%; background: rgba(255,255,255,.06); border: 1px solid var(--border);
   border-radius: 8px; color: var(--text); padding: 10px; outline: none; box-sizing: border-box;
+  margin-bottom: 12px;
 }
+.pwd-box input:last-of-type { margin-bottom: 0; }
 .pwd-box button {
   width: 100%; margin-top: 12px; background: var(--accent); border: none; color: #fff;
   border-radius: 8px; padding: 10px 0; cursor: pointer; font-size: 14px;
