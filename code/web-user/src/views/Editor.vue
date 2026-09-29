@@ -496,6 +496,8 @@ const mindMapId = ref(route.params.id || null)
 // 状态
 const docName = ref('未命名')
 const dirty = ref(false)
+// 加载/setData 引发的 data_change 抑制时间戳（避免把"加载渲染"误判为未保存修改）
+let suppressDirtyUntil = 0
 const savedTime = ref('')
 const canvasTabs = ref([])
 const docIndex = ref(0)
@@ -741,6 +743,7 @@ async function createMind() {
   manualStyled = new Set(doc.manualStyles || [])
   applyStyleState(doc)
   applyMediaCardStyle(doc.data.root, doc.theme)
+  suppressDirtyUntil = Date.now() + 8000
   mind.value = new MindMap({
     el: mapEl.value,
     data: doc.data.root,
@@ -845,7 +848,7 @@ function numSvg(n) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 function emojiSvg(e) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><text x="16" y="26" font-size="26" text-anchor="middle">'+e+'</text></svg>' }
 
 function bindMindEvents() {
-  mind.value.on('data_change', () => { if (wsApplying) return; markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
+  mind.value.on('data_change', () => { if (wsApplying) return; if (Date.now() < suppressDirtyUntil) return; markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
   mind.value.on('view_data_change', (vd) => { try { updateScrollbars() } catch (e) {}; if (canvasTabs.value[docIndex.value]) canvasTabs.value[docIndex.value].viewData = vd; applyLazyView() })
   mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView() })
   mind.value.on('back_forward', (cur, total) => {
@@ -995,10 +998,6 @@ mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNod
   if (window.__attIconTimer) clearInterval(window.__attIconTimer)
   window.__attIconTimer = setInterval(() => {
     try {
-      const rt = mind.value && mind.value.renderer && mind.value.renderer.renderTree
-      if (rt && !window.__attDebugDone) {
-        window.__attDebugDone = true
-      }
       try { fixAttachNodeTexts() } catch (e) {}
       injectAttachIcons()
     } catch (e) {}
@@ -1088,7 +1087,7 @@ async function forceSave() {
 async function loadLatest(silent = false) {
   conflictDialog.value = false
   try {
-    const fresh = await mindmapApi.get(mindMapId.value)
+    const fresh = await mindmapApi.get(mindMapId.value, { params: { _t: Date.now() } })
     let d = fresh.data || {}
     if (typeof d === 'string' && d) { try { d = JSON.parse(d) } catch (e2) { d = {} } }
     if (d._tabs && Array.isArray(d._tabs) && d._tabs.length) {
@@ -1103,6 +1102,7 @@ async function loadLatest(silent = false) {
       docIndex.value = 0
     }
     curVersion.value = fresh.version || 0
+    suppressDirtyUntil = Date.now() + 8000
     await loadDoc(silent)
     if (!silent) toast('已加载最新内容')
   } catch (e) {
@@ -1171,6 +1171,7 @@ async function loadDoc(keepView = false) {
     if (keepView) {
       try { keepTransform = mind.value.view.getTransformData() } catch (e) {}
     }
+    suppressDirtyUntil = Date.now() + 8000
     try { mind.value.setData(docRoot) } catch (e) { console.error('setData失败', e) }
     if (keepView) {
       if (keepTransform) { try { mind.value.view.setTransformData(keepTransform) } catch (e) {} }
@@ -1187,6 +1188,8 @@ async function loadDoc(keepView = false) {
   applyBranchRainbow()
   markSaved()
   clearTimeout(autoSaveTimer)
+  // 延迟 data_change 可能把页面误判为未保存，8s 后（抑制期结束）补一次 markSaved
+  setTimeout(() => { if (Date.now() > suppressDirtyUntil) markSaved() }, 8000)
   // setData 重渲染后 SVG 角标会丢失，重挂所有他人锁角标
   try {
     Object.keys(nodeLocks).forEach((nid) => {

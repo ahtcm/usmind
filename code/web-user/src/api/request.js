@@ -11,6 +11,11 @@ request.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = 'Bearer ' + token
   }
+  // GET 请求禁用浏览器 HTTP 缓存（防 axios 命中旧响应导致协作数据不同步）
+  if (config.method === 'get' || config.method === 'GET') {
+    config.headers['Cache-Control'] = 'no-cache, no-store'
+    config.params = Object.assign({}, config.params, { _t: Date.now() })
+  }
   return config
 })
 
