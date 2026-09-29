@@ -2453,7 +2453,7 @@ function liftFormulaSvg(svgStr) {
       let el = fo.parentNode
       while (el && el.nodeName !== 'svg') {
         const at = el.getAttribute('transform')
-        if (at) ancestors.unshift(at)
+        if (at) ancestors.push(at) // 内→外应用SVG变换，unshift会致坐标错位成黑条
         el = el.parentNode
       }
       // 把矩阵链应用到 (x, y)，得到公式在画布中的绝对坐标
@@ -2494,12 +2494,14 @@ function liftFormulaSvg(svgStr) {
         sv.querySelectorAll('defs').forEach((d) => d.remove())
         const wAttr = sv.getAttribute('width')
         const hAttr = sv.getAttribute('height')
-        if (wAttr && wAttr.indexOf('ex') >= 0) sv.setAttribute('width', (parseFloat(wAttr) * fontSize * 0.5) + 'px')
-        if (hAttr && hAttr.indexOf('ex') >= 0) sv.setAttribute('height', (parseFloat(hAttr) * fontSize * 0.5) + 'px')
+        if (wAttr && wAttr.indexOf('ex') >= 0) sv.setAttribute('width', String(parseFloat(wAttr) * fontSize * 0.5)) // 无单位数字，SVG图片模式可解析
+        if (hAttr && hAttr.indexOf('ex') >= 0) sv.setAttribute('height', String(parseFloat(hAttr) * fontSize * 0.5))
         // 关键：实测 SVG 图片模式中嵌套 <svg> 只要祖先链存在任何 transform
         // （matrix/translate/scale，含单位矩阵）均不渲染。因此把公式 svg 提升到
         // 根 svg 的直接子级（无 transform 祖先），用 x/y 绝对定位。
         sv.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+        // 防止公式 svg 内容溢出盒子绘制成黑条：裁剪到盒子范围
+        sv.setAttribute('overflow', 'hidden')
         sv.setAttribute('x', px)
         sv.setAttribute('y', py)
         root.appendChild(sv)
