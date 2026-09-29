@@ -100,6 +100,13 @@
           <el-input-number v-model="form.ipAutoBlackSeconds" :min="60" :max="86400 * 30" />
           <span class="field-hint">拉黑时长内该 IP 直接拒绝访问</span>
         </el-form-item>
+        <el-form-item label="评论限频(次/窗口)">
+          <el-input-number v-model="form.commentRateLimit" :min="1" :max="1000" />
+          <span class="field-hint">分享页评论在窗口内允许的次数，超限自动拉黑 IP</span>
+        </el-form-item>
+        <el-form-item label="评论统计窗口(秒)">
+          <el-input-number v-model="form.commentRateWindow" :min="5" :max="3600" />
+        </el-form-item>
       </el-form>
     </el-card>
 
@@ -124,7 +131,8 @@ const form = reactive({
   authSmsEnabled: false,
   smsProvider: '', smsAccessKeyId: '', smsAccessKeySecret: '', smsSignName: '', smsTemplateCode: '',
   ipGuardEnabled: true,
-  ipRateLimit: 60, ipRateWindow: 60, ipAutoBlackSeconds: 3600
+  ipRateLimit: 60, ipRateWindow: 60, ipAutoBlackSeconds: 3600,
+  commentRateLimit: 5, commentRateWindow: 60
 })
 
 onMounted(async () => {
@@ -153,7 +161,9 @@ onMounted(async () => {
       ipGuardEnabled: !!d.ipGuardEnabled,
       ipRateLimit: Number(d.ipRateLimit || 60),
       ipRateWindow: Number(d.ipRateWindow || 60),
-      ipAutoBlackSeconds: Number(d.ipAutoBlackSeconds || 3600)
+      ipAutoBlackSeconds: Number(d.ipAutoBlackSeconds || 3600),
+      commentRateLimit: Number(d.commentRateLimit || 5),
+      commentRateWindow: Number(d.commentRateWindow || 60)
     })
   } catch (e) { /* 忽略 */ }
 })
@@ -184,7 +194,9 @@ async function save() {
       ipGuardEnabled: form.ipGuardEnabled ? 1 : 0,
       ipRateLimit: form.ipRateLimit,
       ipRateWindow: form.ipRateWindow,
-      ipAutoBlackSeconds: form.ipAutoBlackSeconds
+      ipAutoBlackSeconds: form.ipAutoBlackSeconds,
+      commentRateLimit: form.commentRateLimit,
+      commentRateWindow: form.commentRateWindow
     })
     ElMessage.success('保存成功')
   } finally {
