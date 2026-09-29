@@ -975,7 +975,14 @@ function bindMindEvents() {
   mind.value.on('draw_click', () => hideCtxMenu())
   mind.value.on('node_dragging', () => mapEl.value.classList.add('no-anim'))
   mind.value.on('node_dragend', () => mapEl.value.classList.remove('no-anim'))
-  mind.value.on('node_text_edit_change', (ev) => { mapEl.value.classList.add('no-anim'); pushNodeChange(ev && ev.node, ev && ev.text) })
+  mind.value.on('node_text_edit_change', (ev) => {
+    mapEl.value.classList.add('no-anim')
+    const nd = ev && ev.node
+    const nid = nd && (nd.uid || (nd.nodeData && nd.nodeData.uid))
+    // 覆盖 fast input（单击直接输入）等未走双击路径的编辑：补获取锁，否则 node_change 会被后端锁校验拒绝
+    if (nid && myEditNodeId !== nid) acquireNodeLock(nid)
+    pushNodeChange(nd, ev && ev.text)
+  })
 mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNodeLock() })
   // 结构类命令（创建/删除/移动/粘贴节点）执行后立即保存：让协作端秒级收到广播，无需等自动保存周期
   mind.value.on('afterExecCommand', (name) => {
@@ -991,11 +998,27 @@ mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNod
   }
   const onEditFocusOut = (e) => {
     if (e.target && e.target.classList && e.target.classList.contains('smm-node-edit-wrap')) {
-      setTimeout(() => { if (!mind.value.renderer.textEdit.showTextEdit) textEditActive.value = false }, 250)
+      setTimeout(() => {
+        if (!mind.value.renderer.textEdit.showTextEdit) {
+          textEditActive.value = false
+          // 让 250ms 节流的最后一次 node_change 先发出（约300ms），再释放锁，避免末尾编辑内容丢失
+          setTimeout(() => { if (!myEditNodeId) return; releaseNodeLock() }, 320)
+        }
+      }, 250)
     }
   }
   document.addEventListener('focusin', onEditFocusIn)
   document.addEventListener('focusout', onEditFocusOut)
+  // 移动端输入法兜底：部分浏览器 composition 期间不发 input 事件，compositionend 时补一次实时推送
+  const onEditCompositionEnd = () => {
+    try {
+      const box = document.querySelector('.smm-node-edit-wrap, .smm-text-edit, [contenteditable=true]')
+      if (!box || !myEditNodeId) return
+      const node = mind.value.renderer.findNodeByUid(myEditNodeId)
+      if (node) pushNodeChange(node, box.textContent || '')
+    } catch (e) {}
+  }
+  document.addEventListener('compositionend', onEditCompositionEnd, true)
   mind.value.on('node_tree_render_end', () => { try { updateScrollbars() } catch (e) {}; clearTimeout(loadingTimer); if (!mind.value.editNodeClassList || !mind.value.editNodeClassList.length) mapEl.value.classList.remove('no-anim'); if (loadingToken > 0) hideLoading(loadingToken); applyLazyView(); try { fixAttachNodeTexts() } catch (e) {}; try { injectAttachIcons() } catch (e) {}; try { applyCommentFlash() } catch (e) {} })
   mind.value.on('node_attachmentClick', (node) => openAttachmentPreview(node))
   // 轮询注入附件图标（不依赖 render_end 时序）
@@ -3355,6 +3378,14 @@ function applyRemoteLock(nid, action, userId, userName) {
     if (nodeLocks[nid] && nodeLocks[nid].userId === userId) return
     nodeLocks[nid] = { userId, userName }
     if (userId !== myUid()) setLockMark(nid, true, userName)
+  } else if (action === 'denied') {
+    // 锁已被他人持有：提示只读，停止发送 node_change（避免被后端静默丢弃造成"编辑了但不同步"）
+    if (myEditNodeId === nid) {
+      if (nodeChangeTimer) { clearTimeout(nodeChangeTimer); nodeChangeTimer = null }
+      if (userId && Number(userId) !== myUid()) toast('该节点正被 ' + (userName || '其他成员') + ' 编辑，当前为只读', 'warning')
+      releaseNodeLock(true)
+      try { mind.value.renderer.textEdit.hideEditTextBox() } catch (e) {}
+    }
   } else if (action === 'release') {
     const cur = nodeLocks[nid]
     if (!cur || (userId && cur.userId !== userId)) return
