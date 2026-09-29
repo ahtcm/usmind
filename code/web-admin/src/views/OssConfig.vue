@@ -3,6 +3,7 @@
     <el-card shadow="never">
       <div class="toolbar">
         <span style="color: #606266">共 {{ list.length }} 个存储配置</span>
+        <el-button type="warning" :loading="migrating" @click="handleMigrate">迁移本地文件</el-button>
         <el-button type="primary" :icon="Plus" @click="openCreate">新增配置</el-button>
         <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
       </div>
@@ -54,23 +55,23 @@
             <el-option label="本地存储" value="LOCAL" />
           </el-select>
         </el-form-item>
-        <el-form-item label="Endpoint" prop="endpoint">
+        <el-form-item v-if="form.type !== 'LOCAL'" label="Endpoint" prop="endpoint">
           <el-input v-model="form.endpoint" placeholder="https://oss-cn-hangzhou.aliyuncs.com" />
         </el-form-item>
-        <el-form-item label="AccessKey" prop="accessKey">
+        <el-form-item v-if="form.type !== 'LOCAL'" label="AccessKey" prop="accessKey">
           <el-input v-model="form.accessKey" placeholder="AccessKey" />
         </el-form-item>
-        <el-form-item label="SecretKey" prop="secretKey">
+        <el-form-item v-if="form.type !== 'LOCAL'" label="SecretKey" prop="secretKey">
           <el-input v-model="form.secretKey" type="password" show-password placeholder="编辑时留空则不修改" />
         </el-form-item>
-        <el-form-item label="Bucket" prop="bucket">
+        <el-form-item v-if="form.type !== 'LOCAL'" label="Bucket" prop="bucket">
           <el-input v-model="form.bucket" />
         </el-form-item>
-        <el-form-item label="Region" prop="region">
+        <el-form-item v-if="form.type !== 'LOCAL'" label="Region" prop="region">
           <el-input v-model="form.region" placeholder="cn-hangzhou" />
         </el-form-item>
         <el-form-item label="自定义域名" prop="domain">
-          <el-input v-model="form.domain" placeholder="可选，CDN域名" />
+          <el-input v-model="form.domain" placeholder="可选，CDN域名；本地存储也可填，会拼成访问前缀" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -82,17 +83,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getOssConfigs, createOssConfig, updateOssConfig, deleteOssConfig,
-  activateOssConfig, testOssConfig, batchDeleteOssConfigs
+  activateOssConfig, testOssConfig, batchDeleteOssConfigs, migrateOss
 } from '@/api/oss'
 
 const loading = ref(false)
 const list = ref([])
 const selectedIds = ref([])
+const migrating = ref(false)
 
 const dialog = reactive({ visible: false, mode: 'create', loading: false })
 const formRef = ref(null)
@@ -100,12 +102,12 @@ const form = reactive({
   id: null, name: '', type: 'ALIYUN', endpoint: '',
   accessKey: '', secretKey: '', bucket: '', region: '', domain: ''
 })
-const rules = {
+const rules = computed(() => ({
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   type: [{ required: true, message: '请选择类型', trigger: 'change' }],
-  endpoint: [{ required: true, message: '请输入Endpoint', trigger: 'blur' }],
-  bucket: [{ required: true, message: '请输入Bucket', trigger: 'blur' }]
-}
+  endpoint: form.type === 'LOCAL' ? [] : [{ required: true, message: '请输入Endpoint', trigger: 'blur' }],
+  bucket: form.type === 'LOCAL' ? [] : [{ required: true, message: '请输入Bucket', trigger: 'blur' }]
+}))
 
 function typeLabel(t) {
   return { ALIYUN: '阿里云OSS', TENCENT: '腾讯COS', QINIU: '七牛', MINIO: 'MinIO', LOCAL: '本地' }[t] || t
@@ -196,6 +198,33 @@ async function handleDelete(row) {
   await deleteOssConfig(row.id)
   ElMessage.success('删除成功')
   loadData()
+}
+
+async function handleMigrate() {
+  const active = list.value.find(r => r.isActive)
+  if (!active) {
+    ElMessage.warning('请先在列表里激活一个OSS/MinIO/COS/七牛配置')
+    return
+  }
+  if ((active.type || '').toUpperCase() === 'LOCAL') {
+    ElMessage.warning('当前激活的是本地存储，请先激活云端存储配置再迁移')
+    return
+  }
+  await ElMessageBox.confirm(
+    `将把本地已上传的全部文件（图片/附件/音视频等）迁移到「${active.name}」，并自动更新所有导图数据和用户头像中的引用。\n本地文件默认保留（可稍后手动清理），迁移过程可重复执行、已迁移的自动跳过。`,
+    '迁移本地文件到云端', { type: 'warning', confirmButtonText: '开始迁移' }
+  )
+  migrating.value = true
+  try {
+    const data = await migrateOss({ deleteAfter: false })
+    const errTip = data.failed || data.errors?.length ? `，失败 ${data.failed} 个（${(data.errors || []).slice(0, 3).join('；')}）` : ''
+    ElMessage.success(`迁移完成：成功 ${data.files} 个${errTip}；导图更新 ${data.mindmaps} 个、头像更新 ${data.users} 个；本地文件保留 ${data.deletedLocal || 0}（未删除）`)
+    loadData()
+  } catch (e) {
+    // 拦截器已提示
+  } finally {
+    migrating.value = false
+  }
 }
 
 function handleSelectionChange(rows) {

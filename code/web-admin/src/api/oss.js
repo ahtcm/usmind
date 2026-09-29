@@ -27,3 +27,7 @@ export function activateOssConfig(id) {
 export function testOssConfig(id) {
   return request.get(`/admin/oss/test/${id}`)
 }
+
+export function migrateOss(data) {
+  return request.post('/admin/oss/migrate', data)
+}

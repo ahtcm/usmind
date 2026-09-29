@@ -62,4 +62,11 @@ public class OssController {
     public Result<Map<String, Object>> test(@PathVariable Long id) {
         return Result.ok(ossConfigService.test(id));
     }
+
+    @PostMapping("/migrate")
+    public Result<Map<String, Object>> migrate(@RequestBody(required = false) Map<String, Object> body) {
+        boolean deleteAfter = body != null && body.get("deleteAfter") != null
+                && Boolean.parseBoolean(String.valueOf(body.get("deleteAfter")));
+        return Result.ok(ossConfigService.migrate(deleteAfter));
+    }
 }
