@@ -2734,6 +2734,9 @@ async function runExport(type) {
   if (exporting.value) { toast('正在导出中，请稍候...', 'warn'); return }
   exporting.value = true
   showExportLoading(0, '')
+  // 先让出主线程：Vue 响应式 DOM 更新 + 浏览器绘制遮罩后再开始耗时同步计算（getSvgData 序列化大 SVG 会阻塞主线程）
+  await nextTick()
+  await new Promise(r => setTimeout(r, 60))
   try {
     if (type === 'png' || type === 'jpg' || type === 'jpeg') {
       await exportChunkedImages(type)
