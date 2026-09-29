@@ -1,8 +1,21 @@
 ﻿# USMIND 变更记录
 
+## 2026-09-29 · 导出重构：html2canvas 混合 DOM 方案（公式/图片完整导出 + 进度遮罩）
+
+- **背景**：43 号"数学公式"导图导出 PNG/PDF 出现黑块（MathJax 大公式外层 svg + 内层嵌套 svg 被旧 `liftFormulaSvg` 同时提升到根级，同位置叠加渲染成黑块）；50 号"图片"导图导出失败（simple-mind-map 输出 SVG 中空元素未自闭合导致 XML 解析失败，Image 加载失败回退到 SVG blob）。
+- **方案（用户拍板：先导出完整 SVG，再用图片/PDF 装这个 SVG）**：SVG 作为 `<img>` 加载时 foreignObject 一律不渲染（浏览器安全限制），html2canvas 直接捕获内联 SVG 时也会把 svg 序列化成图片（foreignObject 照样丢）。最终实现为**混合 DOM 捕获**：
+  - `collectFoItems`：DOMParser 解析完整 SVG，收集所有 `foreignObject`（按祖先 matrix 变换链内→外累积到画布绝对坐标），移除后得到纯 SVG（连线 / 节点形状）。
+  - `renderChunkByHtml`：离屏容器 = SVG 层（innerHTML 纯块 SVG，viewBox 裁剪到分块视口）+ HTML 富文本层（原 foreignObject 内容绝对定位到画布坐标，浏览器原生渲染文字 / 公式 / 图片）；MathJax 公式 svg 的 `ex` 单位按 foreignObject 的 font-size 换算为 px（html2canvas 序列化 svg 为图片时无字体上下文）；视频 / 音频按用户方案贴「▶视频 / ♪音频：文件名」占位；`html2canvas(wrap, { useCORS, scale:1 })` 逐块捕获。
+  - `exportChunkedImages` / `exportChunkedPdf`：不再走 `loadImg(blobURL)+drawImage` 大 SVG 渲染，逐块调 `renderChunkByHtml`（CHUNK=5000，超大画布分块 PNG 打包 zip / PDF 逐页）。
+- **进度遮罩**：导出点击后**立即**显示全屏遮罩（`export-loading`，与页面加载同风格：spinner + 当前步骤文案 + 百分比进度条），先 `nextTick + 60ms` 让出主线程再开始 `getSvgData`（大导图 SVG 序列化是同步操作会阻塞 Vue 渲染）；导出中 `exporting` 标志防重复点击，失败 / 异常兜底自关（10 分钟超时）。
+- **实测**：50 图片导图 PNG 584×524（彩色图片正常显示）、PDF 合法；43 公式导图 PNG 分块 zip 4 块全部公式完整、无黑块、PDF 1.4MB；进度遮罩点击后 2ms 出现、25%→50%→75%→完成自动关闭；控制台无报错。
+- **依赖**：新增 `html2canvas`（npm 国内镜像安装）。
+- **提交**：`d29e335`（方案落地）/ `8c51113`（进度遮罩）/ `4ac6a18`（立即显示+防重复）/ `53d0f1e`（先让出主线程，遮罩 2ms 渲染）。
+
 ## 2026-09-28 · 移除便携绿色版（按需求）
 
-- **删除便携版全部内容**：elease\usmind-portable\（产物目录此前已清理）；构建脚本 script\bat\build-portable.bat / uild-all.bat（便携+自解压+在线一键构建，随便携产物一并移除）；启动器源码 code\launcher-src\launcher\Main.java、logo.ico、min.svg、x.svg、
+- **删除便携版全部内容**：
+elease\usmind-portable\（产物目录此前已清理）；构建脚本 script\bat\build-portable.bat / uild-all.bat（便携+自解压+在线一键构建，随便携产物一并移除）；启动器源码 code\launcher-src\launcher\Main.java、logo.ico、min.svg、x.svg、
 ginx-portable.conf、launcher.jar、classes\。
 - **保留自解压 / 在线版源码**：code\launcher-src\selfextract.cs / Installer.cs / uild_online.ps1 / 两个 stub exe（用户未要求删除；二者基于便携产物组装，如需重新启用需先重建便携产物）。
 - **文档同步**：README 目录树 / 发布形态章节（三种→两种，重编号）/ 构建表格 / FAQ；FILE_GUIDE「发布与构建体系」章节与脚本表格同步更新。

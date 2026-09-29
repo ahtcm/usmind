@@ -81,7 +81,9 @@
 - `canvasTabs` 数组管理多个导图；标签可切换 / 新建 / 删除 / 双击重命名 / 拖拽排序 / `<>` 按钮横向滚动（超出时显示）。
 
 #### ⑧ 导入导出
-- **导出**：`runExport` —— JSON（当前数据）、PNG / JPG / JPEG / SVG / PDF（`html2canvas` 画布截图，PDF 逐页拼图）、Markdown（节点树转 md 列表）。
+- **导出**：`runExport` —— JSON（当前数据）、PNG / JPG / JPEG / SVG / PDF、Markdown（节点树转 md 列表）。
+  - **PNG/JPG/PDF 走 html2canvas 混合 DOM 方案**：先 `doExport.getSvgData()` 取完整 SVG（foreignObject 完整保留、质量高）→ `collectFoItems` 把每个 foreignObject 提取为 HTML 富文本层（绝对定位到画布坐标，浏览器原生渲染文字 / 公式 / 图片），SVG 层只留连线与节点形状 → 两层混合后用 `html2canvas` 逐元素捕获。公式 svg 的 `ex` 单位按 font-size 换算 px；视频 / 音频贴「▶视频 / ♪音频：文件名」占位；超大画布按 5000px 分块（PNG 打包 zip / PDF 逐页）。
+  - **进度遮罩**：`export-loading` 全屏遮罩显示当前步骤（"正在导出第 X/Y 块（PNG）..."）与百分比进度条；点击导出立即显示（先 `nextTick + 60ms` 让出主线程再开始 `getSvgData`，避免同步序列化阻塞 Vue 渲染）；`exporting` 标志防重复点击；失败 / 异常兜底自关。
 - **`.usmind` 资源包**（`exportUsmind`）：JSZip 收集节点内全部资源文件 + `data.json` 打包为 `.usmind` 压缩包；导入（`onImportUsmindFile`）解包后**自动上传资源入库并改写节点 URL**——相当于脑图连同资源从一个系统整体迁移到另一个系统。
 - **JSON 导入**：`onImportFile` 读取 JSON 重建导图。
 
