@@ -13,14 +13,14 @@
         <div class="export-wrap" @click.stop="exportOpen = !exportOpen">
           <button title="导出" :class="{ active: exportOpen }"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <div v-if="exportOpen" class="export-menu">
-            <div class="export-menu-item" @click="runExport('json')"><span class="em-tag" style="background:#f7b731">J</span>JSON 数据</div>
-            <div class="export-menu-item" @click="exportUsmind"><span class="em-tag" style="background:#2d98da">U</span>USMIND 压缩包</div>
-            <div class="export-menu-item" @click="runExport('png')"><span class="em-tag" style="background:#45b7d1">P</span>PNG 图片</div>
-            <div class="export-menu-item" @click="runExport('jpg')"><span class="em-tag" style="background:#e77f67">J</span>JPG 图片</div>
-            <div class="export-menu-item" @click="runExport('jpeg')"><span class="em-tag" style="background:#ea8685">G</span>JPEG 图片</div>
-            <div class="export-menu-item" @click="runExport('svg')"><span class="em-tag" style="background:#778beb">S</span>SVG 矢量图</div>
-            <div class="export-menu-item" @click="runExport('pdf')"><span class="em-tag" style="background:#fc5c65">P</span>PDF 文档</div>
-            <div class="export-menu-item" @click="runExport('md')"><span class="em-tag" style="background:#26de81">M</span>Markdown</div>
+            <div class="export-menu-item" @click="runExport('json')"><span v-if="isMemberExport('json')" class="em-vip">👑</span><span class="em-tag" style="background:#f7b731">J</span>JSON 数据</div>
+            <div class="export-menu-item" @click="exportUsmind"><span v-if="isMemberExport('usmind')" class="em-vip">👑</span><span class="em-tag" style="background:#2d98da">U</span>USMIND 压缩包</div>
+            <div class="export-menu-item" @click="runExport('png')"><span v-if="isMemberExport('png')" class="em-vip">👑</span><span class="em-tag" style="background:#45b7d1">P</span>PNG 图片</div>
+            <div class="export-menu-item" @click="runExport('jpg')"><span v-if="isMemberExport('jpg')" class="em-vip">👑</span><span class="em-tag" style="background:#e77f67">J</span>JPG 图片</div>
+            <div class="export-menu-item" @click="runExport('jpeg')"><span v-if="isMemberExport('jpeg')" class="em-vip">👑</span><span class="em-tag" style="background:#ea8685">G</span>JPEG 图片</div>
+            <div class="export-menu-item" @click="runExport('svg')"><span v-if="isMemberExport('svg')" class="em-vip">👑</span><span class="em-tag" style="background:#778beb">S</span>SVG 矢量图</div>
+            <div class="export-menu-item" @click="runExport('pdf')"><span v-if="isMemberExport('pdf')" class="em-vip">👑</span><span class="em-tag" style="background:#fc5c65">P</span>PDF 文档</div>
+            <div class="export-menu-item" @click="runExport('md')"><span v-if="isMemberExport('md')" class="em-vip">👑</span><span class="em-tag" style="background:#26de81">M</span>Markdown</div>
             <div class="export-menu-sep"></div>
             <div class="export-menu-item" @click="onImportClick"><span class="em-tag" style="background:#a55eea">I</span>导入 JSON</div>
             <div class="export-menu-item" @click="onImportUsmindClick"><span class="em-tag" style="background:#fa8231">U</span>导入 USMIND</div>
@@ -151,6 +151,7 @@
           <div class="sp-section">主题模板</div>
           <div class="theme-grid">
             <div v-for="t in themes" :key="t.name" class="theme-card" :class="{ active: currentTheme === t.name }" @click="applyTheme(t.name)">
+              <span v-if="isMemberTheme(t)" class="theme-vip" title="会员专属主题">👑</span>
               <div class="theme-swatches">
                 <span v-for="(bc, bi) in (t.branchColors || themes[0].branchColors)" :key="bi" class="theme-swatches-seg" :style="{ background: bc }"></span>
               </div>
@@ -2761,6 +2762,7 @@ async function runExport(type) {
 async function exportUsmind() {
   exportOpen.value = false
   if (!mind.value) { toast('请先进入画布', 'error'); return }
+  if (!checkMemberFeature('export', 'usmind')) { toast('该导出格式为会员专属，开通会员后可用', 'error'); return }
   const name = docName.value || '思维导图'
   try {
     toast('正在收集资源并打包...')
@@ -3037,6 +3039,22 @@ function onPaste(e) {
 }
 
 let memberFeature = { memberThemeIds: '', memberExportFormats: '', memberLevel: 0, enabled: true }
+function memberIdsArr() {
+  if (!memberFeature.memberThemeIds) return []
+  return String(memberFeature.memberThemeIds).split(',').map(x => x.trim()).filter(Boolean)
+}
+function isMemberTheme(t) {
+  if (!memberFeature.enabled || !memberFeature.memberThemeIds) return false
+  const ids = memberIdsArr()
+  const tid = t && t.id != null ? String(t.id) : ''
+  return ids.includes(tid)
+}
+function isMemberExport(fmt) {
+  if (!memberFeature.enabled || !memberFeature.memberExportFormats) return false
+  const fmts = String(memberFeature.memberExportFormats).split(',').map(x => x.trim())
+  const v = fmt === 'md' ? 'markdown' : fmt
+  return fmts.includes(v)
+}
 function checkMemberFeature(kind, value) {
   const cfg = memberFeature
   if (!cfg.enabled) return true // 会员功能总开关关闭：全部开放
@@ -3050,7 +3068,8 @@ function checkMemberFeature(kind, value) {
   } else if (kind === 'export') {
     if (!cfg.memberExportFormats) return true
     const fmts = String(cfg.memberExportFormats).split(',').map(x => x.trim())
-    if (!fmts.includes(value)) return true
+    const v = value === 'md' ? 'markdown' : value
+    if (!fmts.includes(v)) return true
   }
   return cfg.memberLevel > 0
 }
@@ -3299,4 +3318,8 @@ onBeforeUnmount(() => {
 <style>
 /* 全局：隐藏 MathJax 辅助数学标记，防止部分浏览器下与主公式叠加显示成两层 */
 mjx-assistive-mml { display: none !important; }
+
+.theme-card { position: relative; }
+.theme-vip { position: absolute; top: -6px; right: -4px; z-index: 3; font-size: 13px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.em-vip { margin-right: 5px; font-size: 13px; line-height: 1; }
 </style>
