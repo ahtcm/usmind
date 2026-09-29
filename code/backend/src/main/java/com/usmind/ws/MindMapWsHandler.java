@@ -9,6 +9,7 @@ import com.usmind.mapper.MindMapMapper;
 import com.usmind.mapper.SysUserMapper;
 import com.usmind.service.OrgService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -19,6 +20,8 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +32,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  *  - 客户端携带 ?token=JWT 握手，校验身份后订阅导图频道
  *  - 订阅时校验访问权（属主或机构协作成员）
  *  - 导图保存成功后由 MindMapServiceImpl 调用 broadcast 推送轻量变更通知
+ *  - 节点级协作：节点锁定（acquire/release）、实时编辑内容推送（node_change）
  */
 @Slf4j
 @Component
@@ -43,6 +47,12 @@ public class MindMapWsHandler extends TextWebSocketHandler {
     /** mindMapId -> 订阅该导图的会话集合 */
     private final Map<String, Set<WebSocketSession>> sessions = new ConcurrentHashMap<>();
 
+    /** 节点锁：mindMapId -> nodeId -> 锁信息 */
+    private final Map<String, Map<String, LockEntry>> nodeLocks = new ConcurrentHashMap<>();
+
+    /** 锁有效期（毫秒），编辑中客户端每 20s 续期 */
+    private static final long LOCK_TTL_MS = 60_000L;
+
     public MindMapWsHandler(JwtUtil jwtUtil, MindMapMapper mindMapMapper,
                             SysUserMapper sysUserMapper, OrgService orgService) {
         this.jwtUtil = jwtUtil;
@@ -53,6 +63,15 @@ public class MindMapWsHandler extends TextWebSocketHandler {
 
     public static final String ATTR_UID = "uid";
     public static final String ATTR_MINDMAP = "mindMapId";
+
+    static class LockEntry {
+        long userId;
+        String userName;
+        long expireAt;
+        LockEntry(long userId, String userName, long expireAt) {
+            this.userId = userId; this.userName = userName; this.expireAt = expireAt;
+        }
+    }
 
     /** 广播变更通知给订阅该导图的所有会话 */
     public void broadcast(String mindMapId, String payload) {
@@ -73,6 +92,28 @@ public class MindMapWsHandler extends TextWebSocketHandler {
         return set == null ? 0 : set.size();
     }
 
+    /** 定期清理过期节点锁并广播释放 */
+    @Scheduled(fixedDelay = 30_000)
+    public void cleanExpiredLocks() {
+        long now = System.currentTimeMillis();
+        List<String> toRemoveMindMaps = new ArrayList<>();
+        for (Map.Entry<String, Map<String, LockEntry>> e : nodeLocks.entrySet()) {
+            Map<String, LockEntry> locks = e.getValue();
+            boolean changed = false;
+            for (Map.Entry<String, LockEntry> le : new ArrayList<>(locks.entrySet())) {
+                if (le.getValue().expireAt < now) {
+                    LockEntry entry = locks.remove(le.getKey());
+                    if (entry != null) {
+                        changed = true;
+                        broadcast(e.getKey(), buildLockEvent(e.getKey(), le.getKey(), "release", entry.userId, entry.userName));
+                    }
+                }
+            }
+            if (changed && locks.isEmpty()) toRemoveMindMaps.add(e.getKey());
+        }
+        toRemoveMindMaps.forEach(nodeLocks::remove);
+    }
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String body = message.getPayload();
@@ -88,9 +129,9 @@ public class MindMapWsHandler extends TextWebSocketHandler {
         if (mindMapId == null || mindMapId.isBlank()) return;
         if (!mindMapId.matches("\\d+")) return;
         long id = Long.parseLong(mindMapId);
+        Long uid = (Long) session.getAttributes().get(ATTR_UID);
 
         if ("subscribe".equals(type)) {
-            Long uid = (Long) session.getAttributes().get(ATTR_UID);
             if (uid == null) { send(session, "{\"type\":\"error\",\"message\":\"未登录\"}"); return; }
             if (!canAccess(uid, id)) {
                 send(session, "{\"type\":\"error\",\"message\":\"无权访问该导图\"}");
@@ -99,10 +140,99 @@ public class MindMapWsHandler extends TextWebSocketHandler {
             sessions.computeIfAbsent(mindMapId, k -> new CopyOnWriteArraySet<>()).add(session);
             session.getAttributes().put(ATTR_MINDMAP, mindMapId);
             send(session, "{\"type\":\"subscribed\",\"mindMapId\":" + mindMapId + "}");
+            // 订阅后回发当前所有节点锁状态，保证新进入的成员能看到既有锁定
+            pushCurrentLocks(session, mindMapId);
         } else if ("unsubscribe".equals(type)) {
             Set<WebSocketSession> set = sessions.get(mindMapId);
             if (set != null) set.remove(session);
             session.getAttributes().remove(ATTR_MINDMAP);
+        } else if ("lock".equals(type) && uid != null) {
+            String nodeId = node.path("nodeId").asText();
+            if (nodeId.isBlank()) return;
+            String action = node.path("action").asText();
+            String userName = getUserName(uid);
+            long now = System.currentTimeMillis();
+            Map<String, LockEntry> locks = nodeLocks.computeIfAbsent(mindMapId, k -> new ConcurrentHashMap<>());
+            if ("acquire".equals(action)) {
+                LockEntry existing = locks.get(nodeId);
+                if (existing != null && existing.userId != uid && existing.expireAt >= now) {
+                    // 已被他人锁定：仅告知请求者
+                    send(session, buildLockEvent(mindMapId, nodeId, "denied", existing.userId, existing.userName));
+                    return;
+                }
+                locks.put(nodeId, new LockEntry(uid, userName, now + LOCK_TTL_MS));
+                broadcast(mindMapId, buildLockEvent(mindMapId, nodeId, "acquire", uid, userName));
+            } else if ("release".equals(action)) {
+                LockEntry existing = locks.get(nodeId);
+                if (existing != null && existing.userId == uid) {
+                    locks.remove(nodeId);
+                    broadcast(mindMapId, buildLockEvent(mindMapId, nodeId, "release", uid, userName));
+                }
+            }
+        } else if ("node_change".equals(type) && uid != null) {
+            String nodeId = node.path("nodeId").asText();
+            String text = node.path("text").asText();
+            if (nodeId.isBlank()) return;
+            // 校验发送者确有锁（防滥用）
+            Map<String, LockEntry> locks = nodeLocks.get(mindMapId);
+            LockEntry entry = locks == null ? null : locks.get(nodeId);
+            if (entry == null || entry.userId != uid) return;
+            String userName = getUserName(uid);
+            String payload;
+            try {
+                payload = objectMapper.writeValueAsString(Map.of(
+                        "event", "node_change",
+                        "mindMapId", id,
+                        "nodeId", nodeId,
+                        "text", text == null ? "" : text,
+                        "userId", uid,
+                        "userName", userName == null ? "" : userName,
+                        "ts", System.currentTimeMillis()
+                ));
+            } catch (Exception e) {
+                return;
+            }
+            broadcast(mindMapId, payload);
+        }
+    }
+
+    /** 回发当前导图全部节点锁状态（新订阅者进入时） */
+    private void pushCurrentLocks(WebSocketSession session, String mindMapId) {
+        Map<String, LockEntry> locks = nodeLocks.get(mindMapId);
+        if (locks == null || locks.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        for (Map.Entry<String, LockEntry> e : locks.entrySet()) {
+            LockEntry le = e.getValue();
+            if (le.expireAt < now) continue;
+            send(session, buildLockEvent(mindMapId, e.getKey(), "acquire", le.userId, le.userName));
+        }
+    }
+
+    private String buildLockEvent(String mindMapId, String nodeId, String action, long userId, String userName) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "event", "node_lock",
+                    "mindMapId", Long.parseLong(mindMapId),
+                    "nodeId", nodeId,
+                    "action", action,
+                    "userId", userId,
+                    "userName", userName == null ? "" : userName,
+                    "ts", System.currentTimeMillis()
+            ));
+        } catch (Exception e) {
+            return "{\"event\":\"node_lock\"}";
+        }
+    }
+
+    private String getUserName(long userId) {
+        try {
+            SysUser u = sysUserMapper.selectById(userId);
+            if (u == null) return "";
+            String name = u.getNickname();
+            if (name == null || name.isBlank()) name = u.getUsername();
+            return name == null ? "" : name;
+        } catch (Exception e) {
+            return "";
         }
     }
 
@@ -130,6 +260,23 @@ public class MindMapWsHandler extends TextWebSocketHandler {
         if (mm != null) {
             Set<WebSocketSession> set = sessions.get(mm.toString());
             if (set != null) set.remove(session);
+            // 断开时释放该用户在该导图持有的所有节点锁
+            Long uid = (Long) session.getAttributes().get(ATTR_UID);
+            if (uid != null) {
+                Map<String, LockEntry> locks = nodeLocks.get(mm.toString());
+                if (locks != null && !locks.isEmpty()) {
+                    List<String> released = new ArrayList<>();
+                    for (Map.Entry<String, LockEntry> e : locks.entrySet()) {
+                        if (e.getValue().userId == uid) {
+                            locks.remove(e.getKey());
+                            released.add(e.getKey());
+                        }
+                    }
+                    for (String nid : released) {
+                        broadcast(mm.toString(), buildLockEvent(mm.toString(), nid, "release", uid, ""));
+                    }
+                }
+            }
         }
         // 兜底：清理所有残留引用
         sessions.values().forEach(set -> set.remove(session));

@@ -10,6 +10,20 @@
         <button title="新建画布" @click="onNewCanvas"><svg viewBox="0 0 24 24"><path d="M5 4h9l5 5v11H5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 4v5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 13h6M12 10v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
         <button title="返回列表" @click="goList"><svg viewBox="0 0 24 24"><path d="M4 7h5l2-2h9v14H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 11h16" stroke="currentColor" stroke-width="1.8"/></svg></button>
         <button title="保存" @click="saveDoc"><svg viewBox="0 0 24 24"><path d="M5 4h13l2 2v14H4V6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 4v6h8V4M8 20v-6h8v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <div class="autosave-wrap" @click.stop="autoSaveOpen = !autoSaveOpen">
+          <button title="自动保存设置" :class="{ active: autoSaveOpen }"><svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v2M12 19v2M4.2 6l1.7 1M18.1 17l1.7 1M3 12h2M19 12h2M4.2 18l1.7-1M18.1 7l1.7-1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+          <div v-if="autoSaveOpen" class="autosave-menu" @click.stop>
+            <div class="as-row">
+              <span class="as-label">自动保存</span>
+              <label class="as-switch"><input type="checkbox" v-model="autoSaveEnabled" /><span></span></label>
+            </div>
+            <div class="as-row">
+              <span class="as-label">间隔（秒）</span>
+              <input class="as-input" type="number" min="3" max="600" v-model.number="autoSaveInterval" @change="onAutoSaveIntervalChange" />
+            </div>
+            <div class="as-tip">快捷键 Ctrl+S 立即保存</div>
+          </div>
+        </div>
         <div class="export-wrap" @click.stop="exportOpen = !exportOpen">
           <button title="导出" :class="{ active: exportOpen }"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <div v-if="exportOpen" class="export-menu">
@@ -583,6 +597,7 @@ let ctxNode = null
 let manualStyled = new Set()
 let autoSaveTimer = null
 let beforeUnloadHandler = null
+let onCtrlSKeydown = null
 
 const tabs = [
   { key: 'style', label: '样式' },
@@ -750,6 +765,20 @@ async function createMind() {
       { type: 'number', list: Array.from({length:10},(_,i)=>({name:String(i+1),icon:numSvg(i+1)})) },
       { type: 'emoji', list: FALLBACK_EMOJI.map(e=>({name:e,icon:emojiSvg(e)})) }
     ],
+    // 协作锁：被他人锁定的节点不允许进入文本编辑（TextEdit 官方钩子）
+    beforeTextEdit: (node) => {
+      try {
+        const nid = node.uid || (node.nodeData && node.nodeData.uid)
+        if (nid && myEditNodeId !== nid) {
+          const lk = nodeLocks[nid]
+          if (lk && lk.userId !== myUid()) {
+            toast('该节点已被 ' + lk.userName + ' 锁定，无法编辑', 'error')
+            return false
+          }
+        }
+      } catch (e) {}
+      return true
+    },
 
     // 导出时给克隆 SVG 加 viewBox：超大画布（如全展开的万级节点）无 viewBox 时，
     // 查看器/浏览器按 1:1 只显示左上角一小块，加 viewBox 后可完整 fit 显示全部内容
@@ -816,7 +845,7 @@ function numSvg(n) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 function emojiSvg(e) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><text x="16" y="26" font-size="26" text-anchor="middle">'+e+'</text></svg>' }
 
 function bindMindEvents() {
-  mind.value.on('data_change', () => { markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
+  mind.value.on('data_change', () => { if (wsApplying) return; markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
   mind.value.on('view_data_change', (vd) => { try { updateScrollbars() } catch (e) {}; if (canvasTabs.value[docIndex.value]) canvasTabs.value[docIndex.value].viewData = vd; applyLazyView() })
   mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView() })
   mind.value.on('back_forward', (cur, total) => {
@@ -898,6 +927,16 @@ function bindMindEvents() {
   // 双击：图片节点 → 全屏浏览图片；附件节点 → 打开附件编辑与浏览（统一双击规则）；公式节点 → 公式编辑弹窗
   mind.value.on('node_dblclick', (node, e) => {
     try {
+      const nid0 = node.uid || (node.nodeData && node.nodeData.uid)
+      if (nid0 && myEditNodeId !== nid0) {
+        const lk = nodeLocks[nid0]
+        if (lk && lk.userId !== myUid()) {
+          try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
+          setTimeout(() => { try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {} }, 0)
+          toast('该节点已被 ' + lk.userName + ' 锁定，无法编辑', 'error')
+          return
+        }
+      }
       if (node.getData('attachmentUrl')) {
         try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
         const nm = node.getData('attachmentName') || ''
@@ -923,15 +962,18 @@ function bindMindEvents() {
       }
       if (rich && (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0)) {
         try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
+        acquireNodeLock(nid0)
         openMathEdit(node)
+        return
       }
+      acquireNodeLock(nid0)
     } catch (err) { console.warn(err) }
   })
   mind.value.on('draw_click', () => hideCtxMenu())
   mind.value.on('node_dragging', () => mapEl.value.classList.add('no-anim'))
   mind.value.on('node_dragend', () => mapEl.value.classList.remove('no-anim'))
-  mind.value.on('node_text_edit_change', () => mapEl.value.classList.add('no-anim'))
-mind.value.on('hide_text_edit', () => textEditActive.value = false)
+  mind.value.on('node_text_edit_change', (ev) => { mapEl.value.classList.add('no-anim'); pushNodeChange(ev && ev.node, ev && ev.text) })
+mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNodeLock() })
   // 编辑框聚焦/失焦切换快速入口
   const onEditFocusIn = (e) => {
     if (e.target && e.target.classList && e.target.classList.contains('smm-node-edit-wrap')) {
@@ -1061,7 +1103,7 @@ async function loadLatest(silent = false) {
       docIndex.value = 0
     }
     curVersion.value = fresh.version || 0
-    await loadDoc()
+    await loadDoc(silent)
     if (!silent) toast('已加载最新内容')
   } catch (e) {
     toast('加载最新失败: ' + e.message, 'error')
@@ -1069,8 +1111,9 @@ async function loadLatest(silent = false) {
 }
 
 function scheduleAutoSave() {
+  if (!autoSaveEnabled.value) return
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
-  autoSaveTimer = setTimeout(() => { if (dirty.value) saveDoc() }, 3000)
+  autoSaveTimer = setTimeout(() => { if (dirty.value) saveDoc() }, Math.max(3, autoSaveInterval.value) * 1000)
 }
 
 // 旧 KaTeX 公式数据迁移为 MathJax SVG（foreignObject 内 KaTeX 多行矩阵会行重叠塌陷）
@@ -1109,7 +1152,7 @@ async function migrateDocMath(doc) {
   }
 }
 
-async function loadDoc() {
+async function loadDoc(keepView = false) {
   const tk = ++loadingToken
   pageLoading.value = true
   loadingStart = Date.now()
@@ -1124,8 +1167,16 @@ async function loadDoc() {
   applyMediaCardStyle(doc.data.root, doc.theme)
   if (mind.value) {
     const docRoot = (doc.data && doc.data.root) ? doc.data.root : defaultData()
+    let keepTransform = null
+    if (keepView) {
+      try { keepTransform = mind.value.view.getTransformData() } catch (e) {}
+    }
     try { mind.value.setData(docRoot) } catch (e) { console.error('setData失败', e) }
-    mind.value.view.fit()
+    if (keepView) {
+      if (keepTransform) { try { mind.value.view.setTransformData(keepTransform) } catch (e) {} }
+    } else {
+      mind.value.view.fit()
+    }
     ;[300, 900, 1800].forEach((d) => setTimeout(() => { try { centerRoot(); updateScrollbars() } catch (e) {} }, d))
     if (doc.layout) { mind.value.setLayout(doc.layout); layoutKey.value = LAYOUT_REV[doc.layout] || 'r' }
     mind.value.setTheme(doc.theme)
@@ -1136,6 +1187,13 @@ async function loadDoc() {
   applyBranchRainbow()
   markSaved()
   clearTimeout(autoSaveTimer)
+  // setData 重渲染后 SVG 角标会丢失，重挂所有他人锁角标
+  try {
+    Object.keys(nodeLocks).forEach((nid) => {
+      const lk = nodeLocks[nid]
+      if (lk && Number(lk.userId) !== myUid()) setLockMark(nid, true, lk.userName)
+    })
+  } catch (e) {}
 }
 
 async function switchCanvas(i) {
@@ -3140,6 +3198,7 @@ function connectWs() {
     ws = new WebSocket(proto + location.host + '/ws?token=' + encodeURIComponent(token))
   } catch (e) { scheduleWsReconnect(); return }
   ws.onopen = () => {
+    console.log('[ws] open, mindMapId=', mindMapId.value)
     if (mindMapId.value) {
       ws.send(JSON.stringify({ type: 'subscribe', mindMapId: String(mindMapId.value) }))
       wsSubscribed = true
@@ -3148,11 +3207,23 @@ function connectWs() {
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data)
+      console.log('[ws] recv', msg.event || msg.type)
+      if (msg.event === 'node_lock') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        applyRemoteLock(msg.nodeId, msg.action, Number(msg.userId), msg.userName || '')
+        return
+      }
+      if (msg.event === 'node_change') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        if (Number(msg.userId) === myUid()) return
+        applyRemoteNodeChange(msg.nodeId, msg.text, Number(msg.userId))
+        return
+      }
       if (msg.event !== 'mindmap_updated') return
       if (String(msg.mindMapId) !== String(mindMapId.value)) return
-      let myUid = 0
-      try { myUid = Number((JSON.parse(localStorage.getItem('usmind.user') || '{}')).id) || 0 } catch (e) { myUid = 0 }
-      if (myUid && Number(msg.updatedBy) === myUid) return
+      let myUidVal = 0
+      try { myUidVal = Number((JSON.parse(localStorage.getItem('usmind.user') || '{}')).id) || 0 } catch (e) { myUidVal = 0 }
+      if (myUidVal && Number(msg.updatedBy) === myUidVal) return
       const v = Number(msg.version)
       if (!v || v <= curVersion.value) return
       if (dirty.value) {
@@ -3162,7 +3233,7 @@ function connectWs() {
       } else {
         loadLatest(true)
       }
-    } catch (e) { /* 忽略解析错误 */ }
+    } catch (e) { console.warn('ws msg err', e) }
   }
   ws.onclose = () => { ws = null; wsSubscribed = false; scheduleWsReconnect() }
   ws.onerror = () => { try { ws.close() } catch (e) {} }
@@ -3181,6 +3252,7 @@ function applyCollabUpdate() {
 
 function disconnectWs() {
   if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null }
+  releaseNodeLock(true)
   if (ws) {
     try {
       if (mindMapId.value) ws.send(JSON.stringify({ type: 'unsubscribe', mindMapId: String(mindMapId.value) }))
@@ -3189,6 +3261,133 @@ function disconnectWs() {
     ws = null
   }
   wsSubscribed = false
+}
+
+// ============ 节点级协作：锁定 + 实时编辑推送 ============
+const nodeLocks = reactive({}) // nodeId -> { userId, userName }
+let myEditNodeId = null
+let myLockTimer = null
+let nodeChangeTimer = null
+let wsApplying = false
+
+function myUid() {
+  try { return Number((JSON.parse(localStorage.getItem('usmind.user') || '{}')).id) || 0 } catch (e) { return 0 }
+}
+
+function sendWs(obj) {
+  if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(obj)) } catch (e) {} }
+}
+
+function acquireNodeLock(nid) {
+  if (!nid) return
+  myEditNodeId = nid
+  sendWs({ type: 'lock', mindMapId: String(mindMapId.value), nodeId: nid, action: 'acquire' })
+  if (myLockTimer) clearInterval(myLockTimer)
+  myLockTimer = setInterval(() => {
+    if (myEditNodeId) sendWs({ type: 'lock', mindMapId: String(mindMapId.value), nodeId: myEditNodeId, action: 'acquire' })
+  }, 20000)
+}
+
+function releaseNodeLock(silent) {
+  if (myEditNodeId && ws && ws.readyState === 1) {
+    sendWs({ type: 'lock', mindMapId: String(mindMapId.value), nodeId: myEditNodeId, action: 'release' })
+  }
+  myEditNodeId = null
+  if (myLockTimer) { clearInterval(myLockTimer); myLockTimer = null }
+  if (!silent && nodeChangeTimer) { clearTimeout(nodeChangeTimer); nodeChangeTimer = null }
+}
+
+function pushNodeChange(node, text) {
+  if (!ws || ws.readyState !== 1) return
+  const nid = node && (node.uid || (node.nodeData && node.nodeData.uid))
+  if (!nid) return
+  if (nodeChangeTimer) clearTimeout(nodeChangeTimer)
+  nodeChangeTimer = setTimeout(() => {
+    sendWs({ type: 'node_change', mindMapId: String(mindMapId.value), nodeId: nid, text: (text == null ? '' : text).slice(0, 8000) })
+  }, 250)
+}
+
+function applyRemoteNodeChange(nid, text, fromUid) {
+  if (myEditNodeId === nid) return
+  try {
+    const node = mind.value.renderer.findNodeByUid(nid)
+    if (!node) return
+    wsApplying = true
+    mind.value.renderer.setNodeText(node, text == null ? '' : text)
+    wsApplying = false
+    const lk = nodeLocks[nid]
+    if (lk) setLockMark(nid, true, lk.userName)
+  } catch (e) { wsApplying = false; console.warn('applyRemoteNodeChange err', e) }
+}
+
+function applyRemoteLock(nid, action, userId, userName) {
+  if (!nid) return
+  if (action === 'acquire') {
+    if (nodeLocks[nid] && nodeLocks[nid].userId === userId) return
+    nodeLocks[nid] = { userId, userName }
+    if (userId !== myUid()) setLockMark(nid, true, userName)
+  } else if (action === 'release') {
+    const cur = nodeLocks[nid]
+    if (!cur || (userId && cur.userId !== userId)) return
+    delete nodeLocks[nid]
+    setLockMark(nid, false)
+  }
+}
+
+// 自定义节点锁角标（SVG 覆盖层，不依赖库的 cooperate 插件）
+function setLockMark(nid, show, userName) {
+  try {
+    const node = mind.value.renderer.findNodeByUid(nid)
+    if (!node || !node.group || !node.group.node) return
+    const g = node.group.node
+    let badge = g.querySelector('.collab-lock-badge')
+    if (show) {
+      if (!badge) {
+        badge = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+        badge.setAttribute('class', 'collab-lock-badge')
+        g.appendChild(badge)
+      }
+      let bb = { width: 0, height: 0 }
+      try { bb = g.getBBox() } catch (e) {}
+      const w = Math.max(64, String(userName || '').length * 14 + 34)
+      const h = 22
+      const x = Math.max(2, bb.width - w - 2)
+      const y = -h - 2
+      badge.setAttribute('transform', '')
+      badge.innerHTML = ''
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      rect.setAttribute('x', x); rect.setAttribute('y', y)
+      rect.setAttribute('width', w); rect.setAttribute('height', h)
+      rect.setAttribute('rx', 11); rect.setAttribute('fill', '#e67e22'); rect.setAttribute('opacity', '0.94')
+      badge.appendChild(rect)
+      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+      txt.setAttribute('x', x + w / 2); txt.setAttribute('y', y + 15)
+      txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('font-size', '12')
+      txt.setAttribute('fill', '#fff')
+      badge.textContent = '🔒 ' + (userName || '协作中')
+      badge.appendChild(txt)
+    } else if (badge) {
+      badge.remove()
+    }
+  } catch (e) { console.warn('setLockMark err', e) }
+}
+
+// 自动保存配置
+const autoSaveEnabled = ref(true)
+const autoSaveInterval = ref(10)
+const autoSaveOpen = ref(false)
+try {
+  const as = JSON.parse(localStorage.getItem('usmind.autosave') || '{}')
+  autoSaveEnabled.value = as.enabled !== false
+  autoSaveInterval.value = Math.max(3, Math.min(600, as.interval || 10))
+} catch (e) {}
+function saveAutoSaveCfg() {
+  localStorage.setItem('usmind.autosave', JSON.stringify({ enabled: autoSaveEnabled.value, interval: autoSaveInterval.value }))
+}
+watch(autoSaveEnabled, (v) => { saveAutoSaveCfg(); if (!v && autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null } })
+watch(autoSaveInterval, (v) => { if (v < 3) autoSaveInterval.value = 3; if (v > 600) autoSaveInterval.value = 600; saveAutoSaveCfg() })
+function onAutoSaveIntervalChange() {
+  if (dirty.value) scheduleAutoSave()
 }
 const shareDialog = ref(false)
 const shareLink = ref('')
@@ -3515,6 +3714,8 @@ onMounted(async () => {
 
   beforeUnloadHandler = () => { if (dirty.value) saveDoc() }
   window.addEventListener('beforeunload', beforeUnloadHandler)
+  onCtrlSKeydown = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (mindMapId.value) saveDoc() } }
+  window.addEventListener('keydown', onCtrlSKeydown)
   document.addEventListener('click', onDocClick)
   document.addEventListener('paste', onPaste)
   startCommentPoll()
@@ -3530,6 +3731,7 @@ function onDocClick(e) {
 
 onBeforeUnmount(() => {
   disconnectWs()
+  if (onCtrlSKeydown) window.removeEventListener('keydown', onCtrlSKeydown)
   document.removeEventListener('mousemove', onBarDragMove)
   document.removeEventListener('mouseup', onBarDragEnd)
   if (beforeUnloadHandler) window.removeEventListener('beforeunload', beforeUnloadHandler)
@@ -3702,6 +3904,20 @@ onBeforeUnmount(() => {
 }
 .collab-toast-text { font-size: 13px; color: #f5d98b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .math-btn-sm { padding: 3px 10px; font-size: 12px; }
+.autosave-wrap { position: relative; display: inline-flex; }
+.autosave-wrap button.active { background: rgba(255,255,255,.2); }
+.autosave-menu { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); z-index: 210; width: 220px; padding: 10px 12px; background: rgba(30,34,42,.97); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.5); backdrop-filter: blur(8px); }
+.as-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; }
+.as-label { font-size: 13px; color: #e8eaf0; white-space: nowrap; }
+.as-input { width: 74px; padding: 3px 8px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 7px; color: #fff; font-size: 13px; text-align: center; }
+.as-input:focus { outline: none; border-color: rgba(122,162,247,.7); }
+.as-switch { position: relative; display: inline-flex; width: 42px; height: 22px; flex-shrink: 0; }
+.as-switch input { opacity: 0; width: 0; height: 0; }
+.as-switch span { position: absolute; inset: 0; background: rgba(255,255,255,.16); border-radius: 999px; transition: .25s; cursor: pointer; }
+.as-switch span::before { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .25s; }
+.as-switch input:checked + span { background: #4A5CF7; }
+.as-switch input:checked + span::before { transform: translateX(20px); }
+.as-tip { margin-top: 6px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,.08); font-size: 11px; color: #8a92a8; text-align: center; }
 </style>
 
 <style>

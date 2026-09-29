@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -81,7 +82,13 @@ public class IpGuardServiceImpl implements IpGuardService {
         }
         // 拉黑期间放 Redis 快速生效；到期后清理
         redisTemplate.opsForValue().set("ipblack:" + ip, "1", blackSeconds, TimeUnit.SECONDS);
-        redisTemplate.delete("rate:" + ip + ":*");
+        // 清空该 IP 的频率计数（避免解封后残留计数导致再次超频）
+        try {
+            Set<String> rateKeys = redisTemplate.keys("rate:" + ip + ":*");
+            if (rateKeys != null && !rateKeys.isEmpty()) redisTemplate.delete(rateKeys);
+        } catch (Exception e) {
+            log.warn("清理频率计数失败: {}", e.getMessage());
+        }
     }
 
     private boolean match(String ruleType, String targetType, String value) {
