@@ -30,6 +30,20 @@
     </el-card>
 
     <el-card shadow="never" class="cfg-card">
+      <template #header><b>机构协作</b><span class="card-tip">创建机构 / 发起导图协作的会员门槛；关闭后普通用户也可创建机构和发起协作，会员到期仅停止发起新协作，已有协作不受影响</span></template>
+      <el-form label-width="180px" label-position="left">
+        <el-form-item label="创建机构需要会员">
+          <el-switch v-model="form.orgCreateNeedMember" />
+          <span class="field-hint">开启时，非会员无法创建机构</span>
+        </el-form-item>
+        <el-form-item label="发起协作需要会员">
+          <el-switch v-model="form.orgInviteNeedMember" />
+          <span class="field-hint">开启时，非会员/会员到期后无法把导图加入机构协作（已有协作不受影响，续费即可恢复）</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="cfg-card">
       <template #header><b>上传限制</b><span class="card-tip">普通用户 / 会员的资源数量与单文件大小上限</span></template>
       <el-form label-width="180px" label-position="left">
         <el-form-item label="普通用户数量上限">
@@ -78,6 +92,7 @@ const exportOptions = ['json', 'usmind', 'png', 'jpg', 'jpeg', 'svg', 'pdf', 'ma
 
 const form = reactive({
   memberEnabled: true,
+  orgCreateNeedMember: true, orgInviteNeedMember: true,
   uploadFreeCount: 20, uploadFreeMaxMb: 20, uploadVipCount: 200, uploadVipMaxMb: 200,
   mindmapFreeCount: 5, mindmapVipCount: 200
 })
@@ -86,6 +101,8 @@ onMounted(async () => {
   try {
     const d = await getSettings()
     form.memberEnabled = d.memberEnabled !== undefined ? !!d.memberEnabled : true
+    form.orgCreateNeedMember = d.orgCreateNeedMember !== undefined ? !!Number(d.orgCreateNeedMember) : true
+    form.orgInviteNeedMember = d.orgInviteNeedMember !== undefined ? !!Number(d.orgInviteNeedMember) : true
     memberThemeIds.value = d.memberThemeIds ? String(d.memberThemeIds).split(',').map(x => x.trim()).filter(Boolean) : []
     memberExportFormats.value = d.memberExportFormats ? String(d.memberExportFormats).split(',').map(x => x.trim()).filter(Boolean) : []
     form.uploadFreeCount = Number(d.uploadFreeCount || 20)
@@ -105,6 +122,8 @@ async function save() {
   try {
     await saveSettings({
       memberEnabled: form.memberEnabled ? 1 : 0,
+      orgCreateNeedMember: form.orgCreateNeedMember ? 1 : 0,
+      orgInviteNeedMember: form.orgInviteNeedMember ? 1 : 0,
       memberThemeIds: memberThemeIds.value.join(','),
       memberExportFormats: memberExportFormats.value.join(','),
       uploadFreeCount: String(form.uploadFreeCount),
