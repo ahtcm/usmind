@@ -48,9 +48,9 @@ public class MindMapController {
     }
 
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody MindMapSaveRequest req) {
-        mindMapService.update(SecurityUtil.currentUserId(), id, req);
-        return Result.ok();
+    public Result<Map<String, Object>> update(@PathVariable Long id, @RequestBody MindMapSaveRequest req) {
+        int version = mindMapService.update(SecurityUtil.currentUserId(), id, req);
+        return Result.ok(Map.of("version", version));
     }
 
     @DeleteMapping("/{id}")

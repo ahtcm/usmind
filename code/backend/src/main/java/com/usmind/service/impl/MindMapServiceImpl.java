@@ -21,16 +21,31 @@ import java.util.UUID;
 public class MindMapServiceImpl implements MindMapService {
 
     private final MindMapMapper mindMapMapper;
+    private final com.usmind.mapper.OrgMemberMapper orgMemberMapper;
+    private final com.usmind.mapper.OrgCollabMapper orgCollabMapper;
     private final com.usmind.mapper.SysUserMapper sysUserMapper;
     private final com.usmind.service.SettingsService settingsService;
+    private final com.usmind.service.OrgService orgService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MindMapServiceImpl(MindMapMapper mindMapMapper,
+                              com.usmind.mapper.OrgMemberMapper orgMemberMapper,
+                              com.usmind.mapper.OrgCollabMapper orgCollabMapper,
                               com.usmind.mapper.SysUserMapper sysUserMapper,
-                              com.usmind.service.SettingsService settingsService) {
+                              com.usmind.service.SettingsService settingsService,
+                              com.usmind.service.OrgService orgService) {
         this.mindMapMapper = mindMapMapper;
+        this.orgMemberMapper = orgMemberMapper;
+        this.orgCollabMapper = orgCollabMapper;
         this.sysUserMapper = sysUserMapper;
         this.settingsService = settingsService;
+        this.orgService = orgService;
+    }
+
+    /** 是否拥有该导图的读写权限：属主本人，或所属机构协作成员 */
+    private boolean canAccess(long userId, MindMap m) {
+        if (m.getUserId().equals(userId)) return true;
+        return orgService.canAccessMindMap(userId, m.getId());
     }
 
     private boolean isVip(Long userId) {
@@ -63,7 +78,42 @@ public class MindMapServiceImpl implements MindMapService {
         // 列表不返回大字段 data
         Page<MindMap> result = mindMapMapper.selectPage(p, qw.select(MindMap.class, f ->
                 !f.getColumn().equals("data")));
+        // 合并本人参与的机构协作导图（排除已属自己的），标记 isCollab
+        java.util.List<Long> collabIds = new java.util.ArrayList<>();
+        try {
+            java.util.List<com.usmind.entity.OrgCollab> cs = orgCollabOfUser(userId);
+            for (com.usmind.entity.OrgCollab c : cs) {
+                com.usmind.entity.MindMap m = mindMapMapper.selectById(c.getMindMapId());
+                if (m != null && !m.getUserId().equals(userId)) collabIds.add(m.getId());
+            }
+        } catch (Exception e) { /* 机构服务异常不影响个人列表 */ }
+        if (!collabIds.isEmpty()) {
+            java.util.List<MindMap> collabs = mindMapMapper.selectList(new LambdaQueryWrapper<MindMap>()
+                    .in(MindMap::getId, collabIds).select(MindMap.class, f -> !f.getColumn().equals("data")));
+            // 空分页时 records 可能是不可变空列表，先包装为可变列表再合并
+            java.util.List<MindMap> records = new java.util.ArrayList<>(result.getRecords());
+            java.util.Set<Long> ownIds = new java.util.HashSet<>();
+            for (MindMap m : records) ownIds.add(m.getId());
+            for (MindMap m : collabs) {
+                if (ownIds.contains(m.getId())) continue;
+                m.setIsCollab(true);
+                records.add(m);
+                result.setTotal(result.getTotal() + 1);
+            }
+            result.setRecords(records);
+        }
         return result;
+    }
+
+    private java.util.List<com.usmind.entity.OrgCollab> orgCollabOfUser(long userId) {
+        // 用户所在机构的全部协作导图
+        java.util.List<com.usmind.entity.OrgMember> ms = orgMemberMapper.selectList(
+                new LambdaQueryWrapper<com.usmind.entity.OrgMember>().eq(com.usmind.entity.OrgMember::getUserId, userId));
+        if (ms.isEmpty()) return java.util.Collections.emptyList();
+        java.util.List<Long> orgIds = new java.util.ArrayList<>();
+        for (com.usmind.entity.OrgMember m : ms) orgIds.add(m.getOrgId());
+        return orgCollabMapper.selectList(new LambdaQueryWrapper<com.usmind.entity.OrgCollab>()
+                .in(com.usmind.entity.OrgCollab::getOrgId, orgIds));
     }
 
     @Override
@@ -91,17 +141,23 @@ public class MindMapServiceImpl implements MindMapService {
     @Override
     public MindMap get(long userId, Long id) {
         MindMap m = mindMapMapper.selectById(id);
-        if (m == null || !m.getUserId().equals(userId)) {
+        if (m == null || !canAccess(userId, m)) {
             throw new BusinessException(404, "导图不存在");
         }
         return m;
     }
 
     @Override
-    public void update(long userId, Long id, MindMapSaveRequest req) {
+    public int update(long userId, Long id, MindMapSaveRequest req) {
         MindMap m = mindMapMapper.selectById(id);
-        if (m == null || !m.getUserId().equals(userId)) {
+        if (m == null || !canAccess(userId, m)) {
             throw new BusinessException(404, "导图不存在");
+        }
+        // 协作冲突检测（乐观锁）：前端传入 baseVersion，与当前版本不一致且未强制覆盖时返回 409
+        int cur = m.getVersion() == null ? 0 : m.getVersion();
+        boolean force = req.getForce() != null && req.getForce();
+        if (!force && req.getBaseVersion() != null && req.getBaseVersion() != cur) {
+            throw new BusinessException(409, "导图已被其他成员修改，请选择「加载最新」或「以我的为准覆盖」");
         }
         if (req.getName() != null) m.setName(req.getName());
         if (req.getData() != null) m.setData(toJson(req.getData()));
@@ -109,7 +165,9 @@ public class MindMapServiceImpl implements MindMapService {
         if (req.getTheme() != null) m.setTheme(req.getTheme());
         if (req.getViewData() != null) m.setViewData(toJson(req.getViewData()));
         if (req.getManualStyles() != null) m.setManualStyles(toJson(req.getManualStyles()));
+        m.setVersion(cur + 1);
         mindMapMapper.updateById(m);
+        return m.getVersion();
     }
 
     @Override
@@ -119,6 +177,9 @@ public class MindMapServiceImpl implements MindMapService {
             throw new BusinessException(404, "导图不存在");
         }
         mindMapMapper.deleteById(id);
+        // 删除协作关系
+        orgCollabMapper.delete(new LambdaQueryWrapper<com.usmind.entity.OrgCollab>()
+                .eq(com.usmind.entity.OrgCollab::getMindMapId, id));
     }
 
     @Override

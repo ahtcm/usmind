@@ -15,6 +15,7 @@ const routes = [
       { path: 'pay-config', name: 'PayConfig', component: () => import('@/views/PayConfig.vue'), meta: { title: '支付与验证码', requireAdmin: true } },
       { path: 'ip-rules', name: 'IpRules', component: () => import('@/views/IpRules.vue'), meta: { title: 'IP 黑白名单', requireAdmin: true } },
       { path: 'mindmaps', name: 'MindMaps', component: () => import('@/views/MindMaps.vue'), meta: { title: '导图管理', requireAdmin: true } },
+      { path: 'orgs', name: 'Orgs', component: () => import('@/views/Orgs.vue'), meta: { title: '机构管理', requireAdmin: true } },
       { path: 'resources', name: 'Resources', component: () => import('@/views/Resources.vue'), meta: { title: '资源管理', requireAdmin: true } },
       { path: 'oss', name: 'Oss', component: () => import('@/views/OssConfig.vue'), meta: { title: 'OSS配置', requireAdmin: true } },
       { path: 'themes', name: 'Themes', component: () => import('@/views/Themes.vue'), meta: { title: '主题模板', requireAdmin: true } },

@@ -7,7 +7,8 @@ const routes = [
   { path: '/editor/:id?', name: 'Editor', component: () => import('../views/Editor.vue'), meta: { requiresAuth: true } },
   { path: '/share/:token', name: 'ShareView', component: () => import('../views/ShareView.vue') },
   { path: '/profile', name: 'ProfileView', component: () => import('../views/ProfileView.vue'), meta: { requiresAuth: true } },
-  { path: '/member', name: 'MemberView', component: () => import('../views/MemberView.vue'), meta: { requiresAuth: true } }
+  { path: '/member', name: 'MemberView', component: () => import('../views/MemberView.vue'), meta: { requiresAuth: true } },
+  { path: '/orgs', name: 'OrgView', component: () => import('../views/Org.vue'), meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

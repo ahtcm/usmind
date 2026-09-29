@@ -20,6 +20,10 @@
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .8-4.5 4.3 1 6.4-5.5-3-5.5 3 1-6.4L3 8.8 9 8z"/></svg>
               会员中心
             </div>
+            <div class="drop-item" @click="goOrgs">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+              我的机构
+            </div>
             <div class="drop-sep"></div>
             <div class="drop-item danger" @click="onLogout">退出登录</div>
           </div>
@@ -29,7 +33,7 @@
     </div>
     <div class="maps-grid" v-if="list.length">
       <div class="map-card" v-for="m in list" :key="m.id" @click="openMap(m)">
-        <div class="mc-name">{{ m.name || '未命名' }}</div>
+        <div class="mc-name">{{ m.name || '未命名' }}<span v-if="m.isCollab" class="mc-collab">协作</span></div>
         <div class="mc-meta">更新于 {{ formatTime(m.updatedAt) }}</div>
         <div class="mc-actions">
           <button @click.stop="onShare(m)" v-if="!m.isShared">分享</button>
@@ -131,6 +135,11 @@ function goMember() {
   router.push('/member')
 }
 
+function goOrgs() {
+  menuOpen.value = false
+  router.push('/orgs')
+}
+
 async function onAvatarPick(e) {
   const f = e.target && e.target.files && e.target.files[0]
   e.target.value = ''
@@ -173,5 +182,6 @@ function formatTime(t) {
 .drop-item:hover { background: var(--accent); color: #fff; }
 .drop-item.danger:hover { background: #e5484d; }
 .drop-sep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.08); }
+.mc-collab { margin-left: 8px; font-size: 10px; color: #f5c96b; background: rgba(245,201,107,.15); border-radius: 6px; padding: 1px 7px; vertical-align: middle; }
 @keyframes umToastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
 </style>

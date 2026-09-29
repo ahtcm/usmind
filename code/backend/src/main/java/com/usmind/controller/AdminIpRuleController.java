@@ -6,21 +6,39 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.usmind.common.Result;
 import com.usmind.entity.IpRule;
 import com.usmind.mapper.IpRuleMapper;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/admin/ip-rules")
 public class AdminIpRuleController {
 
     private final IpRuleMapper ipRuleMapper;
+    private final StringRedisTemplate redisTemplate;
 
-    public AdminIpRuleController(IpRuleMapper ipRuleMapper) {
+    public AdminIpRuleController(IpRuleMapper ipRuleMapper, StringRedisTemplate redisTemplate) {
         this.ipRuleMapper = ipRuleMapper;
+        this.redisTemplate = redisTemplate;
+    }
+
+    /** 删除/禁用黑名单规则时，同步清除 Redis 快速生效缓存，否则限制会残留到 TTL 到期 */
+    private void clearRedisCache(IpRule r) {
+        if (r == null) return;
+        try {
+            if ("black".equals(r.getRuleType()) && "ip".equals(r.getTargetType()) && r.getTargetValue() != null) {
+                redisTemplate.delete("ipblack:" + r.getTargetValue());
+                Set<String> keys = redisTemplate.keys("rate:" + r.getTargetValue() + ":*");
+                if (keys != null && !keys.isEmpty()) redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            // Redis 不可用时不影响数据库操作
+        }
     }
 
     @GetMapping
@@ -60,18 +78,30 @@ public class AdminIpRuleController {
         if (rule.getRemark() != null) exist.setRemark(rule.getRemark());
         if (rule.getEnabled() != null) exist.setEnabled(rule.getEnabled());
         ipRuleMapper.updateById(exist);
+        // 改为禁用或修改为白名单时，清除旧的拉黑缓存
+        if (Integer.valueOf(0).equals(exist.getEnabled()) || !"black".equals(exist.getRuleType())) {
+            clearRedisCache(exist);
+        }
         return Result.ok();
     }
 
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
+        IpRule exist = ipRuleMapper.selectById(id);
         ipRuleMapper.deleteById(id);
+        clearRedisCache(exist);
         return Result.ok();
     }
 
     @DeleteMapping("/batch")
     public Result<Void> batchDelete(@RequestBody List<Long> ids) {
-        if (ids != null && !ids.isEmpty()) ipRuleMapper.deleteBatchIds(ids);
+        if (ids != null && !ids.isEmpty()) {
+            for (Long id : ids) {
+                IpRule exist = ipRuleMapper.selectById(id);
+                ipRuleMapper.deleteById(id);
+                clearRedisCache(exist);
+            }
+        }
         return Result.ok();
     }
 }

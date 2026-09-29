@@ -24,6 +24,10 @@ public class MindMap {
     private String sharePassword;
     private String sharePasswordPlain;
     private Integer viewCount;
+    private Integer version;
     private LocalDateTime createdAt;
+    /** 非表字段：是否为机构协作导图（列表标记用） */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private Boolean isCollab;
     private LocalDateTime updatedAt;
 }

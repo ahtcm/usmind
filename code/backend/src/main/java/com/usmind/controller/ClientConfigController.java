@@ -34,6 +34,9 @@ public class ClientConfigController {
         m.put("authSmsEnabled", settingsService.getInt("authSmsEnabled", 0) == 1);
         m.put("wechatLoginEnabled", settingsService.getInt("wechatLoginEnabled", 0) == 1);
         m.put("memberEnabled", settingsService.getInt("memberEnabled", 1) == 1);
+        // 机构协作开关
+        m.put("orgCreateNeedMember", settingsService.getInt("orgCreateNeedMember", 1) == 1);
+        m.put("orgInviteNeedMember", settingsService.getInt("orgInviteNeedMember", 1) == 1);
         // 上传类型白名单（后台可配）
         m.put("allowedFileTypes", settingsService.get("allowedFileTypes", ""));
         m.put("uploadMaxSizeMb", settingsService.getInt("uploadMaxSizeMb", 100));

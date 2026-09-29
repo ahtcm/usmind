@@ -300,6 +300,19 @@
     </div>
 
     <!-- 分享链接弹窗 -->
+  <!-- 协作保存冲突弹窗 -->
+  <div v-if="conflictDialog" class="share-mask" @click.self="conflictDialog = false">
+    <div class="share-box">
+      <div class="share-title">协作冲突</div>
+      <div class="share-tip">该导图已被其他成员修改（版本已更新）。请选择：</div>
+      <div class="share-actions">
+        <button class="math-btn math-btn-primary" @click="loadLatest">加载最新内容</button>
+        <button class="math-btn" @click="forceSave">以我的为准覆盖</button>
+        <button class="math-btn" @click="conflictDialog = false">取消</button>
+      </div>
+    </div>
+  </div>
+
   <div v-if="shareDialog" class="share-mask" @click.self="shareDialog = false">
     <div class="share-box">
       <div class="share-title">分享导图</div>
@@ -976,17 +989,75 @@ async function saveDoc() {
   doc.layout = mind.value.opt.layout || 'logicalStructure'
   doc.theme = mind.value.opt.theme || themes.value[0].name
   try {
-    await mindmapApi.update(mindMapId.value, {
+    const r = await mindmapApi.update(mindMapId.value, {
       name: docName.value,
       data: { root: data, _tabs: canvasTabs.value, _activeTab: docIndex.value },
       layout: doc.layout,
       theme: doc.theme,
       viewData: doc.viewData,
-      manualStyles: Array.from(manualStyled)
+      manualStyles: Array.from(manualStyled),
+      baseVersion: curVersion.value
     })
+    if (r && r.version != null) curVersion.value = r.version
     markSaved()
   } catch (e) {
-    console.warn('保存失败:', e)
+    if (e && e.code === 409) {
+      conflictDialog.value = true
+    } else {
+      console.warn('保存失败:', e)
+      toast((e && e.message) || '保存失败', 'error')
+    }
+  }
+}
+
+/** 冲突后：以我的为准覆盖 */
+async function forceSave() {
+  conflictDialog.value = false
+  const doc = canvasTabs.value[docIndex.value]
+  const data = mind.value.getData()
+  if (data && data.data && styleRadius.value > 0 && !data.data.shape) data.data.shape = 'rectangle'
+  try {
+    const r = await mindmapApi.update(mindMapId.value, {
+      name: docName.value,
+      data: { root: data, _tabs: canvasTabs.value, _activeTab: docIndex.value },
+      layout: doc.layout,
+      theme: doc.theme,
+      viewData: doc.viewData,
+      manualStyles: Array.from(manualStyled),
+      baseVersion: curVersion.value,
+      force: true
+    })
+    if (r && r.version != null) curVersion.value = r.version
+    markSaved()
+    toast('已以你的内容覆盖保存')
+  } catch (e) {
+    toast((e && e.message) || '覆盖保存失败', 'error')
+  }
+}
+
+/** 冲突后：加载最新内容 */
+async function loadLatest() {
+  conflictDialog.value = false
+  try {
+    const fresh = await mindmapApi.get(mindMapId.value)
+    let d = fresh.data || {}
+    if (typeof d === 'string' && d) { try { d = JSON.parse(d) } catch (e2) { d = {} } }
+    if (d._tabs && Array.isArray(d._tabs) && d._tabs.length) {
+      canvasTabs.value = d._tabs
+      docIndex.value = d._activeTab || 0
+      if (d.root) {
+        const active = canvasTabs.value[docIndex.value]
+        if (active) { if (active.data) active.data.root = d.root; else active.data = { root: d.root } }
+      }
+    } else {
+      canvasTabs.value = [{ name: fresh.name || '未命名', layout: fresh.layout, theme: fresh.theme, viewData: fresh.viewData, data: { root: d.root || d }, manualStyles: [] }]
+      docIndex.value = 0
+    }
+    curVersion.value = fresh.version || 0
+    await loadDoc()
+    toast('已加载最新内容')
+  } catch (e) {
+    toast('加载最新失败: ' + e.message, 'error')
   }
 }
 
@@ -3043,6 +3114,8 @@ async function onImportFile(e) {
     toast('导入失败: ' + err.message, 'error')
   }
 }
+const curVersion = ref(0)
+const conflictDialog = ref(false)
 const shareDialog = ref(false)
 const shareLink = ref('')
 const sharePwd = ref('')
@@ -3331,6 +3404,7 @@ onMounted(async () => {
     mindMapId.value = data.id
     data = await mindmapApi.get(data.id)
   }
+  curVersion.value = data.version || 0
 
   // 解析数据: 后端可能返回 JSON 字符串，需先解析为对象
   let d = data.data || {}

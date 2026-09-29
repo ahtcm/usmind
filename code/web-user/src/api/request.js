@@ -25,7 +25,10 @@ request.interceptors.response.use(
         router.push({ name: 'Login' })
         return Promise.reject(new Error(body.message || '未登录'))
       }
-      return Promise.reject(new Error(body.message || '请求失败'))
+      const er = new Error(body.message || '请求失败')
+      er.code = body.code
+      er.status = body.status
+      return Promise.reject(er)
     }
     return body
   },
