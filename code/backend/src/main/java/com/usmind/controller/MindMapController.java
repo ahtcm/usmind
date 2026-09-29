@@ -59,6 +59,10 @@ public class MindMapController {
         return Result.ok();
     }
 
+    @GetMapping("/{id}/share-info")
+    public Result<Map<String, Object>> shareInfo(@PathVariable Long id) {
+        return Result.ok(mindMapService.shareInfo(SecurityUtil.currentUserId(), id));
+    }
     @PostMapping("/{id}/share")
     public Result<Map<String, Object>> share(@PathVariable Long id, @RequestBody(required = false) ShareRequest req) {
         String pwd = req == null ? null : req.getPassword();

@@ -16,6 +16,7 @@ public interface MindMapService {
     /** 管理后台批量删除（不校验归属） */
     void deleteBatch(List<Long> ids);
     Map<String, Object> share(long userId, Long id, String password);
+    Map<String, Object> shareInfo(long userId, Long id);
     void unshare(long userId, Long id);
     MindMap getByShareToken(String token, String password);
 }

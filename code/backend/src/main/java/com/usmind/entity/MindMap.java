@@ -22,6 +22,7 @@ public class MindMap {
     private Integer isShared;
     private String shareToken;
     private String sharePassword;
+    private String sharePasswordPlain;
     private Integer viewCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

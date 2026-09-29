@@ -136,18 +136,46 @@ public class MindMapServiceImpl implements MindMapService {
         if (m == null || !m.getUserId().equals(userId)) {
             throw new BusinessException(404, "导图不存在");
         }
-        if (!StringUtils.hasText(m.getShareToken())) {
+        boolean alreadyShared = StringUtils.hasText(m.getShareToken());
+        if (!alreadyShared) {
             m.setShareToken(UUID.randomUUID().toString().replace("-", ""));
         }
         m.setIsShared(1);
-        // 分享密码加盐哈希存储（BCrypt），不再明文落库
-        String pwd = password == null ? "" : password;
-        m.setSharePassword(pwd.isEmpty() ? ""
-                : new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(pwd));
+        // password==null：复用分享且保持原密码；password==""：清除密码；否则设置新密码
+        if (password == null) {
+            if (!alreadyShared) {
+                m.setSharePassword("");
+                m.setSharePasswordPlain("");
+            }
+        } else if (password.isEmpty()) {
+            m.setSharePassword("");
+            m.setSharePasswordPlain("");
+        } else {
+            // 分享密码加盐哈希存储（BCrypt），明文仅用于作者端回显
+            m.setSharePassword(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode(password));
+            m.setSharePasswordPlain(password);
+        }
         mindMapMapper.updateById(m);
         Map<String, Object> data = new HashMap<>();
         data.put("shareToken", m.getShareToken());
         data.put("shareUrl", "/share/" + m.getShareToken());
+        data.put("hasPassword", StringUtils.hasText(m.getSharePasswordPlain()) || StringUtils.hasText(m.getSharePassword()));
+        data.put("sharePassword", m.getSharePasswordPlain() == null ? "" : m.getSharePasswordPlain());
+        return data;
+    }
+
+    @Override
+    public Map<String, Object> shareInfo(long userId, Long id) {
+        MindMap m = mindMapMapper.selectById(id);
+        if (m == null || !m.getUserId().equals(userId)) {
+            throw new BusinessException(404, "导图不存在");
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("isShared", Integer.valueOf(1).equals(m.getIsShared()) && StringUtils.hasText(m.getShareToken()));
+        data.put("shareToken", m.getShareToken() == null ? "" : m.getShareToken());
+        data.put("shareUrl", StringUtils.hasText(m.getShareToken()) ? "/share/" + m.getShareToken() : "");
+        data.put("hasPassword", StringUtils.hasText(m.getSharePasswordPlain()) || StringUtils.hasText(m.getSharePassword()));
+        data.put("sharePassword", m.getSharePasswordPlain() == null ? "" : m.getSharePasswordPlain());
         return data;
     }
 

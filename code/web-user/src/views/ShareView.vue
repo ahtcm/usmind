@@ -189,6 +189,8 @@ async function loadShare() {
     const data = await mindmapApi.getShare(route.params.token, pwd.value || undefined)
     shareName.value = data.name || '分享导图'
     sharePwd.value = pwd.value || ''
+    // 密码会话：本机浏览器缓存，刷新不再要求输入密码
+    if (pwd.value) { try { localStorage.setItem('usmind_share_pwd_' + route.params.token, pwd.value) } catch (e) {} }
     const savedNick = (nick.value || '').trim()
     if (savedNick) { nick.value = savedNick; try { localStorage.setItem('usmind_share_nick', savedNick) } catch (e) {} }
     needPwd.value = false // 密码通过：先切到导图视图，让 map 容器渲染
@@ -264,6 +266,7 @@ async function loadShare() {
     mapEl.value.addEventListener('touchcancel', onMapTouchEnd)
   } catch (e) {
     if (e.message && e.message.indexOf('密码') >= 0) {
+      try { localStorage.removeItem('usmind_share_pwd_' + route.params.token) } catch (e2) {}
       needPwd.value = true
       pwdErr.value = '密码错误'
     } else {
@@ -706,6 +709,7 @@ function onMapTouchEnd() { touchPan = null; pinch = null }
 onMounted(async () => {
   needPwd.value = false
   pwd.value = ''
+  try { const savedPwd = localStorage.getItem('usmind_share_pwd_' + route.params.token); if (savedPwd) pwd.value = savedPwd } catch (e) {}
   try { const saved = localStorage.getItem('usmind_share_nick'); if (saved) nick.value = saved } catch (e) {}
   window.addEventListener('resize', updateBgSize)
   // 拉取后台预览/高亮类型配置

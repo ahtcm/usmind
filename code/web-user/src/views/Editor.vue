@@ -312,10 +312,17 @@
         </div>
       </template>
       <template v-else>
-        <div class="share-tip">已开启分享<template v-if="sharePwd">（需密码访问）</template>，链接：</div>
+        <div class="share-tip">已开启分享<template v-if="sharePassword">（需密码访问）</template>，链接：</div>
         <input readonly :value="shareLink" class="share-link-input" @focus="e => e.target.select()" />
+        <template v-if="sharePassword">
+          <div class="share-tip" style="margin-top:8px">访问密码（点击复制）：</div>
+          <input readonly :value="sharePassword" class="share-link-input" @focus="e => e.target.select()" />
+        </template>
+        <div v-else-if="shareHasPwd" class="share-tip" style="margin-top:8px;color:#e6b422">已设置访问密码（原密码不可找回，可点「重设密码」输入新密码）</div>
         <div class="share-actions">
-          <button class="math-btn math-btn-primary" @click="copyShare">复制链接</button>
+          <button class="math-btn math-btn-primary" @click="copyShare('link')">复制链接</button>
+          <button v-if="sharePassword" class="math-btn" @click="copyShare('pwd')">复制密码</button>
+          <button class="math-btn" @click="shareReady = false">重设密码</button>
           <button class="math-btn" @click="shareDialog = false">关闭</button>
         </div>
       </template>
@@ -3040,26 +3047,41 @@ const shareDialog = ref(false)
 const shareLink = ref('')
 const sharePwd = ref('')
 const shareReady = ref(false)
+const sharePassword = ref('')
+const shareHasPwd = ref(false)
 function onShare() {
   if (!mindMapId.value) return
   sharePwd.value = ''
   shareReady.value = false
+  sharePassword.value = ''
+  shareHasPwd.value = false
   shareDialog.value = true
+  // 已分享：直接复用原链接与密码，不再生成新分享
+  mindmapApi.shareInfo(mindMapId.value).then(d => {
+    if (d.isShared && d.shareUrl) {
+      shareLink.value = location.origin + d.shareUrl
+      sharePassword.value = d.sharePassword || ''
+      shareHasPwd.value = !!d.hasPassword
+      shareReady.value = true
+    }
+  }).catch(() => { shareDialog.value = false; toast('查询分享状态失败', 'error') })
 }
 async function confirmShare() {
   if (!mindMapId.value) return
   try {
-    const data = await mindmapApi.share(mindMapId.value, sharePwd.value || undefined)
+    const data = await mindmapApi.share(mindMapId.value, sharePwd.value)
     shareLink.value = location.origin + '/share/' + data.shareToken
+    sharePassword.value = data.sharePassword || ''
+    shareHasPwd.value = !!data.hasPassword
     shareReady.value = true
   } catch (e) { toast('分享失败: ' + e.message, 'error') }
 }
-function copyShare() {
+function copyShare(type) {
   try {
-    const el = document.querySelector('.share-link-input')
-    if (el) { el.select(); document.execCommand('copy') }
+    const els = document.querySelectorAll('.share-link-input')
+    const el = type === 'pwd' ? els[1] : els[0]
+    if (el) { el.select(); document.execCommand('copy'); toast(type === 'pwd' ? '密码已复制' : '链接已复制') }
   } catch (e) {}
-  shareDialog.value = false
 }
 
 // Ctrl+V 粘贴文件到当前选中节点（图片/音视频/文件）
