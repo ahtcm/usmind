@@ -304,6 +304,7 @@
 
 <script setup>
 import { toast, showConfirm, showPrompt } from '../utils/modal'
+import { memberApi, configApi } from '../api/member'
 import { ref, watch, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MindMap from 'simple-mind-map'
@@ -1369,6 +1370,7 @@ function applyThemeFonts(name) {
 }
 
 function applyTheme(name) {
+  if (!checkMemberFeature('theme', name)) { toast('该主题为会员专属，开通会员后可用', 'error'); return }
   canvasTabs.value[docIndex.value].theme = name
   mind.value.setTheme(name)
   ;[400, 1200].forEach((d) => setTimeout(() => { try { applyThemeFonts(name) } catch (e) {} }, d))
@@ -2732,6 +2734,7 @@ async function runExport(type) {
   exportOpen.value = false
   if (!mind.value) { toast('请先进入画布', 'error'); return }
   if (exporting.value) { toast('正在导出中，请稍候...', 'warn'); return }
+  if (!checkMemberFeature('export', type)) { toast('该导出格式为会员专属，开通会员后可用', 'error'); return }
   exporting.value = true
   showExportLoading(0, '')
   // 先让出主线程：Vue 响应式 DOM 更新 + 浏览器绘制遮罩后再开始耗时同步计算（getSvgData 序列化大 SVG 会阻塞主线程）
@@ -3033,6 +3036,36 @@ function onPaste(e) {
   insertFileToNode(node, f)
 }
 
+let memberFeature = { memberThemeIds: '', memberExportFormats: '', memberLevel: 0 }
+function checkMemberFeature(kind, value) {
+  const cfg = memberFeature
+  if (kind === 'theme') {
+    if (!cfg.memberThemeIds) return true
+    const ids = String(cfg.memberThemeIds).split(',').map(x => x.trim())
+    // 主题名 -> 主题ID 映射（后台配置为 ID 列表）
+    const item = themes.value.find(t => t.name === value)
+    const tid = item && item.id != null ? String(item.id) : ''
+    if (!ids.includes(tid) && !ids.includes(value)) return true
+  } else if (kind === 'export') {
+    if (!cfg.memberExportFormats) return true
+    const fmts = String(cfg.memberExportFormats).split(',').map(x => x.trim())
+    if (!fmts.includes(value)) return true
+  }
+  return cfg.memberLevel > 0
+}
+async function loadMemberFeature() {
+  try {
+    const c = await configApi.client()
+    const f = c.feature || {}
+    memberFeature.memberThemeIds = f.memberThemeIds || ''
+    memberFeature.memberExportFormats = f.memberExportFormats || ''
+    try {
+      const m = await memberApi.info()
+      memberFeature.memberLevel = m && m.level ? m.level : 0
+    } catch (e) { memberFeature.memberLevel = 0 }
+  } catch (e) { /* 忽略 */ }
+}
+
 // 初始化
 onMounted(async () => {
   window.addEventListener('resize', () => { updateCanvasBgSize(); updateScrollbars(); nextTick(checkBarOverflow) })
@@ -3066,7 +3099,7 @@ onMounted(async () => {
       remote.forEach((t) => {
         const cfg = t.config && Object.keys(t.config).length ? t.config : themes.value[0].config
         try { MindMap.defineTheme(t.name, cfg) } catch (e) {}
-        const item = { name: t.name, key: t.themeKey || ('theme-' + t.id), branchColors: t.branchColors || [], config: cfg }
+        const item = { name: t.name, id: t.id, key: t.themeKey || ('theme-' + t.id), branchColors: t.branchColors || [], config: cfg }
         const idx = merged.findIndex(x => x.name === t.name || x.key === t.themeKey)
         if (idx >= 0) merged[idx] = item
         else merged.push(item)
@@ -3075,6 +3108,7 @@ onMounted(async () => {
       if (!merged.find(x => x.name === currentTheme.value)) currentTheme.value = merged[0].name
     }
   } catch (e) { /* 后端不可用则仅用内置主题 */ }
+  loadMemberFeature()
 
   let data
   if (mindMapId.value) {

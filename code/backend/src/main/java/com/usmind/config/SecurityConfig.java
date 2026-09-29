@@ -25,9 +25,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.usmind.security.IpGuardFilter ipGuardFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          com.usmind.security.IpGuardFilter ipGuardFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.ipGuardFilter = ipGuardFilter;
     }
 
     @Bean
@@ -60,7 +63,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/captcha", "/api/auth/send-code").permitAll()
+                        .requestMatchers("/api/config/client", "/api/member/plans", "/api/pay/wechat/notify").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
                         .requestMatchers("/api/themes", "/api/icons").permitAll()
                         .requestMatchers("/api/preview-config").permitAll()
@@ -86,7 +90,8 @@ public class SecurityConfig {
                                     new ObjectMapper().writeValueAsString(Result.error(403, "没有权限")));
                         })
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(ipGuardFilter, com.usmind.security.JwtAuthenticationFilter.class);
         return http.build();
     }
 }

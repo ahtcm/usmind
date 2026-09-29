@@ -14,4 +14,6 @@ public interface UserService {
     void delete(Long id);
     void deleteBatch(List<Long> ids);
     void resetPassword(Long id, String password);
+    void grantMember(Long id, int level, int days);
+    void cancelMember(Long id);
 }

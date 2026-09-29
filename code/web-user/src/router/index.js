@@ -5,7 +5,9 @@ const routes = [
   { path: '/login', name: 'Login', component: () => import('../views/Login.vue') },
   { path: '/maps', name: 'MindMapList', component: () => import('../views/MindMapList.vue'), meta: { requiresAuth: true } },
   { path: '/editor/:id?', name: 'Editor', component: () => import('../views/Editor.vue'), meta: { requiresAuth: true } },
-  { path: '/share/:token', name: 'ShareView', component: () => import('../views/ShareView.vue') }
+  { path: '/share/:token', name: 'ShareView', component: () => import('../views/ShareView.vue') },
+  { path: '/profile', name: 'ProfileView', component: () => import('../views/ProfileView.vue'), meta: { requiresAuth: true } },
+  { path: '/member', name: 'MemberView', component: () => import('../views/MemberView.vue'), meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

@@ -3,8 +3,26 @@
     <div class="maps-header">
       <h1>我的<span class="only-pc">思维</span>导图</h1>
       <div class="user-area">
-        <span class="user-name">{{ userStore.user?.nickname || userStore.user?.username || '' }}</span>
-        <button class="btn ghost" @click="onLogout">退出</button>
+        <div class="avatar-menu" @mouseenter="menuOpen = true" @mouseleave="menuOpen = false">
+          <div class="avatar-trigger">
+            <div class="avatar" v-if="userStore.user?.avatar"><img :src="userStore.user.avatar" alt="avatar" /></div>
+            <div class="avatar avatar-text" v-else>{{ (userStore.user?.nickname || userStore.user?.username || 'U').slice(0, 1).toUpperCase() }}</div>
+            <span class="user-name">{{ userStore.user?.nickname || userStore.user?.username || '' }}</span>
+            <span class="caret">▾</span>
+          </div>
+          <div class="avatar-drop" v-if="menuOpen">
+            <div class="drop-item" @click="goProfile">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+              个人信息
+            </div>
+            <div class="drop-item" @click="goMember">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 .8-4.5 4.3 1 6.4-5.5-3-5.5 3 1-6.4L3 8.8 9 8z"/></svg>
+              会员中心
+            </div>
+            <div class="drop-sep"></div>
+            <div class="drop-item danger" @click="onLogout">退出登录</div>
+          </div>
+        </div>
         <button class="btn" @click="onNew">+ 新建导图</button>
       </div>
     </div>
@@ -35,6 +53,7 @@ import { useUserStore } from '../stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
+const menuOpen = ref(false)
 
 onMounted(loadList)
 
@@ -90,6 +109,16 @@ async function onStopShare(m) {
   }
 }
 
+function goProfile() {
+  menuOpen.value = false
+  router.push('/profile')
+}
+
+function goMember() {
+  menuOpen.value = false
+  router.push('/member')
+}
+
 function onLogout() {
   userStore.logout()
   router.push('/login')
@@ -101,3 +130,19 @@ function formatTime(t) {
   return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0')
 }
 </script>
+
+<style scoped>
+.avatar-menu { position: relative; }
+.avatar-trigger { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 8px; border-radius: 10px; transition: background .15s; }
+.avatar-trigger:hover { background: rgba(255,255,255,.08); }
+.avatar { width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #4f6ef7, #6a5cf6); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-text { font-size: 13px; font-weight: 700; color: #fff; }
+.caret { font-size: 10px; color: var(--text-dim); }
+.avatar-drop { position: absolute; top: calc(100% + 6px); right: 0; min-width: 160px; background: rgba(28,31,38,.96); backdrop-filter: blur(18px); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.45); padding: 6px; z-index: 300; animation: umToastIn .18s ease; }
+.drop-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; transition: all .12s; white-space: nowrap; }
+.drop-item:hover { background: var(--accent); color: #fff; }
+.drop-item.danger:hover { background: #e5484d; }
+.drop-sep { height: 1px; margin: 5px 8px; background: rgba(255,255,255,.08); }
+@keyframes umToastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+</style>

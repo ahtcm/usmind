@@ -49,6 +49,13 @@ public class FileServiceImpl implements FileService {
         this.settingsService = settingsService;
     }
 
+    private boolean isVip(Long userId) {
+        SysUser u = sysUserMapper.selectById(userId);
+        if (u == null || u.getMemberLevel() == null || u.getMemberLevel() <= 0) return false;
+        if (u.getMemberExpire() == null) return false;
+        return u.getMemberExpire().isAfter(java.time.LocalDateTime.now());
+    }
+
     @Override
     public Map<String, Object> upload(long userId, MultipartFile file, Long mindMapId) throws IOException {
         if (file == null || file.isEmpty()) {
@@ -57,9 +64,19 @@ public class FileServiceImpl implements FileService {
         String original = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
 
         // 大小软校验（MB）
-        int maxMb = settingsService.getInt("uploadMaxSizeMb", 100);
+        // 会员大小限制：非会员 uploadFreeMaxMb / 会员 uploadVipMaxMb（默认值一致时等价于 uploadMaxSizeMb）
+        boolean vip = isVip(userId);
+        int maxMb = settingsService.getInt(vip ? "uploadVipMaxMb" : "uploadFreeMaxMb",
+                settingsService.getInt("uploadMaxSizeMb", 100));
         if (file.getSize() > maxMb * 1024L * 1024L) {
-            throw new BusinessException(400, "文件大小超过限制(" + maxMb + "MB)");
+            throw new BusinessException(400, "文件大小超过限制(" + maxMb + "MB)" + (vip ? "" : "，升级会员可提升上限"));
+        }
+        // 上传资源数量限制
+        Long count = fileResourceMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.usmind.entity.FileResource>()
+                .eq(com.usmind.entity.FileResource::getUserId, userId));
+        int maxCount = settingsService.getInt(vip ? "uploadVipCount" : "uploadFreeCount", 200);
+        if (count != null && count >= maxCount) {
+            throw new BusinessException(400, "上传资源数量已达上限(" + maxCount + "个)" + (vip ? "" : "，升级会员可提升上限"));
         }
         // 类型软校验
         String allowed = settingsService.get("allowedFileTypes", "");

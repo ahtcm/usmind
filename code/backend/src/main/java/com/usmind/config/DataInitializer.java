@@ -53,10 +53,69 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        initMemberTables();
         initAdmin();
         initLocalOss();
         initThemes();
         initIcons();
+    }
+
+    private void initMemberTables() {
+        try {
+            // 旧库补列（逐个尝试，失败忽略）
+            String[] alters = {
+                "ALTER TABLE sys_user ADD COLUMN member_level INT DEFAULT 0",
+                "ALTER TABLE sys_user ADD COLUMN member_expire DATETIME NULL",
+                "ALTER TABLE sys_user ADD COLUMN source VARCHAR(16) DEFAULT 'local'",
+                "ALTER TABLE sys_user ADD COLUMN openid_wechat VARCHAR(128) DEFAULT ''",
+                "ALTER TABLE sys_user ADD COLUMN openid_qq VARCHAR(128) DEFAULT ''",
+                "ALTER TABLE sys_user ADD COLUMN last_login_at DATETIME NULL"
+            };
+            for (String a : alters) {
+                try { jdbcTemplate.execute(a); } catch (Exception ignored) {}
+            }
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS member_plan (" +
+                " id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                " name VARCHAR(64) DEFAULT ''," +
+                " level INT DEFAULT 1," +
+                " price DECIMAL(10,2) DEFAULT 0," +
+                " days INT DEFAULT 30," +
+                " sort INT DEFAULT 0," +
+                " enabled TINYINT DEFAULT 1," +
+                " created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会员套餐表'");
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS pay_order (" +
+                " id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                " out_trade_no VARCHAR(64) NOT NULL UNIQUE," +
+                " user_id BIGINT," +
+                " plan_id BIGINT," +
+                " amount DECIMAL(10,2) DEFAULT 0," +
+                " channel VARCHAR(16) DEFAULT 'wechat'," +
+                " status VARCHAR(16) DEFAULT 'created'," +
+                " transaction_id VARCHAR(64) DEFAULT ''," +
+                " created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                " paid_at DATETIME NULL" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付订单表'");
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS ip_rule (" +
+                " id BIGINT AUTO_INCREMENT PRIMARY KEY," +
+                " rule_type VARCHAR(8) DEFAULT 'black'," +
+                " target_type VARCHAR(8) DEFAULT 'ip'," +
+                " target_value VARCHAR(128)," +
+                " remark VARCHAR(255) DEFAULT ''," +
+                " enabled TINYINT DEFAULT 1," +
+                " created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IP黑白名单表'");
+            // 默认会员套餐
+            Long planCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM member_plan", Long.class);
+            if (planCount == null || planCount == 0) {
+                jdbcTemplate.execute("INSERT INTO member_plan (name, level, price, days, sort, enabled) VALUES ('月度会员', 1, 9.90, 30, 1, 1), ('季度会员', 1, 26.00, 90, 2, 1), ('年度会员', 1, 88.00, 365, 3, 1)");
+            }
+        } catch (Exception e) {
+            log.warn("初始化会员/支付/IP表失败: {}", e.getMessage());
+        }
     }
 
     private void initAdmin() {

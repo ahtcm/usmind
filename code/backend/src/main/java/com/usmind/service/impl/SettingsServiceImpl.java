@@ -78,6 +78,37 @@ public class SettingsServiceImpl implements SettingsService {
         // 纯文本预览（无高亮）扩展名（后台可配）
         putDefaultIfAbsent("textPreviewExts", "[\"txt\",\"log\",\"ini\",\"conf\",\"cfg\",\"csv\",\"env\",\"properties\",\"tsv\",\"gitignore\",\"dockerfile\",\"sass\",\"plist\"]");
         putDefaultIfAbsent("aiApiKey", "");
+        // 微信支付（默认关闭）
+        putDefaultIfAbsent("wechatPayEnabled", "0");
+        putDefaultIfAbsent("wechatMchId", "");
+        putDefaultIfAbsent("wechatAppId", "");
+        putDefaultIfAbsent("wechatApiKey", "");
+        putDefaultIfAbsent("wechatPrivateKey", "");
+        putDefaultIfAbsent("wechatNotifyUrl", "");
+        // 注册 / 验证码（图形验证码默认开，短信验证码默认关）
+        putDefaultIfAbsent("authCaptchaEnabled", "1");
+        putDefaultIfAbsent("authSmsEnabled", "0");
+        putDefaultIfAbsent("smsProvider", "");
+        putDefaultIfAbsent("smsAccessKeyId", "");
+        putDefaultIfAbsent("smsAccessKeySecret", "");
+        putDefaultIfAbsent("smsSignName", "");
+        putDefaultIfAbsent("smsTemplateCode", "");
+        // 会员功能开关（空=全部开放）
+        putDefaultIfAbsent("memberThemeIds", "");
+        putDefaultIfAbsent("memberExportFormats", "");
+        // 上传限制：数量 / 单文件大小(MB)（非会员 / 会员）
+        putDefaultIfAbsent("uploadFreeCount", "20");
+        putDefaultIfAbsent("uploadFreeMaxMb", "20");
+        putDefaultIfAbsent("uploadVipCount", "200");
+        putDefaultIfAbsent("uploadVipMaxMb", "200");
+        // 画布个数限制
+        putDefaultIfAbsent("mindmapFreeCount", "5");
+        putDefaultIfAbsent("mindmapVipCount", "200");
+        // IP 防护
+        putDefaultIfAbsent("ipGuardEnabled", "1");
+        putDefaultIfAbsent("ipRateLimit", "60");
+        putDefaultIfAbsent("ipRateWindow", "60");
+        putDefaultIfAbsent("ipAutoBlackSeconds", "3600");
         putDefaultIfAbsent("aiModel", "gpt-3.5-turbo");
         putDefaultIfAbsent("aiEndpoint", "");
         // 附件节点文件名默认文字色（后台主题/项目配置可改）
@@ -184,6 +215,19 @@ public class SettingsServiceImpl implements SettingsService {
         }
         if (body.containsKey("attachTextColor") && body.get("attachTextColor") != null) {
             set("attachTextColor", String.valueOf(body.get("attachTextColor")));
+        }
+        // ===== 会员 / 上传 / 画布限制 / 支付 / 验证码 / 防护键（后台可配，统一以 string 落库）=====
+        String[] memberKeys = {
+            "memberThemeIds", "memberExportFormats",
+            "uploadFreeCount", "uploadFreeMaxMb", "uploadVipCount", "uploadVipMaxMb",
+            "mindmapFreeCount", "mindmapVipCount",
+            "wechatPayEnabled", "authCaptchaEnabled", "authSmsEnabled",
+            "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds"
+        };
+        for (String k : memberKeys) {
+            if (body.containsKey(k) && body.get(k) != null) {
+                set(k, String.valueOf(body.get(k)));
+            }
         }
     }
 

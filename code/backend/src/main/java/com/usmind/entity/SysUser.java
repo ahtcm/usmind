@@ -20,6 +20,12 @@ public class SysUser {
     private String phone;
     private String role;
     private Integer status;
+    private Integer memberLevel;
+    private java.time.LocalDateTime memberExpire;
+    private String source;
+    private String openidWechat;
+    private String openidQq;
+    private java.time.LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

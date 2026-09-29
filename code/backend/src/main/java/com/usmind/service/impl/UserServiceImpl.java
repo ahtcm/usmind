@@ -99,4 +99,25 @@ public class UserServiceImpl implements UserService {
         u.setPassword(passwordEncoder.encode(password));
         userMapper.updateById(u);
     }
+
+    @Override
+    public void grantMember(Long id, int level, int days) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null) return;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime base = u.getMemberExpire() != null && u.getMemberExpire().isAfter(now)
+                ? u.getMemberExpire() : now;
+        u.setMemberLevel(level);
+        u.setMemberExpire(base.plusDays(days));
+        userMapper.updateById(u);
+    }
+
+    @Override
+    public void cancelMember(Long id) {
+        SysUser u = userMapper.selectById(id);
+        if (u == null) return;
+        u.setMemberLevel(0);
+        u.setMemberExpire(null);
+        userMapper.updateById(u);
+    }
 }

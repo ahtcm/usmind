@@ -21,10 +21,23 @@ import java.util.UUID;
 public class MindMapServiceImpl implements MindMapService {
 
     private final MindMapMapper mindMapMapper;
+    private final com.usmind.mapper.SysUserMapper sysUserMapper;
+    private final com.usmind.service.SettingsService settingsService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public MindMapServiceImpl(MindMapMapper mindMapMapper) {
+    public MindMapServiceImpl(MindMapMapper mindMapMapper,
+                              com.usmind.mapper.SysUserMapper sysUserMapper,
+                              com.usmind.service.SettingsService settingsService) {
         this.mindMapMapper = mindMapMapper;
+        this.sysUserMapper = sysUserMapper;
+        this.settingsService = settingsService;
+    }
+
+    private boolean isVip(Long userId) {
+        com.usmind.entity.SysUser u = sysUserMapper.selectById(userId);
+        if (u == null || u.getMemberLevel() == null || u.getMemberLevel() <= 0) return false;
+        if (u.getMemberExpire() == null) return false;
+        return u.getMemberExpire().isAfter(java.time.LocalDateTime.now());
     }
 
     /** 导图数据统一序列化为 JSON 字符串存储 */
@@ -55,6 +68,13 @@ public class MindMapServiceImpl implements MindMapService {
 
     @Override
     public Long create(long userId, MindMapSaveRequest req) {
+        // 画布个数限制：非会员 mindmapFreeCount / 会员 mindmapVipCount
+        boolean vip = isVip(userId);
+        int maxCount = settingsService.getInt(vip ? "mindmapVipCount" : "mindmapFreeCount", 200);
+        Long count = mindMapMapper.selectCount(new LambdaQueryWrapper<MindMap>().eq(MindMap::getUserId, userId));
+        if (count != null && count >= maxCount) {
+            throw new BusinessException(400, "画布数量已达上限(" + maxCount + "个)" + (vip ? "" : "，升级会员可提升上限"));
+        }
         MindMap m = new MindMap();
         m.setUserId(userId);
         m.setName(StringUtils.hasText(req.getName()) ? req.getName() : "未命名");

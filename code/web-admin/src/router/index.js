@@ -10,6 +10,10 @@ const routes = [
     children: [
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/Dashboard.vue'), meta: { title: '仪表盘' } },
       { path: 'users', name: 'Users', component: () => import('@/views/Users.vue'), meta: { title: '用户管理', requireAdmin: true } },
+      { path: 'members', name: 'Members', component: () => import('@/views/Members.vue'), meta: { title: '会员管理', requireAdmin: true } },
+      { path: 'member-config', name: 'MemberConfig', component: () => import('@/views/MemberConfig.vue'), meta: { title: '会员功能配置', requireAdmin: true } },
+      { path: 'pay-config', name: 'PayConfig', component: () => import('@/views/PayConfig.vue'), meta: { title: '支付与验证码', requireAdmin: true } },
+      { path: 'ip-rules', name: 'IpRules', component: () => import('@/views/IpRules.vue'), meta: { title: 'IP 黑白名单', requireAdmin: true } },
       { path: 'mindmaps', name: 'MindMaps', component: () => import('@/views/MindMaps.vue'), meta: { title: '导图管理', requireAdmin: true } },
       { path: 'resources', name: 'Resources', component: () => import('@/views/Resources.vue'), meta: { title: '资源管理', requireAdmin: true } },
       { path: 'oss', name: 'Oss', component: () => import('@/views/OssConfig.vue'), meta: { title: 'OSS配置', requireAdmin: true } },

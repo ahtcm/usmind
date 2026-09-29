@@ -113,7 +113,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh } from '@element-plus/icons-vue'
+import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh, Medal, Key, Lock } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,6 +126,10 @@ const isMobile = ref(false)
 const menus = [
   { path: '/dashboard', label: '仪表盘', icon: Odometer },
   { path: '/users', label: '用户管理', icon: User },
+  { path: '/members', label: '会员管理', icon: Medal },
+  { path: '/member-config', label: '会员功能配置', icon: Key },
+  { path: '/pay-config', label: '支付与验证码', icon: Lock },
+  { path: '/ip-rules', label: 'IP 黑白名单', icon: Lock },
   { path: '/mindmaps', label: '导图管理', icon: Share },
   { path: '/resources', label: '资源管理', icon: Files },
   { path: '/oss', label: 'OSS配置', icon: FolderOpened },
