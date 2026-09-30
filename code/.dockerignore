@@ -1,0 +1,6 @@
+﻿# Docker 构建忽略（仅用于 deploy 构建 nginx 前端镜像）
+**/node_modules
+**/dist
+**/target
+.git
+*.log

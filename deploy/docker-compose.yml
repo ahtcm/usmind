@@ -1,0 +1,118 @@
+# ============================================================
+# USMIND 一键 Docker 部署
+# 用法：
+#   1. 复制 .env.example 为 .env 并修改里面的强密码/密钥
+#   2. 本目录（deploy/）执行： docker compose up -d --build
+#   3. 访问： http://服务器IP:80  （用户端）
+#            http://服务器IP:80/admin/ （管理后台）
+#   可选端口兼容：8866（用户端直连）、8867（管理后台直连）
+# ============================================================
+services:
+  # ---------- MySQL 8.0 ----------
+  mysql:
+    image: mysql:8.0
+    container_name: usmind-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USMIND_DB_PASSWORD:-root}
+      MYSQL_DATABASE: usmind_db
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_allowed_packet=512M
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动执行建库/基础表（业务表由后端 DataInitializer 启动时自动创建）
+      - ../sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${USMIND_DB_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [usmind]
+
+  # ---------- Redis 7 ----------
+  redis:
+    image: redis:7-alpine
+    container_name: usmind-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [usmind]
+
+  # ---------- Spring Boot 后端 ----------
+  backend:
+    build: ./backend
+    container_name: usmind-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 数据库 / Redis 指向 compose 服务名
+      USMIND_DB_HOST: mysql
+      USMIND_DB_PORT: "3306"
+      USMIND_DB_USER: root
+      USMIND_DB_PASSWORD: ${USMIND_DB_PASSWORD:-root}
+      USMIND_REDIS_HOST: redis
+      USMIND_REDIS_PORT: "6379"
+      # 生产安全密钥（务必在 .env 中配置 32 字节以上随机串）
+      USMIND_JWT_SECRET: ${USMIND_JWT_SECRET:-}
+      USMIND_OSS_CIPHER_KEY: ${USMIND_OSS_CIPHER_KEY:-}
+      # 上传目录 / 日志目录（挂卷持久化）
+      USMIND_UPLOAD_DIR: /data/uploads
+      LOG_PATH: /data/logs
+      TZ: Asia/Shanghai
+    volumes:
+      - app-data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8899"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    networks: [usmind]
+
+  # ---------- Nginx：前端静态 + API/WS 反代 ----------
+  nginx:
+    # 构建上下文为 code/（包含两个前端源码），Dockerfile 在 deploy/nginx/
+    build:
+      context: ../code
+      dockerfile: ../deploy/nginx/Dockerfile
+    container_name: usmind-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"        # 统一入口（用户端 / + 管理后台 /admin/）
+      - "8866:8866"    # 兼容：用户端直连
+      - "8867:8867"    # 兼容：管理后台直连
+    volumes:
+      - app-data:/data:ro                 # 共享后端上传目录
+      - ../deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    networks: [usmind]
+
+volumes:
+  mysql-data:
+  redis-data:
+  app-data:
+
+networks:
+  usmind:
+    driver: bridge

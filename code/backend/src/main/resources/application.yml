@@ -24,7 +24,8 @@ jwt:
   expire: 86400000
 
 file:
-  upload-dir: ./uploads
+  # 上传目录：默认 ./uploads（相对工作目录），可用环境变量 USMIND_UPLOAD_DIR 覆盖（Docker 挂载卷）
+  upload-dir: ${USMIND_UPLOAD_DIR:./uploads}
 
 ipguard:
   # 本项目统一经 nginx 反向代理（nginx 已强制覆盖 X-Real-IP / X-Forwarded-For 为真实客户端 IP）。

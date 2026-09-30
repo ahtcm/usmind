@@ -29,6 +29,6 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "[Start] Backend on port 8899..."
-exec "$JAVA_BIN" -jar "target/usmind-backend.jar" \
+exec "$JAVA_BIN" -DLOG_PATH="$ROOT/logs" -jar "target/usmind-backend.jar" \
      --spring.profiles.active=dev \
      --file.upload-dir="$ROOT/uploads"

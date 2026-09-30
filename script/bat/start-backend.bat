@@ -27,7 +27,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [Start] Backend on port 8899...
-java -jar "target\usmind-backend.jar" --spring.profiles.active=dev --file.upload-dir="%ROOT%\uploads"
+java -DLOG_PATH="%ROOT%\logs" -jar "target\usmind-backend.jar" --spring.profiles.active=dev --file.upload-dir="%ROOT%\uploads"
 
 echo.
 echo [Stopped] Backend exited
