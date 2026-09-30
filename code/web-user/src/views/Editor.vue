@@ -3278,7 +3278,8 @@ async function runExport(type) {
       updateExportLoading(0, 1, '正在导出 ' + type.toUpperCase() + ' 文件...')
       const name = docName.value || '思维导图'
       await mind.value.doExport.export(type, true, name)
-      updateExportLoading(1, 1, '导出完成')
+      hideExportLoading()
+      toast('导出完成')
     }
   } catch (e) {
     hideExportLoading()
