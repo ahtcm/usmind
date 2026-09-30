@@ -3,7 +3,8 @@ import request from './request'
 export const memberApi = {
   plans: () => request.get('/member/plans'),
   info: () => request.get('/member/info'),
-  wechatCreate: (planId) => request.post('/pay/wechat/create', { planId })
+  wechatCreate: (planId) => request.post('/pay/wechat/create', { planId }),
+  wechatCreateH5: (planId) => request.post('/pay/wechat/create-h5', { planId })
 }
 
 export const configApi = {

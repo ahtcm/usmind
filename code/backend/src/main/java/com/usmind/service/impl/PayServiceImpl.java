@@ -50,6 +50,16 @@ public class PayServiceImpl implements PayService {
 
     @Override
     public Map<String, Object> createWechatOrder(Long userId, Long planId) {
+        return createWechatOrderInternal(userId, planId, "native", null);
+    }
+
+    @Override
+    public Map<String, Object> createWechatH5Order(Long userId, Long planId) {
+        return createWechatOrderInternal(userId, planId, "h5", null);
+    }
+
+    /** 统一微信 v3 下单：type=native 返回 code_url（PC 扫码）；type=h5 返回 mweb_url（手机拉起微信） */
+    private Map<String, Object> createWechatOrderInternal(Long userId, Long planId, String type, String clientIp) {
         // 微信支付默认关闭，后台开启并配置商户参数后生效
         if (settingsService.getInt("wechatPayEnabled", 0) != 1) {
             throw new BusinessException(400, "微信支付未开启");
@@ -77,7 +87,8 @@ public class PayServiceImpl implements PayService {
         order.setCreatedAt(LocalDateTime.now());
         orderMapper.insert(order);
 
-        // 微信支付 v3 Native 下单
+        String path = "/v3/pay/transactions/native";
+        if ("h5".equals(type)) path = "/v3/pay/transactions/h5";
         Map<String, Object> body = new HashMap<>();
         body.put("appid", appId);
         body.put("mchid", mchId);
@@ -88,17 +99,25 @@ public class PayServiceImpl implements PayService {
         amount.put("total", plan.getPrice().multiply(new BigDecimal("100")).intValue());
         amount.put("currency", "CNY");
         body.put("amount", amount);
+        if ("h5".equals(type)) {
+            Map<String, Object> h5Info = new HashMap<>();
+            h5Info.put("type", "Wap");
+            Map<String, Object> sceneInfo = new HashMap<>();
+            sceneInfo.put("h5_info", h5Info);
+            sceneInfo.put("payer_client_ip", clientIp == null ? "127.0.0.1" : clientIp);
+            body.put("scene_info", sceneInfo);
+        }
         try {
             String nonce = UUID.randomUUID().toString().replace("-", "");
             String timestamp = String.valueOf(System.currentTimeMillis() / 1000);
             String json = objectMapper.writeValueAsString(body);
-            String message = "POST\n/v3/pay/transactions/native\n" + timestamp + "\n" + nonce + "\n" + json + "\n";
+            String message = "POST\n" + path + "\n" + timestamp + "\n" + nonce + "\n" + json + "\n";
             String signature = sign(message, privateKey);
             String auth = "WECHATPAY2-SHA256-RSA2048 mchid=\"" + mchId + "\",nonce_str=\"" + nonce
                     + "\",timestamp=\"" + timestamp + "\",serial_no=\"" + apiKey + "\",signature=\"" + signature + "\"";
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.mch.weixin.qq.com/v3/pay/transactions/native"))
+                    .uri(URI.create("https://api.mch.weixin.qq.com" + path))
                     .header("Authorization", auth)
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
@@ -115,8 +134,12 @@ public class PayServiceImpl implements PayService {
             Map<String, Object> out = new HashMap<>();
             out.put("orderId", order.getId());
             out.put("outTradeNo", outTradeNo);
-            out.put("codeUrl", r.get("code_url"));
             out.put("amount", plan.getPrice());
+            if ("h5".equals(type)) {
+                out.put("mwebUrl", r.get("mweb_url"));
+            } else {
+                out.put("codeUrl", r.get("code_url"));
+            }
             return out;
         } catch (BusinessException e) {
             throw e;

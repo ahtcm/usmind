@@ -8,6 +8,9 @@ import java.util.Map;
 public interface PayService {
     Map<String, Object> createWechatOrder(Long userId, Long planId);
 
+    /** 微信 H5 支付下单（手机浏览器拉起微信，返回 mweb_url；默认关闭） */
+    Map<String, Object> createWechatH5Order(Long userId, Long planId);
+
     /** 支付回调处理，返回应答 XML/文本 */
     String handleWechatNotify(String body, Map<String, String> headers);
 }

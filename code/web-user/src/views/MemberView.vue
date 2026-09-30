@@ -102,6 +102,8 @@ function selectPlan(p) {
   payCodeUrl.value = ''
 }
 
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+
 async function doPay() {
   if (!selected.value) return
   if (!wechatPayEnabled.value) {
@@ -112,8 +114,18 @@ async function doPay() {
   err.value = ''
   payCodeUrl.value = ''
   try {
+    if (isMobile) {
+      // 移动端：H5 支付，拉起微信 App 完成支付
+      const d = await memberApi.wechatCreateH5(selected.value.id)
+      if (d.mwebUrl) {
+        location.href = d.mwebUrl
+        pollStatus(d.outTradeNo)
+        return
+      }
+      throw new Error('H5 支付链接为空，请改用电脑扫码支付')
+    }
+    // PC 端：Native 扫码
     const d = await memberApi.wechatCreate(selected.value.id)
-    // 轮询支付结果
     payCodeUrl.value = d.codeUrl
     toast('请使用微信扫码支付')
     pollStatus(d.outTradeNo)
