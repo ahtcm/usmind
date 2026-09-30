@@ -10,6 +10,8 @@ import com.usmind.mapper.OrgMapper;
 import com.usmind.mapper.OrgMemberMapper;
 import com.usmind.service.OrgService;
 import com.usmind.service.SettingsService;
+import com.usmind.ws.MindMapWsHandler;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,16 +31,18 @@ public class OrgServiceImpl implements OrgService {
     private final com.usmind.mapper.SysUserMapper sysUserMapper;
     private final com.usmind.mapper.MindMapMapper mindMapMapper;
     private final SettingsService settingsService;
+    private final MindMapWsHandler wsHandler;
 
     public OrgServiceImpl(OrgMapper orgMapper, OrgMemberMapper orgMemberMapper, OrgCollabMapper orgCollabMapper,
                           com.usmind.mapper.SysUserMapper sysUserMapper, com.usmind.mapper.MindMapMapper mindMapMapper,
-                          SettingsService settingsService) {
+                          SettingsService settingsService, @Lazy MindMapWsHandler wsHandler) {
         this.orgMapper = orgMapper;
         this.orgMemberMapper = orgMemberMapper;
         this.orgCollabMapper = orgCollabMapper;
         this.sysUserMapper = sysUserMapper;
         this.mindMapMapper = mindMapMapper;
         this.settingsService = settingsService;
+        this.wsHandler = wsHandler;
     }
 
     private boolean isVip(Long userId) {
@@ -285,8 +289,23 @@ public class OrgServiceImpl implements OrgService {
     public void disband(Long orgId) {
         Org o = orgMapper.selectById(orgId);
         if (o == null) return;
+        // 先收集非创建者成员（用于解散后强制踢出在线会话）
+        List<Long> memberUids = new ArrayList<>();
+        List<OrgMember> members = orgMemberMapper.selectList(new LambdaQueryWrapper<OrgMember>().eq(OrgMember::getOrgId, orgId));
+        for (OrgMember m : members) {
+            if (!"owner".equals(m.getRole()) && m.getUserId() != null) memberUids.add(m.getUserId());
+        }
         orgMemberMapper.delete(new LambdaQueryWrapper<OrgMember>().eq(OrgMember::getOrgId, orgId));
         orgCollabMapper.delete(new LambdaQueryWrapper<OrgCollab>().eq(OrgCollab::getOrgId, orgId));
+        String orgName = o.getName();
         orgMapper.deleteById(orgId);
+        // 强制踢出在线成员（推送提示后断开连接）
+        if (!memberUids.isEmpty()) {
+            try {
+                wsHandler.kickOrgMembers(orgId, orgName, memberUids);
+            } catch (Exception e) {
+                // 踢人失败不影响解散结果
+            }
+        }
     }
 }

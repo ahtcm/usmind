@@ -351,6 +351,17 @@
     </div>
   </div>
 
+  <!-- 机构已销毁提示弹窗 -->
+  <div v-if="orgDisbanded" class="share-mask">
+    <div class="share-box">
+      <div class="share-title">机构已销毁</div>
+      <div class="share-tip">机构{{ orgDisbandedName }}已被创建者解散，你已被移出协作并返回首页。</div>
+      <div class="share-actions">
+        <button class="math-btn math-btn-primary" @click="goHomeAfterDisband">确定</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 编辑中节点被他人修改增强冲突框 -->
   <div v-if="editConflict" class="share-mask">
     <div class="share-box">
@@ -3497,6 +3508,13 @@ function connectWs() {
         handleEditResultMsg(msg)
         return
       }
+      if (msg.event === 'org_disbanded') {
+        orgDisbandedName.value = msg.orgName || ''
+        orgDisbanded.value = true
+        try { if (ws) ws.close() } catch (e) {}
+        ws = null
+        return
+      }
       if (msg.event !== 'mindmap_updated') return
       if (String(msg.mindMapId) !== String(mindMapId.value)) return
       let myUidVal = 0
@@ -3542,6 +3560,8 @@ let myEditNodeId = null
 // ---- 节点所有权 + 编辑申请 ----
 const collabCfg = reactive({ enableOwnerLock: false, approveTimeout1: 120, approveTimeout2: 180, grantMinutes: 10 })
 const pendingEditReq = ref(null)   // 申请确认弹窗
+const orgDisbanded = ref(false)   // 机构已销毁提示弹窗
+const orgDisbandedName = ref('')  // 机构名称
 const approveEditReq = ref(null)   // 审批弹窗
 const editConflict = ref(null)     // 编辑中节点被他人修改的增强冲突框
 const grantedNodes = reactive({})  // nodeId -> 本地授权截止时间戳
@@ -3562,6 +3582,12 @@ function sendWs(obj) {
 function requestEditPermission(nid, node) {
   if (sentEditReqs[nid]) { toast('已提交编辑申请，等待审批', 'info'); return }
   pendingEditReq.value = { nodeId: nid, nodeText: (node.nodeData && node.nodeData.text) || '' }
+}
+function goHomeAfterDisband() {
+  try { if (ws) ws.close() } catch (e) {}
+  ws = null
+  orgDisbanded.value = false
+  window.location.href = '/maps'
 }
 function confirmSendEditReq() {
   const req = pendingEditReq.value
