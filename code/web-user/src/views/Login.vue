@@ -57,8 +57,15 @@
           <input v-model="reg.nickname" type="text" placeholder="默认同用户名" />
         </div>
         <div class="field">
-          <label>手机号（可选）</label>
+          <label>手机号{{ smsEnabled ? '（必填）' : '（可选）' }}</label>
           <input v-model="reg.phone" type="text" placeholder="用于找回密码" />
+        </div>
+        <div class="field" v-if="smsEnabled">
+          <label>短信验证码</label>
+          <div class="sms-row">
+            <input v-model="reg.smsCode" type="text" placeholder="输入短信验证码" />
+            <button type="button" class="sms-btn" @click="sendSmsCode" :disabled="smsCountdown > 0">{{ smsCountdown > 0 ? smsCountdown + 's' : '获取验证码' }}</button>
+          </div>
         </div>
         <div class="field">
           <label>邮箱（可选）</label>
@@ -100,6 +107,9 @@ const loading = ref(false)
 const captchaEnabled = ref(false)
 const captchaImg = ref('')
 const captchaUuid = ref('')
+const smsEnabled = ref(false)
+const smsCountdown = ref(0)
+let smsTimer = null
 const wechatLoginEnabled = ref(false)
 
 const reg = ref({ username: '', password: '', password2: '', nickname: '', phone: '', email: '', captchaCode: '', avatar: '', avatarPreview: '' })
@@ -123,6 +133,7 @@ onMounted(async () => {
     const c = await configApi.client()
     captchaEnabled.value = !!c.authCaptchaEnabled
     wechatLoginEnabled.value = !!c.wechatLoginEnabled
+    smsEnabled.value = !!c.authSmsEnabled
     if (captchaEnabled.value) loadCaptcha()
   } catch (e) { /* 忽略 */ }
 })
@@ -152,6 +163,22 @@ async function onAvatarPick(e) {
     reg.value.avatarPreview = URL.createObjectURL(f)
   } catch (e2) {
     err.value = (e2 && e2.message) || '头像上传失败'
+  }
+}
+
+async function sendSmsCode() {
+  if (!reg.value.phone || reg.value.phone.length < 6) { err.value = '请先输入正确的手机号'; return }
+  err.value = ''
+  try {
+    await request.post('/auth/send-code', { phone: reg.value.phone })
+    smsCountdown.value = 60
+    if (smsTimer) clearInterval(smsTimer)
+    smsTimer = setInterval(() => {
+      smsCountdown.value--
+      if (smsCountdown.value <= 0 && smsTimer) { clearInterval(smsTimer); smsTimer = null }
+    }, 1000)
+  } catch (e) {
+    err.value = (e && e.message) || '验证码发送失败'
   }
 }
 
@@ -190,6 +217,8 @@ async function doRegister() {
   }
   if (r.password !== r.password2) { err.value = '两次输入的密码不一致'; return }
   if (captchaEnabled.value && !r.captchaCode) { err.value = '请输入图形验证码'; return }
+  if (smsEnabled.value && !r.smsCode) { err.value = '请输入短信验证码'; return }
+  if (smsEnabled.value && !r.phone) { err.value = '请输入手机号'; return }
   loading.value = true
   err.value = ''
   try {
@@ -201,7 +230,8 @@ async function doRegister() {
       email: r.email || undefined,
       avatar: r.avatar || undefined,
       captchaUuid: captchaUuid.value || undefined,
-      captchaCode: r.captchaCode || undefined
+      captchaCode: r.captchaCode || undefined,
+      smsCode: r.smsCode || undefined
     })
     // 注册成功自动登录
     const data = await authApi.login({ username: r.username, password: r.password })
@@ -224,6 +254,10 @@ async function doRegister() {
 .captcha-row { display: flex; gap: 8px; }
 .captcha-row input { flex: 1; }
 .captcha-img { width: 108px; height: 40px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; background: rgba(255,255,255,.06); object-fit: cover; flex-shrink: 0; }
+.sms-row { display: flex; gap: 8px; }
+.sms-row input { flex: 1; }
+.sms-btn { flex-shrink: 0; padding: 0 12px; height: 40px; border-radius: 8px; border: 1px solid var(--border); background: linear-gradient(135deg, #4f8cff, #3b6ef5); color: #fff; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.sms-btn:disabled { opacity: .6; cursor: not-allowed; }
 .login-foot { text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-dim); opacity: .8; }
 .wx-row { margin-top: 14px; }
 .wx-divider { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 12px; margin-bottom: 10px; }
