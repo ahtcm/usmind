@@ -2316,7 +2316,7 @@ async function insertFileToNode(node, file) {
   }
 }
 
-// 右键菜单
+// 右键菜单：按鼠标位置自适应展开方向（靠近上方向下展开、靠近下方向上展开，右侧不足向左）
 function showCtxMenu(e, node) {
   ctxMode.value = 'node'
   ctxNode = node
@@ -2325,7 +2325,21 @@ function showCtxMenu(e, node) {
   ctxHidden.value = false
   const x = e.clientX != null ? e.clientX : e.pageX
   const y = e.clientY != null ? e.clientY : e.pageY
-  ctxStyle.value = { left: Math.min(x, window.innerWidth - 200) + 'px', top: Math.min(y, window.innerHeight - 400) + 'px' }
+  ctxStyle.value = { left: x + 'px', top: y + 'px' }
+  nextTick(() => {
+    const menu = document.getElementById('ctx-menu')
+    if (!menu) return
+    const mw = menu.offsetWidth || 200
+    const mh = menu.offsetHeight || 320
+    const gap = 8
+    let left = x
+    let top = y
+    // 右侧空间不足 → 向左展开；左侧仍不足 → 贴左边界
+    if (left + mw > window.innerWidth - gap) left = Math.max(gap, window.innerWidth - mw - gap)
+    // 下方空间不足 → 向上展开（菜单底部在鼠标位置）；上方仍不足 → 贴顶
+    if (top + mh > window.innerHeight - gap) top = Math.max(gap, y - mh)
+    ctxStyle.value = { left: left + 'px', top: top + 'px' }
+  })
 }
 function hideCtxMenu() {
   if (ctxHidden.value) return
