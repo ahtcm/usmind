@@ -96,6 +96,12 @@
 
 ---
 
+### 1.5 新模块机制（评论 / 机构 / 会员 / 安全）
+- **验证码**：登录与注册共用 `/api/auth/captcha`（uuid + base64 图）；前端按 `/api/config/client` 的 `authCaptchaEnabled` / `authLoginCaptchaEnabled` 决定是否渲染验证码行与请求参数（关闭即整行隐藏、不发参数）。
+- **评论（分享 + 组织内）**：分享页 `ShareView.vue` 免登录输入昵称评论；机构内 `Editor.vue` 评论面板；均 128 字 / 条 + IP 限频；作者端 `Editor.vue` 经 `/ws/comment/{mapId}` 收到 `comment_new` 推送 → 节点呼吸灯 + 电流特效（沿根→节点连线路径 SVG 动画）+ 右上角标 +1 + 音效（可关）；点开评论面板置已读（后端 `node_comment_read` 记录），刷新不再重复提醒。
+- **机构协作**：`Org.vue` 机构中心（创建需会员可后台关 / 邀请码加入 / 踢出 / 退出 / 解散）；`Editor.vue` 协作模式：`/ws/mindmap/{id}` 广播 `doc_update` / `struct_update`（节点增删改增量，对端局部应用不闪屏）/ `lock`（持锁人实时广播编辑内容，他人只读）/ `kick`（解散或踢出强制下线）；保存时后端做节点级合并（保留对方新增、同节点冲突回传 diff）。
+- **会员**：`MemberView.vue` 会员中心（套餐 / 微信支付下单 / 我的会员）；`/api/config/client` 输出 `memberEnabled` 与各功能开关；非会员不可用项显示 👑 图标；`ProfileView.vue` 用户中心（头像点击直接上传）。
+- **WS 断线重连**：两个 WS 端点均带 token 查询参数，`onclose` 后指数退避重连（1s→2s→…→30s 封顶），重连成功后增量补拉。
 ## 二、管理后台（web-admin）
 
 ### 2.1 技术选型

@@ -1,5 +1,22 @@
-﻿# USMIND 变更记录
+# USMIND 变更记录
 
+## 2026-10-01 · 登录图形验证码 + 注册页移除头像 + 后台独立登录接口（`d63ac11` / `b4e7cb5`）
+
+- **登录图形验证码**：登录页用户名/密码后新增图形验证码输入框 + 点击刷新（复用注册验证码组件）；后端 `AuthController.login` 在 `authLoginCaptchaEnabled=1` 时校验 `captchaUuid` + `captchaCode`；`LoginRequest` 增加两字段。
+- **后台独立登录接口**：新增 `/api/auth/admin-login` 不校验图形验证码（后台管理员走此接口，避免验证码不可用/超时误锁后台）；`SecurityConfig` permitAll 加入该路径；web-admin `api/auth.js` 登录改走 admin-login。
+- **独立开关**：`SettingsServiceImpl` 新增 `authLoginCaptchaEnabled`（默认 1）；`/api/config/client` 输出该开关；后台「支付与验证码」页注册验证码卡片后新增「登录图形验证码」开关；关闭后前端登录页同步隐藏验证码、后端登录不校验。
+- **注册页移除头像上传**：删除 Login.vue 注册模板头像上传块（注册字段 = 用户名/密码/确认密码/昵称/手机号/邮箱），与"登录页头像直接上传"设计保持一致。
+- **实测**：默认开显示验证码 → 关闭后前端隐藏且无验证码登录成功 → 恢复默认开；后台 admin-login 正常进 dashboard。
+- **提交**：`8dae620`（注册头像移除）/ `1c03a42`（master）/ `d63ac11`（登录验证码）/ `b4e7cb5`（master）。
+
+## 2026-09-30 · 全量测试问题修复 P1/P2/P3（`06cf31e` / `de0af9e`）
+
+- **P1 IP 自动拉黑无逃生通道**：`ip_rule` 表新增 `expire_at`（LocalDateTime，DataInitializer 建表含该列+旧表 information_schema 迁移补列）；`IpGuardServiceImpl.autoBlack` 写入到期时间、`match` 改 selectList 遍历并对过期记录惰性 deleteById；`IpGuardFilter` 对 `/api/admin/**` 直接放行（后台保留 ADMIN 角色 JWT 保护，管理员删黑名单后用户立即恢复）。实测：触发限频 → 拉黑 → 后台删除黑名单 → 立即恢复可用。
+- **P2 主题会员 👑 图标不显示**：`Editor.vue isMemberTheme` 由索引匹配改为按 `t.name` / `t.key` 匹配，后台配置的会员主题正确显示皇冠。
+- **P2 公式插入不即时渲染**：`insertMathToNode` 改 async，取 raw 后 `await loadMathJax()` 再渲染，插入后即时显示（防节点塌陷）。
+- **P2 后台新增订单/评论管理页**：后端 `AdminOrderController` / `AdminCommentController`（列表/删除/批量删，联查用户名/导图名）；前端 `Orders.vue` / `Comments.vue` + `api/orders.js` / `api/comments.js` + 路由 + AdminLayout 菜单（Tickets / ChatDotRound 图标）。
+- **P3 清理测试遗留数据**：删除临时测试附件（script/tmp_attach 等）。
+- **验证遗留**：后台会员配置写入的测试值 `memberThemeIds=晨曦白` 未还原（供用户验证 👑）。
 ## 2026-09-29 · 导出重构：html2canvas 混合 DOM 方案（公式/图片完整导出 + 进度遮罩）
 
 - **背景**：43 号"数学公式"导图导出 PNG/PDF 出现黑块（MathJax 大公式外层 svg + 内层嵌套 svg 被旧 `liftFormulaSvg` 同时提升到根级，同位置叠加渲染成黑块）；50 号"图片"导图导出失败（simple-mind-map 输出 SVG 中空元素未自闭合导致 XML 解析失败，Image 加载失败回退到 SVG blob）。

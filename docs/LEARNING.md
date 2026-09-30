@@ -130,3 +130,12 @@
 3. **接口驱动**：随时对照 `docs/API.md` 和 `docs/FILE_GUIDE.md` 定位代码。
 4. **改一行验证**：如把 `application-dev.yml` 的数据库密码改错，观察启动报错 → 学会看日志（`logs/` 与 Maven 输出）。
 5. **从"加功能"切入**：给自己定小任务（如"给用户加一个备注字段"），打通 表→实体→Mapper→Service→Controller→前端 全链路。
+
+## 进阶模块学习路径（新功能）
+
+1. **安全与验证码**：`AuthController`（login/admin-login/captcha）→ `CaptchaServiceImpl`（Redis 缓存）→ `SettingsServiceImpl`（`authLoginCaptchaEnabled`）→ `ClientConfigController`（前端开关）→ `web-user/Login.vue`（验证码行渲染）→ `web-admin/PayConfig.vue`（开关）。
+2. **IP 防护**：`IpGuardFilter`（白/黑/限频/自动拉黑）→ `IpGuardServiceImpl`（`expireAt` 过期惰性解封）→ `AdminIpRuleController` + `web-admin/IpRules.vue`（管理界面）→ 实测触发限频→拉黑→后台删除→恢复。
+3. **评论体系**：`ShareCommentController` / `MindMapCommentController`（入库）→ `NodeCommentServiceImpl`（已读记录）→ `CommentWebSocketHandler`（推送）→ `Editor.vue`（呼吸灯/电流/角标/音效）→ `ShareView.vue`（免登录评论）→ `web-admin/Comments.vue`（管理）。
+4. **机构协作**：`OrgController` / `OrgServiceImpl`（CRUD/邀请码/踢出/解散）→ `OrgCollab`（脑图授权）→ `MindMapWebSocketHandler`（`struct_update`/`lock`/`kick`）→ `Editor.vue`（局部应用/持锁广播/保存 diff 合并）→ `Org.vue`（机构中心）→ `web-admin/Orgs.vue`。
+5. **会员支付**：`MemberPlan` / `PayOrder` 表 → `MemberServiceImpl`（购买/开通）→ `PayServiceImpl`（微信下单/回调验签）→ `MemberView.vue`（会员中心）→ `web-admin/MemberConfig.vue`（功能开关）→ `Orders.vue`（订单管理）。
+6. **日志治理**：`RequestLogFilter`（捕获请求/响应，`CappedBody*Wrapper` 限体积）→ `AdminLogController`（列表/详情）→ `Logs.vue`（筛选/详情查看）→ `LogController`（前端上报）→ 日志保留与清理配置。

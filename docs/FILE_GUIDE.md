@@ -51,6 +51,15 @@
 | `ThemeTemplate.java` | sys_theme | id, name, themeKey, branchColors, configJson, sort, enabled, builtin |
 | `IconTemplate.java` | sys_icon | id, name, category, sort, enabled, builtin |
 
+| `IpRule.java` | ip_rule | id, ruleType(white/black), targetType(ip/user_id), targetValue, remark, expireAt(自动拉黑到期时间) |
+| `MemberPlan.java` | member_plan | id, name, price, durationDays, level, sort, enabled |
+| `PayOrder.java` | pay_order | id, orderNo, userId, planId, amount, status(paid/unpaid/closed), payType, paidAt |
+| `NodeComment.java` | node_comment | id, mindMapId, nodeId, userId(可空-游客), nickname, content(≤128字), parentId, source(share/org), createdAt |
+| `NodeCommentRead.java` | node_comment_read | id, userId, commentId, readAt（已读记录，刷新不再重复提醒） |
+| `Org.java` | org | id, name, ownerId, inviteCode, createdAt |
+| `OrgMember.java` | org_member | id, orgId, userId, role(owner/member), joinedAt |
+| `OrgCollab.java` | org_collab | id, orgId, mindMapId, invitedBy, createdAt |
+| `RequestLog.java` | request_log | id, userId(可空), path, method, level(info/warn/error), source(frontend/backend), statusCode, durationMs, requestHeaders, requestBody, responseBody, errorStack, ip, createdAt |
 ### 1.6 mapper（MyBatis-Plus）
 | 文件 | 作用 |
 | --- | --- |
@@ -90,6 +99,21 @@
 | `ProjectConfigController` | `/api/admin/project-config/**`：项目配置（后端 / nginx 配置的读取、保存、导出） |
 | `AiController` | `/api/ai/generate`：AI 生成（代理 OpenAI 兼容接口） |
 
+| `ClientConfigController` | `/api/config/client`：登录前全局开关（验证码 / 会员 / 微信登录等） |
+| `AdminPayConfigController` | `/api/admin/pay-config`：支付 / 验证码 / 防护配置读取保存 |
+| `AdminMemberController` | `/api/admin/members`：会员功能开关与限制配置 |
+| `MemberController` | `/api/member/**`：用户端会员套餐、我的会员、购买下单 |
+| `PayController` | `/api/pay/**`：微信支付下单 / 回调验签 / 状态查询 |
+| `AdminOrderController` | `/api/admin/orders`：订单管理（列表联查用户名 / 删除 / 批量删） |
+| `AdminCommentController` | `/api/admin/comments`：评论管理（列表联查用户名导图名 / 删除 / 批量删） |
+| `MindMapCommentController` | `/api/mindmaps/{id}/comments`：组织内导图评论（列表 / 发表 / 回复） |
+| `ShareCommentController` | `/api/share/{token}/comments`：分享页免登录评论（昵称 / 限频 / 128 字） |
+| `OrgController` | `/api/orgs/**`：用户端机构（创建 / 加入 / 成员 / 踢出 / 退出 / 解散 / 邀请协作） |
+| `AdminOrgController` | `/api/admin/orgs`：管理端机构列表 / 解散 |
+| `AdminIpRuleController` | `/api/admin/ip-rules`：IP / 用户黑白名单（增删 / 批量删） |
+| `AdminLogController` | `/api/admin/logs`：请求日志列表 / 详情 / 批量删除 |
+| `LogController` | `/api/log/report`：前端错误日志上报 |
+| `UserCenterController` | `/api/user/**`：用户中心（改个人信息 / 上传头像） |
 ### 1.9 service（业务层）
 | 文件 | 作用 |
 | --- | --- |
@@ -104,6 +128,12 @@
 | `StatsServiceImpl` | 仪表盘统计（用户 / 导图 / 资源 / 访问量） |
 | `DataBackupService` | 数据库全量导出（JSON / SQL）、恢复导入 |
 
+| `CaptchaServiceImpl` | 图形验证码生成（UUID + base64 图片）与校验（Redis 缓存 5 分钟） |
+| `IpGuardServiceImpl` | IP 防护：白名单优先 / 黑名单拒绝 / 滑动窗口限频 / 超限自动拉黑（带过期时间）/ 到期惰性解封 |
+| `MemberServiceImpl` | 会员套餐 / 购买下单 / 支付回调后开通会员 / 会员状态查询 |
+| `PayServiceImpl` | 微信支付统一下单、回调验签解密、订单状态流转 |
+| `NodeCommentServiceImpl` | 评论 CRUD / 回复 / 已读记录 / 来源标记（share/org） |
+| `OrgServiceImpl` | 机构 CRUD / 邀请码加入 / 成员管理 / 踢出 / 解散（WS 踢在线成员）/ 脑图协作授权 |
 ### 1.10 storage（存储策略）
 | 文件 | 作用 |
 | --- | --- |
@@ -117,6 +147,14 @@
 
 ---
 
+### 1.11 security / filter（安全与日志）
+| 文件 | 作用 |
+| --- | --- |
+| `IpGuardFilter.java` | IP 防护过滤器：白名单放行 → 黑名单拒绝 → 限频统计 → 自动拉黑（`/api/admin/**` 豁免，保留后台逃生通道） |
+| `RequestLogFilter.java` | 请求日志过滤器：记录请求头 / 请求体 / 响应体 / 耗时 / 状态码（受 `CappedBody*Wrapper` 限制体积防内存溢出） |
+| `CappedBodyRequestWrapper.java` / `CappedBodyResponseWrapper.java` | 请求 / 响应体包装器：body 读取后缓存且限制最大记录长度（默认 64KB），避免大文件上传时日志爆炸 |
+
+---
 ## 二、用户端前端（`code/web-user`）
 
 ### 2.1 入口与全局
@@ -140,6 +178,9 @@
 | `previewConfig.js` | `fetchPreviewConfig()`（预览服务 / 全局配置） |
 | `ai.js` | `generate(prompt)` |
 
+| `comment.js` | 导图 / 分享评论：`list` / `post` / `replies` |
+| `member.js` | 会员：`plans` / `me` / `purchase`（微信支付下单） |
+| `org.js` | 机构：`create` / `join` / `my` / `detail` / `kick` / `leave` / `dissolve` / `inviteCollab` |
 ### 2.3 utils（工具）
 | 文件 | 作用 / 函数 |
 | --- | --- |
@@ -157,6 +198,9 @@
 | `ShareView.vue` | 分享页（免登录只读渲染导图，密码校验） |
 | `Editor.vue` | **脑图编辑器主页面（功能最集中，见下）** |
 
+| `MemberView.vue` | 会员中心：套餐列表 / 购买（微信支付）/ 我的会员状态（会员功能后台可整体关闭则入口隐藏） |
+| `ProfileView.vue` | 个人信息：昵称 / 邮箱 / 手机 / 头像上传（点击头像直接上传） |
+| `Org.vue` | 机构中心：创建（需会员，后台可关）/ 邀请码加入 / 成员列表 / 踢出 / 退出 / 解散 / 邀请成员协作脑图 |
 ### 2.5 Editor.vue 主要函数分组
 | 分组 | 函数 |
 | --- | --- |
@@ -200,7 +244,12 @@
 | `icons.js` | 图标 CRUD / 批量导入 / 批量删 |
 | `settings.js` | 系统 KV 配置读写 |
 | `projectConfig.js` | 项目配置读取 / 保存 / 导出 |
-| `request.js` | axios 实例（带 token、统一拦截） |
+
+| `comments.js` | 评论管理：列表 / 删除 / 批量删 |
+| `logs.js` | 请求日志：列表（用户/接口/级别/前后端/时间筛选）/ 详情 / 批量删 |
+| `members.js` | 会员配置：读取 / 保存（主题 / 导出 / 上传 / 画布限制等开关） |
+| `orders.js` | 订单管理：列表 / 删除 / 批量删 |
+| `orgs.js` | 机构管理：列表 / 解散 || `request.js` | axios 实例（带 token、统一拦截） |
 
 ### 3.3 views（页面与主要函数）
 | 文件 | 作用 / 函数 |
@@ -217,6 +266,14 @@
 | `DataBackup.vue` | 数据备份：`doBackup`（导出 JSON / SQL）/ `onFileChange` / `onFileRemove` / `confirmRestore`（上传恢复） |
 | `Settings.vue` | 系统设置：`loadData` / `handleSave`（登录页声明、缓存时长等 KV） |
 
+| `PayConfig.vue` | 支付与验证码：微信支付开关 / 图形验证码（注册+登录）/ 短信验证码 / IP 限频与自动拉黑配置 / 日志记录级别与清理策略 |
+| `MemberConfig.vue` | 会员配置：会员体系总开关 / 主题 / 导出格式 / 上传大小与数量 / 画布数等会员限制（客户端显示 👑） |
+| `Orders.vue` | 订单管理：`loadData`（联查用户名）/ `handleDelete` / `handleBatchDelete` |
+| `Comments.vue` | 评论管理：`loadData`（联查用户名导图名、来源筛选）/ `handleDelete` / `handleBatchDelete` |
+| `IpRules.vue` | IP 黑白名单：`loadData` / `openCreate`（IP/用户ID 正则校验）/ `handleDelete` / `handleBatchDelete` |
+| `Logs.vue` | 请求日志：`loadData`（用户 / 接口 / 级别 / 前后端 / 时间筛选）/ `openDetail`（请求头请求体响应异常栈）/ `handleBatchDelete` |
+| `Orgs.vue` | 机构管理：`loadData` / `handleDelete`（解散） |
+| `Members.vue` | 会员用户：列表 / 手动开通 / 续期 / 停用（会员用户管理） |
 ---
 
 ## 四、发布与构建体系（`code\launcher-src`：自解压版 / 在线版源码）

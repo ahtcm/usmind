@@ -22,6 +22,9 @@
 - **机构协作**：邀请码加入机构、机构内多人实时协作编辑同一导图（WebSocket 广播，结构变更 / 文本编辑秒级同步）；节点所有权机制（默认关闭，可在管理后台全局开关 / 导图级协作设置中配置）：历史节点归导图创建者，节点创建者与导图创建者拥有编辑权，他人编辑需申请（审批优先级：节点创建者 → 导图创建者，超时转派 / 自动拒绝时长可配置）；他人修改未编辑节点时静默 diff 局部应用（不全局刷新、不闪屏、不丢自己的编辑内容），自己正在编辑的节点被他人修改时弹增强冲突框（显示对方内容，可加载最新 / 以我的为准）。
 - **移动端适配**：完整响应式布局，双指缩放 / 单指平移，标签页与工具栏移动端优化。
 
+- **账号与安全**：注册（图形验证码，后台可关）/ 登录（独立图形验证码开关，前台同步隐藏）；登录后头像下拉菜单（个人信息 / 会员中心 / 退出）；用户中心可改昵称 / 邮箱 / 手机 / 头像；短信验证码注册预留（默认关闭，可后台配置接入服务商）；微信登录预留（默认关闭，后台可配 AppID/Secret）。
+- **会员体系**：套餐购买（微信支付，默认关闭，后台可开）；会员功能（特定主题 👑、导出格式、上传大小与数量、画布数等）后台统一配置，客户端非会员显示皇冠图标且不可用；会员体系可整体关闭（用户无感知）。
+- **评论体系**：分享页与机构内均可对节点评论 / 回复（128 字 / 条，IP 限频）；作者端实时收到评论提醒（呼吸灯电流特效沿连线流淌 + 角标 +1 + 音效，可关闭），点开阅读后不再重复提醒；指定人回复只提醒被回复人。
 ### 管理后台（/admin/）
 - **登录鉴权**：管理员登录（JWT），登录页版权 / 入网声明可在后台配置（本地缓存时长可配置）。
 - **仪表盘**：用户数、导图数、资源数、访问量等统计。
@@ -35,6 +38,13 @@
 - **数据备份**：一键备份当前数据库（JSON / SQL），上传备份文件恢复数据。
 - **移动端适配**：管理后台所有页面适配手机。
 
+- **支付与验证码**：微信支付开关（默认关，无商户资质不可用）/ 注册图形验证码开关 / 登录图形验证码开关（前端同步隐藏）/ 短信验证码开关（预留）/ IP 限频与自动拉黑参数（超频自动入黑名单，到期自动解封，后台删除黑名单立即生效）。
+- **会员配置**：会员体系总开关、会员主题（👑）、会员导出格式、上传大小与数量限制、画布数等；订单管理（联查用户名 / 删除 / 批量删）。
+- **评论管理**：全站评论列表（分享 + 机构内，联查用户名 / 导图名，按来源筛选）、删除、批量删除。
+- **IP 黑白名单**：按 IP / 用户 ID 拉黑或加白（正则校验，用户 ID 不存在时提示），删除即解除。
+- **请求日志**：全量接口日志（用户 / 接口下拉 / 级别 / 前后端来源 / 时间筛选），详情含请求头、请求体、响应、异常栈；记录级别与保留天数 / 清理时间可配置。
+- **机构管理**：全站机构列表、解散（在线成员被 WS 踢出并提示）。
+- **仪表盘**：用户 / 导图 / 资源 / 访问量 / 订单 / 会员数统计，注册与订单趋势图。
 ---
 
 ## 二、系统架构
@@ -98,7 +108,7 @@ usmind/
 │   │       ├── java/com/usmind/
 │   │       │   ├── controller/   # REST 接口层（Auth/User/MindMap/Share/File/Theme/Icon/Oss/...）
 │   │       │   ├── service/      # 业务逻辑接口 + impl 实现
-│   │       │   ├── entity/       # MyBatis-Plus 实体（7 张表）
+│   │       │   ├── entity/       # MyBatis-Plus 实体（16 张表：用户/导图/资源/主题/图标/配置/机构/成员/协作/评论/已读/会员套餐/订单/IP规则/请求日志/OSS配置）
 │   │       │   ├── mapper/       # MyBatis-Plus Mapper
 │   │       │   ├── dto/          # 请求/响应对象
 │   │       │   ├── config/       # 安全/Redis/MyBatis/初始化配置
@@ -108,14 +118,14 @@ usmind/
 │   │       └── resources/        # application.yml、emoji-seed.json 等
 │   ├── web-user/          # 用户端（Vue3 + Vite + simple-mind-map）
 │   │   └── src/
-│   │       ├── views/     # Editor.vue（脑图）/ Login / MindMapList / ShareView
+│   │       ├── views/     # Editor.vue（脑图）/ Login / MindMapList / ShareView / Org / MemberView / ProfileView
 │   │       ├── utils/     # mathRenderer(公式)/ mediastore(媒体) / modal / theme / ai
-│   │       ├── api/       # 接口封装（auth/file/icons/mindmap/themes/previewConfig/ai）
+│   │       ├── api/       # 接口封装（auth/file/icons/mindmap/themes/previewConfig/ai/comment/member/org）
 │   │       ├── stores/    # Pinia 用户状态
 │   │       └── router/ assets/
 │   └── web-admin/         # 管理后台（Vue3 + Vite + Element Plus）
 │       └── src/
-│           ├── views/     # Dashboard/Users/MindMaps/Resources/OssConfig/Themes/Icons/ProjectConfig/DataBackup/Settings/Login
+│           ├── views/     # Dashboard/Users/MindMaps/Resources/OssConfig/Themes/Icons/ProjectConfig/DataBackup/Settings/PayConfig/MemberConfig/Orders/Comments/IpRules/Logs/Orgs/Members/Login
 │           ├── api/       # 接口封装
 │           ├── layouts/   # AdminLayout（侧边栏+顶栏）
 │           └── router/ stores/ styles/
