@@ -41,10 +41,10 @@
         </el-table-column>
         <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openDetail(row)">详情</el-button>
-            <el-button size="small" type="primary" @click="openCollab(row)">协作设置</el-button>
-            <el-button v-if="row.isShared" size="small" type="warning" @click="handleCancelShare(row)">取消分享</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" link @click="openDetail(row)">详情</el-button>
+            <el-button size="small" link type="primary" @click="openCollab(row)">协作设置</el-button>
+            <el-button v-if="row.isShared" size="small" link type="warning" @click="handleCancelShare(row)">取消分享</el-button>
+            <el-button size="small" link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
