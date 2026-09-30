@@ -80,6 +80,7 @@ public class ShareCommentController {
         m.put("userName", c.getUserName() == null ? "" : c.getUserName());
         m.put("content", c.getContent() == null ? "" : c.getContent());
         m.put("isAuthor", c.getIsAuthor());
+        m.put("source", c.getSource() == null ? "share" : c.getSource());
         m.put("createdAt", c.getCreatedAt() == null ? "" : c.getCreatedAt().toString());
         commentWsHandler.broadcastComment(c.getMindMapId(), m);
     }

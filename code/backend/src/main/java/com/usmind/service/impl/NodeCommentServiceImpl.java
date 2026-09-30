@@ -88,7 +88,7 @@ public class NodeCommentServiceImpl implements NodeCommentService {
     }
 
     private NodeComment build(Long mindMapId, String nodeId, Long parentId, String nick,
-                              String content, int isAuthor, String ip) {
+                              String content, int isAuthor, long userId, String source, String ip) {
         NodeComment c = new NodeComment();
         c.setMindMapId(mindMapId);
         c.setNodeId(nodeId);
@@ -96,6 +96,8 @@ public class NodeCommentServiceImpl implements NodeCommentService {
         c.setUserName(nick);
         c.setContent(content);
         c.setIsAuthor(isAuthor);
+        c.setUserId(userId);
+        c.setSource(source);
         c.setIp(ip == null ? "" : ip);
         c.setCreatedAt(LocalDateTime.now());
         return c;
@@ -124,7 +126,7 @@ public class NodeCommentServiceImpl implements NodeCommentService {
         if (!StringUtils.hasText(nodeId)) throw new BusinessException(400, "节点标识缺失");
         validateText(content, nick);
         checkParent(m, parentId);
-        NodeComment c = build(m.getId(), nodeId.trim(), parentId, nick.trim(), content.trim(), 0, ip);
+        NodeComment c = build(m.getId(), nodeId.trim(), parentId, nick.trim(), content.trim(), 0, 0L, "share", ip);
         nodeCommentMapper.insert(c);
         return c;
     }
@@ -160,7 +162,25 @@ public class NodeCommentServiceImpl implements NodeCommentService {
         SysUser u = sysUserMapper.selectById(userId);
         String nick = u != null && StringUtils.hasText(u.getNickname()) ? u.getNickname()
                 : (u != null && StringUtils.hasText(u.getUsername()) ? u.getUsername() : "作者");
-        NodeComment c = build(m.getId(), target.getNodeId(), commentId, nick, content.trim(), 1, ip);
+        String src = target.getSource() == null ? "share" : target.getSource();
+        NodeComment c = build(m.getId(), target.getNodeId(), commentId, nick, content.trim(), 1, userId, src, ip);
+        nodeCommentMapper.insert(c);
+        return c;
+    }
+
+    @Override
+    public NodeComment addOrgComment(long userId, Long mindMapId, String nodeId,
+                                     Long parentId, String content, String ip) {
+        MindMap m = requireOwned(userId, mindMapId);
+        rateLimit(ip);
+        if (!StringUtils.hasText(nodeId)) throw new BusinessException(400, "节点标识缺失");
+        if (!StringUtils.hasText(content)) throw new BusinessException(400, "评论内容不能为空");
+        if (content.trim().length() > MAX_CONTENT) throw new BusinessException(400, "评论最多 " + MAX_CONTENT + " 字");
+        checkParent(m, parentId);
+        SysUser u = sysUserMapper.selectById(userId);
+        String nick = u != null && StringUtils.hasText(u.getNickname()) ? u.getNickname()
+                : (u != null && StringUtils.hasText(u.getUsername()) ? u.getUsername() : "成员");
+        NodeComment c = build(m.getId(), nodeId.trim(), parentId, nick, content.trim(), 1, userId, "org", ip);
         nodeCommentMapper.insert(c);
         return c;
     }
@@ -186,8 +206,9 @@ public class NodeCommentServiceImpl implements NodeCommentService {
                 .eq(NodeComment::getMindMapId, m.getId()));
         Map<String, Integer> unread = new HashMap<>();
         if (all.isEmpty()) return unread;
-        // 作者自己的回复不算未读提醒（只统计访客产生的评论）
-        all.removeIf(c -> c.getIsAuthor() != null && c.getIsAuthor() == 1);
+        // 排除自己发的评论（自己回复/自己组织评论不算自己的未读）；分享访客评论 userId=0 不受影响
+        all.removeIf(c -> (c.getIsAuthor() != null && c.getIsAuthor() == 1)
+                && c.getUserId() != null && c.getUserId() == userId);
         Map<Object, Object> read = redisTemplate.opsForHash().entries("cmt:read:" + userId + ":" + m.getId());
         Map<String, Long> lastRead = new HashMap<>();
         read.forEach((k, v) -> {

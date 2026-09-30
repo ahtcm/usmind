@@ -59,6 +59,23 @@ public class MindMapCommentController {
         return Result.ok(data);
     }
 
+    /** 组织内评论：协作导图中登录成员对任意节点发评论（source=org）；parentId 为空=对节点直接评论 */
+    @PostMapping
+    public Result<NodeComment> create(@PathVariable Long id,
+                                      @RequestBody Map<String, String> body,
+                                      HttpServletRequest request) {
+        long userId = SecurityUtil.currentUserId();
+        Long parentId = null;
+        String pid = body.get("parentId");
+        if (pid != null && !pid.isBlank()) {
+            try { parentId = Long.valueOf(pid); } catch (Exception ignored) {}
+        }
+        NodeComment c = nodeCommentService.addOrgComment(userId, id, body.get("nodeId"), parentId,
+                body.get("content"), clientIp(request));
+        broadcast(c);
+        return Result.ok(c);
+    }
+
     /** 作者回复评论：body {commentId, content} */
     @PostMapping("/reply")
     public Result<NodeComment> reply(@PathVariable Long id,
@@ -95,6 +112,7 @@ public class MindMapCommentController {
         m.put("userName", c.getUserName() == null ? "" : c.getUserName());
         m.put("content", c.getContent() == null ? "" : c.getContent());
         m.put("isAuthor", c.getIsAuthor());
+        m.put("source", c.getSource() == null ? "share" : c.getSource());
         m.put("createdAt", c.getCreatedAt() == null ? "" : c.getCreatedAt().toString());
         commentWsHandler.broadcastComment(c.getMindMapId(), m);
     }

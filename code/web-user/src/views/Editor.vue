@@ -294,6 +294,7 @@
         <div v-if="!cmtPanel.list.length" class="cmt-empty">还没有评论</div>
         <div v-for="c in cmtPanel.list" :key="c.id" class="cmt-item" :class="{ 'cmt-author': c.isAuthor === 1 }">
           <div class="cmt-head">
+            <span class="cmt-src" :class="c.source === 'org' ? 'cmt-src-org' : 'cmt-src-share'">{{ c.source === 'org' ? '组织' : '分享' }}</span>
             <b>{{ c.userName }}</b>
             <span v-if="c.isAuthor === 1" class="cmt-author-tag">我</span>
             <span class="cmt-time">{{ fmtCmtTime(c.createdAt) }}</span>
@@ -303,14 +304,18 @@
             <button class="cmt-reply" @click="setCmtReply(c)">{{ cmtPanel.replyTo && cmtPanel.replyTo.id === c.id ? '取消回复' : '回复' }}</button>
           </div>
           <div v-if="cmtPanel.replyTo && cmtPanel.replyTo.id === c.id" class="cmt-quick">
-            <input v-model="cmtPanel.input" maxlength="128" :placeholder="'回复 ' + c.userName + '…'" @keyup.enter="submitAuthorReply" />
-            <button @click="submitAuthorReply">发送</button>
+            <input v-model="cmtPanel.input" maxlength="128" :placeholder="'回复 ' + c.userName + '…'" @keyup.enter="submitComment" />
+            <button @click="submitComment">发送</button>
           </div>
         </div>
       </div>
       <div class="cmt-tip">
         <template v-if="cmtPanel.cmtErr"><span class="cmt-err">{{ cmtPanel.cmtErr }}</span></template>
         <template v-else>共 {{ cmtPanel.list.length }} 条评论 ｜ 有新评论的节点会闪烁提示</template>
+      </div>
+      <div v-if="!cmtPanel.replyTo" class="cmt-new">
+        <input v-model="cmtPanel.input" maxlength="128" placeholder="组织内评论（成员可见，标注为「组织」）…" @keyup.enter="submitComment" />
+        <button @click="submitComment">发送</button>
       </div>
     </div>
 
@@ -3841,8 +3846,9 @@ function nodeElOf(uid) {
 function applyCommentFlash() {
   if (!mind.value || !mind.value.renderer) return
   try {
-    // 清空旧的动画类
-    document.querySelectorAll('.cmt-flash, .cmt-breath-path, .cmt-breath-line').forEach(el => {
+    // 清空旧的动画类与流动电子线（clone 出来的纯视觉元素）
+    document.querySelectorAll('.cmt-flash, .cmt-breath-path, .cmt-breath-line, .cmt-flow-line').forEach(el => {
+      if (el.classList.contains('cmt-flow-line')) { try { el.remove() } catch (e) {} return }
       el.classList.remove('cmt-flash', 'cmt-breath-path', 'cmt-breath-line')
     })
     // 清空徽标层
@@ -3877,6 +3883,16 @@ function applyCommentFlash() {
             try {
               const el = l && l.node ? l.node : l
               if (el && el.classList) el.classList.add('cmt-breath-line')
+              // 流动电子线：clone 原连线（同组，自动跟随画布缩放/平移），加流动动画类
+              try {
+                if (el && el.tagName === 'path' && el.parentNode) {
+                  const flow = el.cloneNode(false)
+                  flow.removeAttribute('class')
+                  flow.removeAttribute('style')
+                  flow.classList.add('cmt-flow-line')
+                  el.parentNode.appendChild(flow)
+                }
+              } catch (e) {}
             } catch (e) {}
           }
         }
@@ -3974,19 +3990,26 @@ function setCmtReply(c) {
   cmtPanel.replyTo = (cmtPanel.replyTo && cmtPanel.replyTo.id === c.id) ? null : c
   cmtPanel.input = ''
 }
-async function submitAuthorReply() {
+async function submitComment() {
   const content = (cmtPanel.input || '').trim()
   if (!content) return
-  if (content.length > 128) { cmtPanel.cmtErr = '回复最多 128 字'; return }
+  if (content.length > 128) { cmtPanel.cmtErr = '最多 128 字'; return }
   const target = cmtPanel.replyTo
-  if (!target) { cmtPanel.cmtErr = '请先选择要回复的评论'; return }
   cmtPanel.cmtErr = ''
   try {
-    const c = await commentApi.reply(mindMapId.value, target.id, content)
-    cmtPanel.list.push(c)
+    let c
+    if (target) {
+      c = await commentApi.reply(mindMapId.value, target.id, content)
+    } else {
+      c = await commentApi.create(mindMapId.value, { nodeId: cmtPanel.nodeId, content })
+    }
+    if (c && c.id) {
+      cmtPanel.list.push(c)
+      // 组织内评论也计入未读统计（自己发的除外，后端已按 userId 排除）
+    }
     cmtPanel.input = ''
     cmtPanel.replyTo = null
-  } catch (e) { cmtPanel.cmtErr = e.message || '回复失败（可能评论过于频繁）' }
+  } catch (e) { cmtPanel.cmtErr = e.message || '发送失败（可能评论过于频繁）' }
 }
 function connectCmtWs() {
   if (cmtWs) { try { cmtWs.close() } catch (e) {} cmtWs = null }
@@ -4042,8 +4065,13 @@ async function pullCommentsOnce() {
 function handleCommentNew(c) {
   if (!c || !c.id) return
   if (c.id > cmtAfterId) cmtAfterId = c.id
-  // 作者自己的回复（isAuthor=1）不触发闪烁；访客新评论 → 节点未读+1
-  if (Number(c.isAuthor) === 1) return
+  // 排除自己发的评论（自己回复/自己组织评论不触发自己的未读）；访客/他人新评论 → 未读+1
+  if (Number(c.isAuthor) === 1) {
+    try {
+      const me = JSON.parse(localStorage.getItem('usmind.user') || '{}')
+      if (me && c.userId != null && Number(c.userId) === Number(me.id)) return
+    } catch (e) { return }
+  }
   unreadNodes[c.nodeId] = (unreadNodes[c.nodeId] || 0) + 1
   syncCommentFlash()
   if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
@@ -4254,20 +4282,41 @@ onBeforeUnmount(() => {
 }
 .cmt-badge-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
 .cmt-badge-el { position: absolute; min-width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #ff6b6b, #e53935); border-radius: 9px; padding: 0 5px; box-shadow: 0 2px 8px rgba(229,57,53,.6); transform: translate(-50%, -50%); }
-.cmt-flash { animation: cmtBreath 1.6s ease-in-out infinite; }
-.cmt-breath-path { animation: cmtBreathPath 1.6s ease-in-out infinite; }
-.cmt-breath-line { animation: cmtBreathLine 1.6s ease-in-out infinite; }
+.cmt-src { display: inline-block; font-size: 10px; line-height: 16px; height: 16px; padding: 0 6px; border-radius: 4px; margin-right: 6px; font-weight: 600; vertical-align: 1px; }
+.cmt-src-share { background: rgba(74,92,247,.12); color: #4A5CF7; }
+.cmt-src-org { background: rgba(14,124,134,.12); color: #0e7c86; }
+.cmt-new { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid rgba(255,255,255,.08); }
+.cmt-new input { flex: 1; min-width: 0; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; color: #e6e6e6; font-size: 13px; padding: 7px 10px; outline: none; }
+.cmt-new input:focus { border-color: rgba(74,92,247,.6); }
+.cmt-new button { background: linear-gradient(135deg, #4A5CF7, #7c6cf0); border: none; color: #fff; font-size: 13px; padding: 7px 16px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+:deep(.cmt-flash) { animation: cmtBreath 1.6s ease-in-out infinite; }
+:deep(.cmt-breath-path) { animation: cmtBreathPath 1.6s ease-in-out infinite; }
+:deep(.cmt-breath-line) { animation: cmtBreathLine 1.6s ease-in-out infinite; }
 @keyframes cmtBreath {
   0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
-  50% { filter: drop-shadow(0 0 9px rgba(255,77,79,.95)); opacity: .72; }
+  50% { filter: drop-shadow(0 0 18px rgba(255,77,79,1)); opacity: .62; }
 }
 @keyframes cmtBreathPath {
   0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
-  50% { filter: drop-shadow(0 0 6px rgba(255,77,79,.75)); opacity: .6; }
+  50% { filter: drop-shadow(0 0 12px rgba(255,77,79,.9)); opacity: .5; }
 }
 @keyframes cmtBreathLine {
-  0%, 100% { stroke-opacity: .9; }
-  50% { stroke-opacity: .25; }
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: .15; }
+}
+/* 流动电子线：克隆原连线路径，虚线点沿路径流动（同组元素，随画布缩放/平移） */
+:deep(.cmt-flow-line) {
+  stroke: #ff4d4f !important;
+  stroke-width: 3.2 !important;
+  stroke-linecap: round !important;
+  fill: none !important;
+  stroke-dasharray: 2.5 22 !important;
+  animation: cmtFlow 0.9s linear infinite !important;
+  opacity: .98 !important;
+  pointer-events: none !important;
+}
+@keyframes cmtFlow {
+  to { stroke-dashoffset: -24.5; }
 }
 .canvas-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .canvas-bg-color { position: absolute; inset: 0; pointer-events: none; z-index: 0; }

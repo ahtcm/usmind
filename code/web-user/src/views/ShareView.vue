@@ -50,6 +50,7 @@
           <div v-if="!cmtList.length" class="cmt-empty">还没有评论，来抢沙发~</div>
           <div v-for="c in cmtList" :key="c.id" class="cmt-item" :class="{ 'cmt-author': c.isAuthor === 1 }">
             <div class="cmt-head">
+              <span class="cmt-src" :class="c.source === 'org' ? 'cmt-src-org' : 'cmt-src-share'">{{ c.source === 'org' ? '组织' : '分享' }}</span>
               <b>{{ c.userName }}</b>
               <span v-if="c.isAuthor === 1" class="cmt-author-tag">作者</span>
               <span class="cmt-time">{{ fmtTime(c.createdAt) }}</span>
@@ -836,6 +837,9 @@ onBeforeUnmount(() => {
 .cmt-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .cmt-head b { color: #f5f7ff; font-size: 13px; }
 .cmt-author-tag { font-size: 11px; color: #fff; background: #f59e0b; border-radius: 4px; padding: 1px 5px; }
+.cmt-src { display: inline-block; font-size: 10px; line-height: 16px; height: 16px; padding: 0 6px; border-radius: 4px; font-weight: 600; }
+.cmt-src-share { background: rgba(74,92,247,.18); color: #9fb0ff; }
+.cmt-src-org { background: rgba(14,124,134,.18); color: #3ec5cf; }
 .cmt-time { margin-left: auto; color: #7c8399; font-size: 11px; white-space: nowrap; }
 .cmt-body { color: #cdd3e3; line-height: 1.55; word-break: break-word; }
 .cmt-foot { margin-top: 4px; }

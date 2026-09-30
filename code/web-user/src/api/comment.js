@@ -13,6 +13,8 @@ export const commentApi = {
   listByMindMap: (id, afterId) => request.get('/mindmaps/' + id + '/comments', { params: afterId ? { afterId } : {} }),
   /** 作者回复评论：{commentId, content} */
   reply: (id, commentId, content) => request.post('/mindmaps/' + id + '/comments/reply', { commentId, content }),
+  /** 组织内评论（协作导图成员对任意节点发评论）：{nodeId, parentId?, content} */
+  create: (id, data) => request.post('/mindmaps/' + id + '/comments', data),
   /** 标记某节点已读（点击后停止闪烁）：{nodeId} */
   markRead: (id, nodeId) => request.post('/mindmaps/' + id + '/comments/read', { nodeId })
 }
