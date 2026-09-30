@@ -50,6 +50,12 @@ public class IpGuardFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        // 管理后台 /api/admin/** 豁免 IP 防护：后台已有 ADMIN 角色 JWT 保护；
+        // 避免管理员 IP 被误自动拉黑后连后台都无法登录解除（无逃生通道）
+        if (path.startsWith("/api/admin/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         String ip = clientIp(request);
         Long userId = null;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

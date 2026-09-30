@@ -115,7 +115,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
 import request from '@/api/request'
-import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh, Medal, Key, Lock, List, OfficeBuilding } from '@element-plus/icons-vue'
+import { Fold, Expand, Menu, ArrowDown, Odometer, User, Share, Files, FolderOpened, Brush, Star, Setting, Tools, Refresh, Medal, Key, Lock, List, OfficeBuilding, Tickets, ChatDotRound } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,6 +135,8 @@ const menus = [
   { path: '/ip-rules', label: 'IP 黑白名单', icon: Lock },
   { path: '/mindmaps', label: '导图管理', icon: Share },
   { path: '/orgs', label: '机构管理', icon: OfficeBuilding },
+  { path: '/orders', label: '订单管理', icon: Tickets },
+  { path: '/comments', label: '评论管理', icon: ChatDotRound },
   { path: '/resources', label: '资源管理', icon: Files },
   { path: '/oss', label: 'OSS配置', icon: FolderOpened },
   { path: '/themes', label: '主题模板', icon: Brush },

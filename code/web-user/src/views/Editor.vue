@@ -2140,9 +2140,10 @@ function openMathQuick() {
   mathDialog.value = true
 }
 
-function insertMathToNode() {
+async function insertMathToNode() {
   const node = mathNode.value
   const raw = mathInput.value.trim()
+  try { await loadMathJax() } catch (e) {}
   if (!node || !raw) { mathDialog.value = false; return }
   // 编辑模式：替换节点内已有 KaTeX 公式
   if (mathEditMode.value) {
@@ -3968,8 +3969,10 @@ function memberIdsArr() {
 function isMemberTheme(t) {
   if (!memberFeature.enabled || !memberFeature.memberThemeIds) return false
   const ids = memberIdsArr()
-  const tid = t && t.id != null ? String(t.id) : ''
-  return ids.includes(tid)
+  // theme object has no id; backend config matches theme name or key
+  const name = t && t.name != null ? String(t.name) : ""
+  const key = t && t.key != null ? String(t.key) : ""
+  return ids.includes(name) || ids.includes(key)
 }
 function isMemberExport(fmt) {
   if (!memberFeature.enabled || !memberFeature.memberExportFormats) return false
@@ -3985,7 +3988,7 @@ function checkMemberFeature(kind, value) {
     const ids = String(cfg.memberThemeIds).split(',').map(x => x.trim())
     // 主题名 -> 主题ID 映射（后台配置为 ID 列表）
     const item = themes.value.find(t => t.name === value)
-    const tid = item && item.id != null ? String(item.id) : ''
+    const tid = item && (item.key != null ? String(item.key) : (item.name != null ? String(item.name) : ''))
     if (!ids.includes(tid) && !ids.includes(value)) return true
   } else if (kind === 'export') {
     if (!cfg.memberExportFormats) return true

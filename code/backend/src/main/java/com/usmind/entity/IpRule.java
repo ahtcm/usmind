@@ -17,5 +17,7 @@ public class IpRule {
     private String targetValue;
     private String remark;
     private Integer enabled;
+    /** 自动拉黑过期时间（超频自动拉黑写入 now+封禁时长；到期自动解封）。手动规则为 null=永久 */
+    private LocalDateTime expireAt;
     private LocalDateTime createdAt;
 }

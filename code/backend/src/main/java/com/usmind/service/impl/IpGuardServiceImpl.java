@@ -74,6 +74,8 @@ public class IpGuardServiceImpl implements IpGuardService {
             rule.setTargetValue(ip);
             rule.setRemark("超频自动拉黑");
             rule.setEnabled(1);
+            // 自动拉黑带过期时间：到期后 match 时惰性删除，实现自动解封
+            rule.setExpireAt(LocalDateTime.now().plusSeconds(blackSeconds));
             rule.setCreatedAt(LocalDateTime.now());
             ipRuleMapper.insert(rule);
             log.warn("IP 超频自动拉黑: {}", ip);
@@ -97,12 +99,24 @@ public class IpGuardServiceImpl implements IpGuardService {
             Boolean b = redisTemplate.hasKey("ipblack:" + value);
             if (Boolean.TRUE.equals(b)) return true;
         }
-        Long cnt = ipRuleMapper.selectCount(new LambdaQueryWrapper<IpRule>()
+        List<IpRule> rules = ipRuleMapper.selectList(new LambdaQueryWrapper<IpRule>()
                 .eq(IpRule::getRuleType, ruleType)
                 .eq(IpRule::getTargetType, targetType)
                 .eq(IpRule::getTargetValue, value)
                 .eq(IpRule::getEnabled, 1));
-        return cnt != null && cnt > 0;
+        if (rules == null || rules.isEmpty()) return false;
+        LocalDateTime now = LocalDateTime.now();
+        for (IpRule r : rules) {
+            // 自动拉黑到期：惰性删除该规则并视为不匹配（自动解封）
+            if (r.getExpireAt() != null && r.getExpireAt().isBefore(now)) {
+                try {
+                    ipRuleMapper.deleteById(r.getId());
+                } catch (Exception ignored) {}
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override

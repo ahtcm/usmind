@@ -146,8 +146,21 @@ public class DataInitializer implements CommandLineRunner {
                 " target_value VARCHAR(128)," +
                 " remark VARCHAR(255) DEFAULT ''," +
                 " enabled TINYINT DEFAULT 1," +
+                " expire_at DATETIME NULL," +
                 " created_at DATETIME DEFAULT CURRENT_TIMESTAMP" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IP黑白名单表'");
+            // migrate: add expire_at column for auto-ban expiry (new tables already have it)
+            try {
+                Integer colCnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ip_rule' AND column_name = 'expire_at'",
+                    Integer.class);
+                if (colCnt == null || colCnt == 0) {
+                    jdbcTemplate.execute("ALTER TABLE ip_rule ADD COLUMN expire_at DATETIME NULL AFTER enabled");
+                    log.info("ip_rule migrated: added expire_at column");
+                }
+            } catch (Exception e) {
+                log.warn("ip_rule migrate expire_at failed: {}", e.getMessage());
+            }
             // 默认会员套餐
             Long planCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM member_plan", Long.class);
             if (planCount == null || planCount == 0) {
