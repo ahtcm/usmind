@@ -4113,11 +4113,11 @@ onBeforeUnmount(() => {
 @keyframes cmtBlink { 0%, 100% { filter: none; } 50% { filter: brightness(1.45) drop-shadow(0 0 7px rgba(122, 162, 247, .75)); } }
 .cmt-badge-fo { pointer-events: none; }
 .cmt-badge-div { min-width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: #e53935; border-radius: 9px; padding: 0 4px; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
-.canvas-bg { position: absolute; inset: 0; overflow: hidden; }
-.canvas-bg-color { position: absolute; inset: 0; }
-.canvas-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.canvas-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.canvas-bg-color { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.canvas-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; pointer-events: none; z-index: 0; }
 .canvas-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
-.canvas-bg-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; pointer-events: none; z-index: 0; }
+.smm-mind-map-container { position: relative; z-index: 1; pointer-events: auto; }
 #map { position: relative; height: 100%; width: 100%; background: transparent !important; opacity: 1; transition: opacity .5s ease; }
 #map.map-loading { opacity: 0; }
 .page-loading { position: absolute; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(255,255,255,.7); backdrop-filter: blur(2px); }
