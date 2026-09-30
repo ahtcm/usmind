@@ -30,17 +30,6 @@
       <!-- 注册 -->
       <template v-else>
         <div class="field">
-          <label>头像（可选）</label>
-          <div class="avatar-upload-row">
-            <label class="avatar-upload" :class="{ 'has-img': reg.avatarPreview }">
-              <img v-if="reg.avatarPreview" :src="reg.avatarPreview" alt="avatar" />
-              <span v-else>＋ 选择图片</span>
-              <input type="file" accept="image/*" @change="onAvatarPick" />
-            </label>
-            <span class="avatar-tip">支持 jpg/png，≤2MB</span>
-          </div>
-        </div>
-        <div class="field">
           <label>用户名</label>
           <input v-model="reg.username" type="text" placeholder="请输入用户名" />
         </div>
