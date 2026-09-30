@@ -36,4 +36,10 @@ public interface NodeCommentService {
 
     /** 某导图全部评论数（作者端角标展示） */
     long countByMindMap(Long mindMapId);
+
+    /** 计算评论的提醒目标 userId 列表（特效只发给这些用户，其他人仅收到信息）：
+     *  回复指定评论 → 仅被回复人（被回复人是访客 userId=0 时退回节点/导图提醒）；
+     *  组织内新节点评论 → 导图所有者 + 节点创建者（去重、排除评论者）；
+     *  分享访客评论 → 导图所有者。 */
+    java.util.List<Long> targetUserIds(NodeComment c);
 }

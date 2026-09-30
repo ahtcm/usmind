@@ -288,7 +288,10 @@
     <div v-if="cmtPanel.open" class="cmt-panel">
       <div class="cmt-header">
         <span class="cmt-title">💬 {{ cmtPanel.nodeName || '节点' }}</span>
-        <button class="cmt-close" @click="closeCmtPanel">×</button>
+        <span class="cmt-hd-r">
+          <button class="cmt-sound" :title="cmtSoundOn ? '关闭评论提示音' : '开启评论提示音'" @click="toggleCmtSound">{{ cmtSoundOn ? '🔊' : '🔇' }}</button>
+          <button class="cmt-close" @click="closeCmtPanel">×</button>
+        </span>
       </div>
       <div class="cmt-list">
         <div v-if="!cmtPanel.list.length" class="cmt-empty">还没有评论</div>
@@ -4079,16 +4082,50 @@ async function pullCommentsOnce() {
 function handleCommentNew(c) {
   if (!c || !c.id) return
   if (c.id > cmtAfterId) cmtAfterId = c.id
-  // 排除自己发的评论（自己回复/自己组织评论不触发自己的未读）；访客/他人新评论 → 未读+1
-  if (Number(c.isAuthor) === 1) {
-    try {
-      const me = JSON.parse(localStorage.getItem('usmind.user') || '{}')
-      if (me && c.userId != null && Number(c.userId) === Number(me.id)) return
-    } catch (e) { return }
+  let me = {}
+  try { me = JSON.parse(localStorage.getItem('usmind.user') || '{}') } catch (e) {}
+  // 自己发的评论不提醒自己（仅打开面板时刷新列表）
+  if (Number(c.isAuthor) === 1 && me.id != null && c.userId != null && Number(c.userId) === Number(me.id)) {
+    if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
+    return
+  }
+  // 定向提醒：后端已算好 targetUserIds，特效（电流+音效+角标）只发给提醒目标，其他人仅收到信息
+  const targets = c.targetUserIds
+  if (Array.isArray(targets) && targets.length > 0) {
+    const isTarget = me.id != null && targets.some(t => Number(t) === Number(me.id))
+    if (!isTarget) {
+      if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
+      return
+    }
   }
   unreadNodes[c.nodeId] = (unreadNodes[c.nodeId] || 0) + 1
   syncCommentFlash()
+  playCmtSound()
   if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
+}
+
+/** 评论提示音：Web Audio 合成短提示音（无需资源文件），开关持久化到 localStorage */
+const cmtSoundOn = ref(localStorage.getItem('usmind.cmtSound') !== '0')
+function toggleCmtSound() {
+  cmtSoundOn.value = !cmtSoundOn.value
+  localStorage.setItem('usmind.cmtSound', cmtSoundOn.value ? '1' : '0')
+}
+function playCmtSound() {
+  if (!cmtSoundOn.value) return
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    const ctx = new Ctx()
+    const o = ctx.createOscillator(), g = ctx.createGain()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(660, ctx.currentTime)
+    o.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.18)
+    g.gain.setValueAtTime(0.12, ctx.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+    o.connect(g); g.connect(ctx.destination)
+    o.start(); o.stop(ctx.currentTime + 0.45)
+    setTimeout(() => { try { ctx.close() } catch (e) {} }, 700)
+  } catch (e) {}
 }
 
 function startCommentPoll() {
@@ -4258,6 +4295,9 @@ onBeforeUnmount(() => {
 .cmt-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmt-close { border: 0; background: none; color: #aab; font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
 .cmt-close:hover { background: rgba(255,255,255,.12); color: #fff; }
+.cmt-hd-r { display: flex; align-items: center; gap: 4px; }
+.cmt-sound { border: 0; background: none; color: #aab; font-size: 15px; cursor: pointer; line-height: 1; padding: 2px 6px; border-radius: 6px; }
+.cmt-sound:hover { background: rgba(255,255,255,.12); color: #fff; }
 .cmt-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .cmt-empty { text-align: center; color: #8890a3; padding: 26px 0; }
 .cmt-item { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.06); border-radius: 10px; padding: 8px 10px; }
