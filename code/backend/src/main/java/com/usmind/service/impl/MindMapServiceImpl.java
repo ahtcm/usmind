@@ -30,6 +30,8 @@ public class MindMapServiceImpl implements MindMapService {
     private final com.usmind.service.SettingsService settingsService;
     private final com.usmind.service.OrgService orgService;
     private final com.usmind.ws.MindMapWsHandler mindMapWsHandler;
+    private final com.usmind.mapper.NodeCommentMapper nodeCommentMapper;
+    private final com.usmind.mapper.NodeCommentReadMapper nodeCommentReadMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MindMapServiceImpl(MindMapMapper mindMapMapper,
@@ -38,7 +40,9 @@ public class MindMapServiceImpl implements MindMapService {
                               com.usmind.mapper.SysUserMapper sysUserMapper,
                               com.usmind.service.SettingsService settingsService,
                               com.usmind.service.OrgService orgService,
-                              com.usmind.ws.MindMapWsHandler mindMapWsHandler) {
+                              com.usmind.ws.MindMapWsHandler mindMapWsHandler,
+                              com.usmind.mapper.NodeCommentMapper nodeCommentMapper,
+                              com.usmind.mapper.NodeCommentReadMapper nodeCommentReadMapper) {
         this.mindMapMapper = mindMapMapper;
         this.orgMemberMapper = orgMemberMapper;
         this.orgCollabMapper = orgCollabMapper;
@@ -46,6 +50,8 @@ public class MindMapServiceImpl implements MindMapService {
         this.settingsService = settingsService;
         this.orgService = orgService;
         this.mindMapWsHandler = mindMapWsHandler;
+        this.nodeCommentMapper = nodeCommentMapper;
+        this.nodeCommentReadMapper = nodeCommentReadMapper;
     }
 
     /** 是否拥有该导图的读写权限：属主本人，或所属机构协作成员 */
@@ -545,6 +551,8 @@ public class MindMapServiceImpl implements MindMapService {
         // 删除协作关系
         orgCollabMapper.delete(new LambdaQueryWrapper<com.usmind.entity.OrgCollab>()
                 .eq(com.usmind.entity.OrgCollab::getMindMapId, id));
+        // 删除该导图下所有评论及已读记录（随导图删除清理）
+        deleteCommentsByMap(id);
     }
 
     @Override
@@ -552,8 +560,22 @@ public class MindMapServiceImpl implements MindMapService {
         if (ids == null || ids.isEmpty()) return;
         for (Long id : ids) {
             MindMap m = mindMapMapper.selectById(id);
-            if (m != null) mindMapMapper.deleteById(id);
+            if (m != null) {
+                mindMapMapper.deleteById(id);
+                // 删除该导图下所有评论及已读记录（随导图删除清理）
+                deleteCommentsByMap(id);
+            }
         }
+    }
+
+    /**
+     * 删除导图下所有评论及其已读记录（导图删除时联动清理，避免孤儿数据）
+     */
+    private void deleteCommentsByMap(Long mindMapId) {
+        nodeCommentReadMapper.delete(new LambdaQueryWrapper<com.usmind.entity.NodeCommentRead>()
+                .eq(com.usmind.entity.NodeCommentRead::getMindMapId, mindMapId));
+        nodeCommentMapper.delete(new LambdaQueryWrapper<com.usmind.entity.NodeComment>()
+                .eq(com.usmind.entity.NodeComment::getMindMapId, mindMapId));
     }
 
     @Override
