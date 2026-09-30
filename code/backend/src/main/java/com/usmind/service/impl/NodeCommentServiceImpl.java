@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.usmind.common.BusinessException;
 import com.usmind.entity.MindMap;
 import com.usmind.entity.NodeComment;
+import com.usmind.entity.NodeCommentRead;
 import com.usmind.entity.SysUser;
 import com.usmind.mapper.MindMapMapper;
 import com.usmind.mapper.NodeCommentMapper;
+import com.usmind.mapper.NodeCommentReadMapper;
 import com.usmind.mapper.SysUserMapper;
 import com.usmind.service.IpGuardService;
 import com.usmind.service.NodeCommentService;
@@ -35,6 +37,7 @@ public class NodeCommentServiceImpl implements NodeCommentService {
     private static final int MAX_NICK = 32;
 
     private final NodeCommentMapper nodeCommentMapper;
+    private final NodeCommentReadMapper nodeCommentReadMapper;
     private final MindMapMapper mindMapMapper;
     private final SysUserMapper sysUserMapper;
     private final StringRedisTemplate redisTemplate;
@@ -43,11 +46,13 @@ public class NodeCommentServiceImpl implements NodeCommentService {
     private final OrgService orgService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public NodeCommentServiceImpl(NodeCommentMapper nodeCommentMapper, MindMapMapper mindMapMapper,
-                                  SysUserMapper sysUserMapper, StringRedisTemplate redisTemplate,
+    public NodeCommentServiceImpl(NodeCommentMapper nodeCommentMapper, NodeCommentReadMapper nodeCommentReadMapper,
+                                  MindMapMapper mindMapMapper, SysUserMapper sysUserMapper,
+                                  StringRedisTemplate redisTemplate,
                                   SettingsService settingsService, IpGuardService ipGuardService,
                                   OrgService orgService) {
         this.nodeCommentMapper = nodeCommentMapper;
+        this.nodeCommentReadMapper = nodeCommentReadMapper;
         this.mindMapMapper = mindMapMapper;
         this.sysUserMapper = sysUserMapper;
         this.redisTemplate = redisTemplate;
@@ -193,14 +198,33 @@ public class NodeCommentServiceImpl implements NodeCommentService {
     public void markNodeRead(long userId, Long mindMapId, String nodeId) {
         MindMap m = requireOwned(userId, mindMapId);
         if (!StringUtils.hasText(nodeId)) return;
-        // 记录该节点当前最大评论 id 为已读游标
+        // 记录该节点当前最大评论 id 为已读游标（口径与 unread 一致：访客评论 + 其他成员评论，不含自己发的）
         Long maxId = nodeCommentMapper.selectList(new LambdaQueryWrapper<NodeComment>()
                         .eq(NodeComment::getMindMapId, m.getId())
                         .eq(NodeComment::getNodeId, nodeId.trim())
-                        .eq(NodeComment::getIsAuthor, 0))
+                        .and(w -> w.eq(NodeComment::getIsAuthor, 0)
+                                .or(n -> n.eq(NodeComment::getIsAuthor, 1).ne(NodeComment::getUserId, userId))))
                 .stream().mapToLong(NodeComment::getId).max().orElse(0L);
         if (maxId <= 0) return;
-        redisTemplate.opsForHash().put("cmt:read:" + userId + ":" + m.getId(), nodeId.trim(), String.valueOf(maxId));
+        // 持久化到 MySQL（刷新/重启不丢失已读状态）；存在则只推进游标
+        NodeCommentRead rec = nodeCommentReadMapper.selectOne(new LambdaQueryWrapper<NodeCommentRead>()
+                .eq(NodeCommentRead::getUserId, userId)
+                .eq(NodeCommentRead::getMindMapId, m.getId())
+                .eq(NodeCommentRead::getNodeId, nodeId.trim()));
+        if (rec == null) {
+            NodeCommentRead nr = new NodeCommentRead();
+            nr.setUserId(userId);
+            nr.setMindMapId(m.getId());
+            nr.setNodeId(nodeId.trim());
+            nr.setLastReadId(maxId);
+            nodeCommentReadMapper.insert(nr);
+        } else if (maxId > (rec.getLastReadId() == null ? 0L : rec.getLastReadId())) {
+            rec.setLastReadId(maxId);
+            nodeCommentReadMapper.update(rec, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<NodeCommentRead>()
+                    .eq(NodeCommentRead::getUserId, userId)
+                    .eq(NodeCommentRead::getMindMapId, m.getId())
+                    .eq(NodeCommentRead::getNodeId, nodeId.trim()));
+        }
     }
 
     @Override
@@ -213,11 +237,13 @@ public class NodeCommentServiceImpl implements NodeCommentService {
         // 排除自己发的评论（自己回复/自己组织评论不算自己的未读）；分享访客评论 userId=0 不受影响
         all.removeIf(c -> (c.getIsAuthor() != null && c.getIsAuthor() == 1)
                 && c.getUserId() != null && c.getUserId() == userId);
-        Map<Object, Object> read = redisTemplate.opsForHash().entries("cmt:read:" + userId + ":" + m.getId());
+        List<NodeCommentRead> reads = nodeCommentReadMapper.selectList(new LambdaQueryWrapper<NodeCommentRead>()
+                .eq(NodeCommentRead::getUserId, userId)
+                .eq(NodeCommentRead::getMindMapId, m.getId()));
         Map<String, Long> lastRead = new HashMap<>();
-        read.forEach((k, v) -> {
-            try { lastRead.put(String.valueOf(k), Long.parseLong(String.valueOf(v))); } catch (Exception ignored) {}
-        });
+        for (NodeCommentRead r : reads) {
+            lastRead.put(r.getNodeId(), r.getLastReadId() == null ? 0L : r.getLastReadId());
+        }
         Map<String, Integer> counts = new HashMap<>();
         for (NodeComment c : all) {
             counts.merge(c.getNodeId(), 1, Integer::sum);
