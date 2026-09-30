@@ -1,1 +1,0 @@
-SELECT `key`, `value` FROM settings WHERE `key` LIKE '%aptcha%' OR `key` LIKE '%sms%' OR `key` LIKE '%wechat%';
