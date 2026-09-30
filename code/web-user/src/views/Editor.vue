@@ -1046,20 +1046,26 @@ function bindMindEvents() {
 mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNodeLock() })
   // 结构类命令（创建/删除/移动/粘贴节点）执行后立即保存：让协作端秒级收到广播，无需等自动保存周期
   mind.value.on('afterExecCommand', (name) => {
-    if (STRUCT_CHANGE_CMDS.indexOf(name) >= 0) scheduleStructureSave()
-    // 新建节点标记创建者：后端 get 时已给历史节点补 creatorUid（导图创建者），
-    // 这里只给仍无创建者的节点（即本次新插入的节点）补上当前用户
-    if (name && name.indexOf('INSERT') === 0) {
-      try {
-        const rn = mind.value.renderer && mind.value.renderer.root
-        if (rn) {
-          const walk = (n) => {
-            if (n && n.nodeData && !n.nodeData.creatorUid) n.nodeData.creatorUid = myUid()
-            if (n.children) n.children.forEach(walk)
+    // 远端增量应用触发的命令（wsApplying 门闩）：不回环保存、不二次广播
+    if (wsApplying) return
+    if (STRUCT_CHANGE_CMDS.indexOf(name) >= 0) {
+      scheduleStructureSave()
+      // 新建节点标记创建者：后端 get 时已给历史节点补 creatorUid（导图创建者），
+      // 这里只给仍无创建者的节点（即本次新插入的节点）补上当前用户
+      if (name && name.indexOf('INSERT') === 0) {
+        try {
+          const rn = mind.value.renderer && mind.value.renderer.root
+          if (rn) {
+            const walk = (n) => {
+              if (n && n.nodeData && !n.nodeData.creatorUid) n.nodeData.creatorUid = myUid()
+              if (n.children) n.children.forEach(walk)
+            }
+            walk(rn)
           }
-          walk(rn)
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
+      // 结构增量实时广播：对端零延迟局部应用（不拉全量、不闪屏）
+      broadcastStructDelta()
     }
   })
   // 编辑框聚焦/失焦切换快速入口
@@ -1269,6 +1275,8 @@ async function diffApplyLatest() {
     }
     const localRoot = mind.value.renderer && mind.value.renderer.root
     if (!localRoot) return
+    // 局部应用期间关闭动画，避免批量 remove/insert 造成视觉跳动
+    mapEl.value.classList.add('no-anim')
     const localMap = {}
     const depthOf = {}
     const walkLocal = (n, dep) => { if (!n || !n.uid) return; localMap[n.uid] = n; depthOf[n.uid] = dep; (n.children || []).forEach(c => walkLocal(c, dep + 1)) }
@@ -1276,9 +1284,10 @@ async function diffApplyLatest() {
     const remoteUids = new Set()
     const walkRemote = (n) => { if (!n) return; const u = uidOf(n); if (u) remoteUids.add(u); (n.children || []).forEach(walkRemote) }
     walkRemote(remoteRoot)
-    // 1. 删除本地多余节点（先删深层）
+    // 1. 删除本地多余节点（先删深层）：只删本地明确删除（deletedUids）的，其余保留
+    //    （防止对方旧版本全量同步时把自己刚新增但尚未保存的节点删掉）
     const toRemove = Object.keys(localMap)
-      .filter(uid => !remoteUids.has(uid) && localMap[uid].parent)
+      .filter(uid => !remoteUids.has(uid) && localMap[uid].parent && deletedUids.has(uid))
       .sort((a, b) => (depthOf[b] || 0) - (depthOf[a] || 0))
       .map(uid => localMap[uid])
     if (toRemove.length) {
@@ -1290,6 +1299,8 @@ async function diffApplyLatest() {
       if (!rd) return
       const uid = uidOf(rd)
       if (!uid) return
+      // 本地明确删除过的节点不复活（防对方旧版本带回来）
+      if (deletedUids.has(uid)) return
       let localNode = localMap[uid]
       if (!localNode) {
         const parentNode = parentUid ? localMap[parentUid] : null
@@ -1328,7 +1339,9 @@ async function diffApplyLatest() {
     applyRemote(remoteRoot, null)
     suppressDirtyUntil = Date.now() + 3000
     try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+    try { structSnap = snapshotStruct() } catch (e) {}
   } catch (e) { console.warn('diffApplyLatest err', e) }
+  try { mapEl.value.classList.remove('no-anim') } catch (e) {}
 }
 
 /** 增强冲突框：加载最新 / 以我为准 */
@@ -1472,6 +1485,7 @@ async function loadDoc(keepView = false) {
     currentTheme.value = doc.theme
   }
   applyBranchRainbow()
+  try { structSnap = snapshotStruct() } catch (e) {}
   markSaved()
   clearTimeout(autoSaveTimer)
   // 延迟 data_change 可能把页面误判为未保存，8s 后（抑制期结束）补一次 markSaved
@@ -3548,6 +3562,25 @@ function connectWs() {
         applyRemoteNodeChange(msg.nodeId, msg.text, Number(msg.userId))
         return
       }
+      if (msg.event === 'node_added') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        if (Number(msg.userId) === myUid()) return
+        if (msg.nodeDataTooLarge) return
+        applyRemoteNodeAdded(msg)
+        return
+      }
+      if (msg.event === 'node_removed') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        if (Number(msg.userId) === myUid()) return
+        applyRemoteNodeRemoved(msg.nodeId)
+        return
+      }
+      if (msg.event === 'node_moved') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        if (Number(msg.userId) === myUid()) return
+        applyRemoteNodeMoved(msg.nodeId, msg.parentId)
+        return
+      }
       if (msg.event === 'org_disbanded') {
         orgDisbandedName.value = msg.orgName || ''
         orgDisbanded.value = true
@@ -3662,6 +3695,133 @@ function applyRemoteNodeChange(nid, text, fromUid) {
     const lk = nodeLocks[nid]
     if (lk) setLockMark(nid, true, lk.userName)
   } catch (e) { wsApplying = false; console.warn('applyRemoteNodeChange err', e) }
+}
+
+// ============ 结构变更 WS 增量：快照 diff 广播 + 对端局部应用 ============
+let structSnap = {} // uid -> { p: parentUid|'', i: index }
+function snapshotStruct() {
+  const snap = {}
+  const rn = mind.value && mind.value.renderer && mind.value.renderer.root
+  if (!rn) return snap
+  const walk = (n) => {
+    if (!n) return
+    const kids = n.children || []
+    kids.forEach((c, i) => {
+      const cu = c.uid || (c.nodeData && c.nodeData.uid)
+      if (cu) snap[cu] = { p: (n.uid || (n.nodeData && n.nodeData.uid)) || '', i }
+      walk(c)
+    })
+  }
+  walk(rn)
+  return snap
+}
+function toDataStruct(n) {
+  if (!n) return null
+  return { data: n.nodeData || {}, children: (n.children || []).map(toDataStruct) }
+}
+function collectDeletedDesc(uid, old) {
+  try {
+    deletedUids.add(uid)
+    for (const u2 in old) if (old[u2].p === uid) collectDeletedDesc(u2, old)
+  } catch (e) {}
+}
+function broadcastStructDelta() {
+  try {
+    if (!ws || ws.readyState !== 1 || !mind.value || !mind.value.renderer) return
+    const ns = snapshotStruct()
+    const old = structSnap || {}
+    const mm = String(mindMapId.value)
+    // 删除：广播 + 收集被删子树 uid（含后代）到 deletedUids，防止并发合并时被对方旧版本"复活"
+    for (const uid in old) if (!ns[uid]) {
+      sendWs({ type: 'node_removed', mindMapId: mm, nodeId: uid })
+      collectDeletedDesc(uid, old)
+    }
+    // 新增
+    for (const uid in ns) if (!old[uid]) {
+      const node = mind.value.renderer.findNodeByUid(uid)
+      if (!node) continue
+      sendWs({ type: 'node_added', mindMapId: mm, nodeId: uid, parentId: ns[uid].p || '', index: ns[uid].i, nodeData: node.nodeData || {}, children: (node.children || []).map(toDataStruct) })
+    }
+    // 移动（父节点或同级索引变化）
+    for (const uid in old) if (ns[uid] && (ns[uid].p !== old[uid].p || ns[uid].i !== old[uid].i)) {
+      sendWs({ type: 'node_moved', mindMapId: mm, nodeId: uid, parentId: ns[uid].p || '', index: ns[uid].i })
+    }
+    structSnap = ns
+  } catch (e) { console.warn('broadcastStructDelta err', e) }
+}
+// 远端结构变更会触发库的 hideEditTextBox：先把正在编辑的内容 flush 到节点并立即推送，防止输入内容被吞
+function flushMyEdit() {
+  try {
+    if (!myEditNodeId) return
+    const box = document.querySelector('.smm-node-edit-wrap, .smm-text-edit, [contenteditable=true]')
+    const node = mind.value.renderer.findNodeByUid(myEditNodeId)
+    if (!box || !node) return
+    const t = (box.textContent || '')
+    if (node.nodeData.text !== t) {
+      node.nodeData.text = t
+      delete node.nodeData.richText
+      try { mind.value.renderer.renderNode(node) } catch (e) {}
+    }
+    // 立即推送（不走 250ms 防抖，避免末尾编辑内容丢失）
+    sendWs({ type: 'node_change', mindMapId: String(mindMapId.value), nodeId: myEditNodeId, text: t.slice(0, 8000), nodeCreatorUid: Number((node.nodeData && node.nodeData.creatorUid) || 0) })
+  } catch (e) {}
+}
+function applyRemoteNodeAdded(msg) {
+  try {
+    flushMyEdit()
+    if (myEditNodeId === msg.nodeId) return
+    if (mind.value.renderer.findNodeByUid(msg.nodeId)) return
+    const parentNode = msg.parentId ? mind.value.renderer.findNodeByUid(msg.parentId) : null
+    if (!parentNode) return // 父节点尚未同步：交给保存广播全量兜底
+    const nd = msg.nodeData || {}
+    if (!nd.uid) nd.uid = msg.nodeId
+    if (!nd.creatorUid) nd.creatorUid = Number(msg.userId) || 0
+    wsApplying = true
+    mapEl.value.classList.add('no-anim')
+    mind.value.renderer.insertChildNode(false, [parentNode], nd, msg.children || [])
+    mapEl.value.classList.remove('no-anim')
+    wsApplying = false
+    suppressDirtyUntil = Date.now() + 1500
+    try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+  } catch (e) { wsApplying = false; try { mapEl.value.classList.remove('no-anim') } catch (e2) {} }
+}
+function applyRemoteNodeRemoved(nid) {
+  try {
+    flushMyEdit()
+    if (myEditNodeId === nid) return
+    const node = mind.value.renderer.findNodeByUid(nid)
+    if (!node || !node.parent) return
+    wsApplying = true
+    mapEl.value.classList.add('no-anim')
+    mind.value.renderer.removeNode(node)
+    mapEl.value.classList.remove('no-anim')
+    wsApplying = false
+    suppressDirtyUntil = Date.now() + 1500
+    try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+  } catch (e) { wsApplying = false; try { mapEl.value.classList.remove('no-anim') } catch (e2) {} }
+}
+function applyRemoteNodeMoved(nid, parentId) {
+  try {
+    flushMyEdit()
+    if (myEditNodeId === nid) return
+    const node = mind.value.renderer.findNodeByUid(nid)
+    const parent = parentId ? mind.value.renderer.findNodeByUid(parentId) : null
+    if (!node || !parent || node.isRoot || node.parent === parent) return
+    wsApplying = true
+    mapEl.value.classList.add('no-anim')
+    // 从原父节点摘除
+    const oldParent = node.parent
+    if (oldParent && oldParent.children) oldParent.children = oldParent.children.filter(c => c !== node)
+    // 挂到目标父节点（追加末尾；同级精确顺序由保存广播校准）
+    if (!parent.nodeData.children) parent.nodeData.children = []
+    const exists = parent.nodeData.children.some(c => (c.uid || (c.nodeData && c.nodeData.uid)) === nid)
+    if (!exists) parent.nodeData.children.push(node)
+    try { mind.value.reRender() } catch (e) { try { mind.value.renderer.renderNode(parent) } catch (e2) {} }
+    mapEl.value.classList.remove('no-anim')
+    wsApplying = false
+    suppressDirtyUntil = Date.now() + 1500
+    try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+  } catch (e) { wsApplying = false; try { mapEl.value.classList.remove('no-anim') } catch (e2) {} }
 }
 
 function applyRemoteLock(nid, action, userId, userName) {

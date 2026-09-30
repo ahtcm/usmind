@@ -237,18 +237,20 @@ public class MindMapServiceImpl implements MindMapService {
         boolean force = req.getForce() != null && req.getForce();
         // 并发合并条件：版本不一致，或显式携带冲突解决方式（409 后重提时 baseVersion 可能已等于最新版本，仍需按 resolve 合并而非整树覆盖）
         boolean resolveFlag = req.getResolveConflicts() != null && !req.getResolveConflicts().isBlank();
-        boolean concurrent = !force && (resolveFlag || (req.getBaseVersion() != null && req.getBaseVersion() != cur));
+        boolean concurrent = resolveFlag || (req.getBaseVersion() != null && req.getBaseVersion() != cur);
+        // force（"以我为准覆盖"）也走 uid 并集合并：保留对方新增节点不丢数据，仅同节点文本以客户端为准
         Object finalData = req.getData();
-        if (concurrent) {
+        if (concurrent || force) {
             // 并发保存：按 uid 并集合并——本地新增/对方新增都保留（不覆盖未冲突节点）；
             // 同节点内容不同 → 冲突：resolveConflicts=mine 用客户端、theirs 用服务端、否则抛 409 返回冲突列表由前端选择
             JsonNode serverRoot = rootOf(m.getData());
             JsonNode clientRoot = rootOf(req.getData());
             List<Map<String, Object>> conflicts = new java.util.ArrayList<>();
             if (serverRoot != null && clientRoot != null) {
+                String resolve = force ? "mine" : req.getResolveConflicts();
                 JsonNode merged = mergeTrees(serverRoot, clientRoot,
-                        req.getDeletedUids(), req.getResolveConflicts(), conflicts);
-                if (!conflicts.isEmpty()) {
+                        req.getDeletedUids(), resolve, conflicts);
+                if (!conflicts.isEmpty() && !force) {
                     throw new com.usmind.common.ConflictException(
                             "导图已被其他成员修改，以下节点存在内容冲突，请选择以谁的为准", conflicts, cur);
                 }
@@ -263,8 +265,45 @@ public class MindMapServiceImpl implements MindMapService {
         if (req.getTheme() != null) m.setTheme(req.getTheme());
         if (req.getViewData() != null) m.setViewData(toJson(req.getViewData()));
         if (req.getManualStyles() != null) m.setManualStyles(toJson(req.getManualStyles()));
-        m.setVersion(cur + 1);
-        mindMapMapper.updateById(m);
+        // 乐观锁：m.version 保持旧版本用于 WHERE 条件，DB 侧 version=version+1 自增
+        int rows = mindMapMapper.updateByIdAndVersion(m);
+        if (rows == 0) {
+            // 乐观锁失败：版本已被他人推进（并发竞态）——重读最新版本、重新做并集合并，再尝试一次；
+            // 仍失败则抛冲突由前端选择以谁的为准
+            MindMap fresh = mindMapMapper.selectById(id);
+            if (fresh == null) throw new BusinessException(404, "导图不存在");
+            int cur2 = fresh.getVersion() == null ? 0 : fresh.getVersion();
+            JsonNode serverRoot2 = rootOf(fresh.getData());
+            JsonNode clientRoot2 = rootOf(req.getData());
+            List<Map<String, Object>> conflicts2 = new java.util.ArrayList<>();
+            String resolve2 = force ? "mine" : req.getResolveConflicts();
+            Object finalData2 = req.getData();
+            if (serverRoot2 != null && clientRoot2 != null) {
+                JsonNode merged2 = mergeTrees(serverRoot2, clientRoot2,
+                        req.getDeletedUids(), resolve2, conflicts2);
+                if (!conflicts2.isEmpty() && !force) {
+                    throw new com.usmind.common.ConflictException(
+                            "导图已被其他成员修改，以下节点存在内容冲突，请选择以谁的为准", conflicts2, cur2);
+                }
+                finalData2 = buildMergedData(req.getData(), merged2);
+            }
+            validateDeletes(userId, fresh, req.getDeletedUids());
+            if (req.getName() != null) fresh.setName(req.getName());
+            if (finalData2 != null) fresh.setData(toJson(finalData2));
+            if (req.getLayout() != null) fresh.setLayout(req.getLayout());
+            if (req.getTheme() != null) fresh.setTheme(req.getTheme());
+            if (req.getViewData() != null) fresh.setViewData(toJson(req.getViewData()));
+            if (req.getManualStyles() != null) fresh.setManualStyles(toJson(req.getManualStyles()));
+            rows = mindMapMapper.updateByIdAndVersion(fresh);
+            if (rows == 0) {
+                throw new com.usmind.common.ConflictException(
+                        "并发保存繁忙，请稍后重试", new java.util.ArrayList<>(), cur2);
+            }
+            m = fresh;
+            m.setVersion(cur2 + 1);
+        } else {
+            m.setVersion(cur + 1);
+        }
         // 协作实时同步：广播变更通知（前端据此自动加载最新 / 弹更新提示）
         try {
             String updater = "";
