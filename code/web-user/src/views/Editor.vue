@@ -1067,6 +1067,10 @@ mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNod
       // 结构增量实时广播：对端零延迟局部应用（不拉全量、不闪屏）
       broadcastStructDelta()
     }
+    // 折叠/展开后：渲染重绘，延迟重建评论特效（收起节点特效落到最近可见祖先=未收起的部分）
+    if (name === 'SET_NODE_EXPAND' || name === 'UNEXPAND_ALL' || name === 'EXPAND_ALL') {
+      setTimeout(() => { try { syncCommentFlash() } catch (e) {} }, 220)
+    }
   })
   // 编辑框聚焦/失焦切换快速入口
   const onEditFocusIn = (e) => {
@@ -4020,6 +4024,65 @@ function nodeElOf(uid) {
   const n = (mind.value.renderer.nodeCache || {})[uid]
   return (n && n.group) ? (n.group.node || n.group) : null
 }
+/** 评论特效落点：目标节点可见则用目标；否则沿父链向上找最近可见节点（收起时展示到未收起的部分）。
+ * 注意：折叠后收起节点会从 nodeCache 与渲染树移除，此时从 getData() 数据树（始终保留全部节点）
+ * 找到目标→根的父链 uid 路径，再沿路径向下找第一个在 nodeCache 中可见的祖先作为落点。 */
+function cmtAnchorOf(uid) {
+  try {
+    const cache = mind.value && mind.value.renderer ? (mind.value.renderer.nodeCache || {}) : {}
+    const vis = (c) => {
+      if (!c || !c.group) return null
+      const g = c.group.node || c.group
+      try {
+        const rc = g.getBoundingClientRect()
+        const win = g.ownerDocument && g.ownerDocument.defaultView ? g.ownerDocument.defaultView : null
+        const cs = win ? win.getComputedStyle(g) : null
+        if (rc.width > 1 && rc.height > 1 && (!cs || (cs.display !== 'none' && cs.visibility !== 'hidden'))) return g
+      } catch (e) {}
+      return null
+    }
+    // 1) cache 直接命中（目标可见）
+    let t = cache[uid] || null
+    if (t) {
+      const g = vis(t)
+      if (g) return { node: t, el: g }
+    }
+    // 2) 未命中/不可见：数据树找父链路径（目标→根），再沿路径找最近可见祖先。
+    // 注意：mind.getData() 返回 { data: 根节点, children: 根的直接子节点, theme, layout... }，
+    // 根节点的 children 在顶层，其余节点 children 在各自节点对象内。
+    try {
+      const data = mind.value && mind.value.getData ? mind.value.getData() : null
+      const rootNode = data && data.data ? data.data : null
+      if (rootNode) {
+        if (!rootNode.children && data.children) rootNode.children = data.children
+        const find = (n, path) => {
+          if (!n) return null
+          const nid = (n.data || {}).uid
+          if (nid === uid) return path.concat(nid)
+          for (const c of (n.children || [])) { const f = find(c, path.concat(nid)); if (f) return f }
+          return null
+        }
+        const path = find(rootNode, [])
+        if (path && path.length) {
+          for (let i = path.length - 1; i >= 0; i--) {
+            const c = cache[path[i]]
+            const g = vis(c)
+            if (g) return { node: c, el: g }
+          }
+        }
+      }
+    } catch (e) {}
+    // 3) 兜底：沿 node.parent 链
+    let guard = 0
+    while (t && guard < 30) {
+      const g = vis(t)
+      if (g) return { node: t, el: g }
+      t = t.parent
+      guard++
+    }
+  } catch (e) {}
+  return null
+}
 function applyCommentFlash() {
   if (!mind.value || !mind.value.renderer) return
   try {
@@ -4033,16 +4096,26 @@ function applyCommentFlash() {
     if (layer) layer.innerHTML = ''
     const nodeCache = mind.value.renderer.nodeCache || {}
     const mapRect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    // 按锚点分组：同一落点（如收起时多个未读节点落到同一可见祖先）合并呼吸灯/路径/徽标，避免重叠
+    const groups = new Map()
     Object.keys(unreadNodes).forEach(uid => {
       const cnt = unreadNodes[uid]
       if (!cnt) return
-      const n = nodeCache[uid]
-      const gEl = n && n.group ? (n.group.node || n.group) : null
-      if (!gEl) return
-      // 1) 目标节点呼吸灯
+      const anchor = cmtAnchorOf(uid)
+      if (!anchor) return
+      const key = anchor.el
+      const g0 = groups.get(key)
+      if (g0) { g0.cnt += cnt; return }
+      groups.set(key, { node: anchor.node, el: key, cnt })
+    })
+    groups.forEach((g0) => {
+      const n = g0.node
+      const gEl = g0.el
+      const cnt = g0.cnt
+      // 1) 落点节点呼吸灯（节点收起时落在最近可见祖先，即"未收起的部分"）
       const rect = gEl.querySelector('rect')
       if (rect) rect.classList.add('cmt-flash')
-      // 2) 路径呼吸灯：根 → 目标的所有祖先节点矩形 + 每层"通往目标"的那条连线
+      // 2) 路径呼吸灯：根 → 落点的所有祖先节点矩形 + 每层"通往落点"的那条连线
       let p = n.parent
       let child = n
       let guard = 0
@@ -4108,6 +4181,9 @@ function applyCommentFlash() {
 }
 function syncCommentFlash() {
   nextTick(() => { try { applyCommentFlash() } catch (e) {} })
+  // 渲染布局稳定前 getBoundingClientRect 可能未就绪：延迟补偿重建 + 徽标重定位
+  setTimeout(() => { try { applyCommentFlash(); repositionCommentBadges() } catch (e) {} }, 200)
+  setTimeout(() => { try { applyCommentFlash(); repositionCommentBadges() } catch (e) {} }, 500)
 }
 /** 轻量徽标重定位：平移/缩放画布时仅更新未读徽标位置（与 applyCommentFlash 创建顺序一致），不重建、不打断呼吸灯动画 */
 function repositionCommentBadges() {
@@ -4122,9 +4198,9 @@ function repositionCommentBadges() {
     for (let i = 0; i < badges.length && i < uids.length; i++) {
       const uid = uids[i]
       if (!uid) continue
-      const n = nodeCache[uid]
-      const gEl = n && n.group ? (n.group.node || n.group) : null
-      if (!gEl) continue
+      const anchor = cmtAnchorOf(uid)
+      if (!anchor) continue
+      const gEl = anchor.el
       const r = gEl.getBoundingClientRect()
       if (r.width <= 1 || r.height <= 1) continue
       const b = badges[i]
