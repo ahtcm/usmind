@@ -3856,6 +3856,9 @@ const unreadNodes = reactive({})
 let cmtAfterId = 0
 let cmtTimer = null
 let cmtLoading = false
+let cmtWs = null          // 评论实时推送通道（/ws/comment）
+let cmtWsTimer = null     // 评论通道重连定时器
+let cmtSubscribed = false
 
 function nodeElOf(uid) {
   if (!mind.value || !mind.value.renderer) return null
@@ -3946,6 +3949,67 @@ async function submitAuthorReply() {
     cmtPanel.replyTo = null
   } catch (e) { cmtPanel.cmtErr = e.message || '回复失败（可能评论过于频繁）' }
 }
+function connectCmtWs() {
+  if (cmtWs) { try { cmtWs.close() } catch (e) {} cmtWs = null }
+  if (!mindMapId.value) return
+  const token = localStorage.getItem('usmind.token') || ''
+  if (!token) return
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://'
+  try {
+    cmtWs = new WebSocket(proto + location.host + '/ws/comment?token=' + encodeURIComponent(token) + '&mindMapId=' + mindMapId.value)
+  } catch (e) { scheduleCmtWsReconnect(); return }
+  cmtWs.onopen = () => {
+    cmtSubscribed = true
+    // 重连成功：增量拉取一次兜底（WS 断线期间可能漏掉的评论）
+    pullCommentsOnce()
+  }
+  cmtWs.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data)
+      if (msg.event !== 'comment_new') return
+      if (String(msg.mindMapId) !== String(mindMapId.value)) return
+      handleCommentNew(msg.comment)
+    } catch (e) {}
+  }
+  cmtWs.onclose = () => { cmtWs = null; cmtSubscribed = false; scheduleCmtWsReconnect() }
+  cmtWs.onerror = () => { try { cmtWs.close() } catch (e) {} }
+}
+
+function scheduleCmtWsReconnect() {
+  if (cmtWsTimer) clearTimeout(cmtWsTimer)
+  if (!mindMapId.value) return
+  cmtWsTimer = setTimeout(() => { if (mindMapId.value) connectCmtWs() }, 5000)
+}
+
+function disconnectCmtWs() {
+  if (cmtWsTimer) { clearTimeout(cmtWsTimer); cmtWsTimer = null }
+  if (cmtWs) { try { cmtWs.close() } catch (e) {} cmtWs = null; cmtSubscribed = false }
+}
+
+async function pullCommentsOnce() {
+  if (!mindMapId.value) return
+  try {
+    const r = await commentApi.listByMindMap(mindMapId.value, cmtAfterId)
+    const news = Array.isArray(r.comments) ? r.comments : []
+    if (news.length) news.forEach(c => { if (c.id > cmtAfterId) cmtAfterId = c.id })
+    if (r.unread && typeof r.unread === 'object') {
+      Object.keys(r.unread).forEach(k => { if (!r.unread[k]) delete unreadNodes[k]; else unreadNodes[k] = r.unread[k] })
+      syncCommentFlash()
+    }
+    if (cmtPanel.open && news.some(c => c.nodeId === cmtPanel.nodeId)) refreshCmtList()
+  } catch (e) {}
+}
+
+function handleCommentNew(c) {
+  if (!c || !c.id) return
+  if (c.id > cmtAfterId) cmtAfterId = c.id
+  // 作者自己的回复（isAuthor=1）不触发闪烁；访客新评论 → 节点未读+1
+  if (Number(c.isAuthor) === 1) return
+  unreadNodes[c.nodeId] = (unreadNodes[c.nodeId] || 0) + 1
+  syncCommentFlash()
+  if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
+}
+
 function startCommentPoll() {
   if (!mindMapId.value || cmtTimer) return
   cmtTimer = setInterval(async () => {
@@ -4076,7 +4140,7 @@ onMounted(async () => {
   window.addEventListener('keydown', onCtrlSKeydown)
   document.addEventListener('click', onDocClick)
   document.addEventListener('paste', onPaste)
-  startCommentPoll()
+  connectCmtWs()
   connectWs()
   markSaved()
   clearTimeout(autoSaveTimer)
@@ -4089,6 +4153,7 @@ function onDocClick(e) {
 
 onBeforeUnmount(() => {
   disconnectWs()
+  disconnectCmtWs()
   if (onCtrlSKeydown) window.removeEventListener('keydown', onCtrlSKeydown)
   document.removeEventListener('mousemove', onBarDragMove)
   document.removeEventListener('mouseup', onBarDragEnd)

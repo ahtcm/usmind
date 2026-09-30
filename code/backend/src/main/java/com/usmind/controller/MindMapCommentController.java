@@ -4,6 +4,7 @@ import com.usmind.common.Result;
 import com.usmind.common.SecurityUtil;
 import com.usmind.entity.NodeComment;
 import com.usmind.service.NodeCommentService;
+import com.usmind.ws.CommentWsHandler;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -15,18 +16,21 @@ import java.util.Map;
 /**
  * 作者侧评论：编辑器内查看/回复评论、标记节点已读（未读节点在前端闪烁提示）。
  * 已登录 + 导图归属校验（NodeCommentService.requireOwned）。
+ * 作者回复入库成功后经 /ws/comment 广播 comment_new，分享页实时收到。
  */
 @RestController
 @RequestMapping("/api/mindmaps/{id}/comments")
 public class MindMapCommentController {
 
     private final NodeCommentService nodeCommentService;
+    private final CommentWsHandler commentWsHandler;
 
     @Value("${ipguard.trusted-proxy:false}")
     private boolean trustedProxy;
 
-    public MindMapCommentController(NodeCommentService nodeCommentService) {
+    public MindMapCommentController(NodeCommentService nodeCommentService, CommentWsHandler commentWsHandler) {
         this.nodeCommentService = nodeCommentService;
+        this.commentWsHandler = commentWsHandler;
     }
 
     private String clientIp(HttpServletRequest request) {
@@ -68,6 +72,7 @@ public class MindMapCommentController {
         }
         if (commentId == null) throw new com.usmind.common.BusinessException(400, "评论标识缺失");
         NodeComment c = nodeCommentService.authorReply(userId, id, commentId, body.get("content"), clientIp(request));
+        broadcast(c);
         return Result.ok(c);
     }
 
@@ -77,5 +82,20 @@ public class MindMapCommentController {
         long userId = SecurityUtil.currentUserId();
         nodeCommentService.markNodeRead(userId, id, body.get("nodeId"));
         return Result.ok();
+    }
+
+    /** 作者回复入库后广播给该导图的评论订阅会话（不含 IP） */
+    private void broadcast(NodeComment c) {
+        if (c == null || c.getMindMapId() == null) return;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", c.getId());
+        m.put("mindMapId", c.getMindMapId());
+        m.put("nodeId", c.getNodeId());
+        m.put("parentId", c.getParentId());
+        m.put("userName", c.getUserName() == null ? "" : c.getUserName());
+        m.put("content", c.getContent() == null ? "" : c.getContent());
+        m.put("isAuthor", c.getIsAuthor());
+        m.put("createdAt", c.getCreatedAt() == null ? "" : c.getCreatedAt().toString());
+        commentWsHandler.broadcastComment(c.getMindMapId(), m);
     }
 }
