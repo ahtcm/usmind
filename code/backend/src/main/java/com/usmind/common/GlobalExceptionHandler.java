@@ -9,6 +9,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -16,6 +17,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusiness(BusinessException e) {
         return Result.error(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public Result<Map<String, Object>> handleConflict(ConflictException e) {
+        return new Result<>(409, e.getMessage(),
+                Map.of("conflicts", e.getConflicts(), "serverVersion", e.getServerVersion()));
     }
 
     @ExceptionHandler(BadCredentialsException.class)

@@ -33,6 +33,7 @@ request.interceptors.response.use(
       const er = new Error(body.message || '请求失败')
       er.code = body.code
       er.status = body.status
+      er.data = body.data
       return Promise.reject(er)
     }
     return body
