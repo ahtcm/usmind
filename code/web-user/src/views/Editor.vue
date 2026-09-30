@@ -4089,9 +4089,9 @@ function handleCommentNew(c) {
     if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
     return
   }
-  // 定向提醒：后端已算好 targetUserIds，特效（电流+音效+角标）只发给提醒目标，其他人仅收到信息
+  // 定向提醒：后端已算好 targetUserIds（数组存在即权威——空数组=无人需提醒，不闪；仅缺失=旧广播，回退全闪）
   const targets = c.targetUserIds
-  if (Array.isArray(targets) && targets.length > 0) {
+  if (Array.isArray(targets)) {
     const isTarget = me.id != null && targets.some(t => Number(t) === Number(me.id))
     if (!isTarget) {
       if (cmtPanel.open && c.nodeId === cmtPanel.nodeId) refreshCmtList()
