@@ -61,6 +61,7 @@
       <div v-show="!bgVideoVal" class="canvas-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
       <video v-if="bgVideoVal" class="canvas-bg-video" :src="bgVideoVal" autoplay loop muted playsinline :style="{ opacity: bgOpacityVal, transform: 'scale(' + bgZoom + ')' }"></video>
       <div id="map" ref="mapEl"></div>
+      <div id="cmt-badge-layer" class="cmt-badge-layer"></div>
     </div>
 
     <!-- 画布滚动条（水平+垂直，透明细条，双向同步平移） -->
@@ -914,7 +915,7 @@ function emojiSvg(e) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 function bindMindEvents() {
   mind.value.on('data_change', () => { if (wsApplying) return; if (Date.now() < suppressDirtyUntil) return; markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
   mind.value.on('view_data_change', (vd) => { try { updateScrollbars() } catch (e) {}; if (canvasTabs.value[docIndex.value]) canvasTabs.value[docIndex.value].viewData = vd; applyLazyView() })
-  mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView() })
+  mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView(); try { applyCommentFlash() } catch (e) {} })
   mind.value.on('back_forward', (cur, total) => {
     const bu = document.getElementById('btn-undo'); const br = document.getElementById('btn-redo')
     if (bu) bu.disabled = cur <= 0
@@ -3868,33 +3869,75 @@ function nodeElOf(uid) {
 function applyCommentFlash() {
   if (!mind.value || !mind.value.renderer) return
   try {
-    document.querySelectorAll('.cmt-flash').forEach(el => el.classList.remove('cmt-flash'))
+    // 清空旧的动画类
+    document.querySelectorAll('.cmt-flash, .cmt-breath-path, .cmt-breath-line').forEach(el => {
+      el.classList.remove('cmt-flash', 'cmt-breath-path', 'cmt-breath-line')
+    })
+    // 清空徽标层
+    const layer = document.getElementById('cmt-badge-layer')
+    if (layer) layer.innerHTML = ''
+    const nodeCache = mind.value.renderer.nodeCache || {}
+    const mapRect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
     Object.keys(unreadNodes).forEach(uid => {
       const cnt = unreadNodes[uid]
       if (!cnt) return
-      const gEl = nodeElOf(uid)
+      const n = nodeCache[uid]
+      const gEl = n && n.group ? (n.group.node || n.group) : null
       if (!gEl) return
+      // 1) 目标节点呼吸灯
       const rect = gEl.querySelector('rect')
       if (rect) rect.classList.add('cmt-flash')
-      let badge = gEl.querySelector('.cmt-badge-fo')
-      if (!badge) {
-        const NS = 'http://www.w3.org/2000/svg'
-        badge = document.createElementNS(NS, 'foreignObject')
-        badge.setAttribute('class', 'cmt-badge-fo')
-        const div = document.createElement('div')
-        div.className = 'cmt-badge-div'
-        badge.appendChild(div)
-        gEl.appendChild(badge)
+      // 2) 路径呼吸灯：根 → 目标的所有祖先节点矩形 + 每层"通往目标"的那条连线
+      let p = n.parent
+      let child = n
+      let guard = 0
+      while (p && guard < 30) {
+        const pg = p.group ? (p.group.node || p.group) : null
+        if (pg) {
+          const pr = pg.querySelector('rect')
+          if (pr) pr.classList.add('cmt-breath-path')
+        }
+        // 精确连线：child 在 p.children 中的下标 → 对应 p._lines 中那条线
+        if (p._lines && p._lines.length && p.children && p.children.length) {
+          const idx = p.children.indexOf(child)
+          if (idx >= 0 && idx < p._lines.length) {
+            const l = p._lines[idx]
+            try {
+              const el = l && l.node ? l.node : l
+              if (el && el.classList) el.classList.add('cmt-breath-line')
+            } catch (e) {}
+          }
+        }
+        child = p
+        p = p.parent
+        guard++
       }
-      const div = badge.querySelector('.cmt-badge-div')
-      div.textContent = cnt > 99 ? '99+' : cnt
-      let bb = null
-      try { bb = (rect || gEl).getBBox ? (rect || gEl).getBBox() : null } catch (e) {}
-      const bx = bb ? Math.max(0, bb.x + bb.width - 6) : 0
-      badge.setAttribute('x', bx)
-      badge.setAttribute('y', bb ? Math.max(0, bb.y - 15) : 0)
-      badge.setAttribute('width', '22')
-      badge.setAttribute('height', '18')
+      // 3) 右上角未读数徽标（HTML 覆盖层，固定屏幕尺寸，不随画布缩放；动态元素用内联样式避开 scoped CSS）
+      if (layer && mapRect) {
+        const r = gEl.getBoundingClientRect()
+        if (r.width > 1 && r.height > 1) {
+          const b = document.createElement('div')
+          b.textContent = cnt > 99 ? '99+' : cnt
+          const st = b.style
+          st.position = 'absolute'
+          st.left = (r.right - mapRect.left) + 'px'
+          st.top = (r.top - mapRect.top) + 'px'
+          st.transform = 'translate(-50%, -50%)'
+          st.minWidth = '18px'
+          st.height = '18px'
+          st.lineHeight = '18px'
+          st.textAlign = 'center'
+          st.fontSize = '11px'
+          st.fontWeight = '700'
+          st.color = '#fff'
+          st.background = 'linear-gradient(135deg, #ff6b6b, #e53935)'
+          st.borderRadius = '9px'
+          st.padding = '0 5px'
+          st.boxShadow = '0 2px 8px rgba(229,57,53,.6)'
+          st.pointerEvents = 'none'
+          layer.appendChild(b)
+        }
+      }
     })
   } catch (e) {}
 }
@@ -4199,11 +4242,24 @@ onBeforeUnmount(() => {
 .cmt-list::-webkit-scrollbar { width: 5px; }
 .cmt-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
 .cmt-list::-webkit-scrollbar-track { background: transparent; }
-/* 未读节点闪烁 + 角标 */
-.cmt-flash { animation: cmtBlink 1.1s ease-in-out infinite; }
-@keyframes cmtBlink { 0%, 100% { filter: none; } 50% { filter: brightness(1.45) drop-shadow(0 0 7px rgba(122, 162, 247, .75)); } }
-.cmt-badge-fo { pointer-events: none; }
-.cmt-badge-div { min-width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: #e53935; border-radius: 9px; padding: 0 4px; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+/* 未读节点：呼吸灯（节点+根路径）+ 右上角未读数徽标（HTML 覆盖层，不随画布缩放） */
+.cmt-badge-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
+.cmt-badge-el { position: absolute; min-width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 11px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #ff6b6b, #e53935); border-radius: 9px; padding: 0 5px; box-shadow: 0 2px 8px rgba(229,57,53,.6); transform: translate(-50%, -50%); }
+.cmt-flash { animation: cmtBreath 1.6s ease-in-out infinite; }
+.cmt-breath-path { animation: cmtBreathPath 1.6s ease-in-out infinite; }
+.cmt-breath-line { animation: cmtBreathLine 1.6s ease-in-out infinite; }
+@keyframes cmtBreath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
+  50% { filter: drop-shadow(0 0 9px rgba(255,77,79,.95)); opacity: .72; }
+}
+@keyframes cmtBreathPath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
+  50% { filter: drop-shadow(0 0 6px rgba(255,77,79,.75)); opacity: .6; }
+}
+@keyframes cmtBreathLine {
+  0%, 100% { stroke-opacity: .9; }
+  50% { stroke-opacity: .25; }
+}
 .canvas-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .canvas-bg-color { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .canvas-bg-image { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; pointer-events: none; z-index: 0; }
