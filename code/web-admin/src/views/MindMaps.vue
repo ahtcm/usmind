@@ -87,7 +87,7 @@
       <el-form label-width="150px" v-if="collab.data">
         <el-form-item label="节点所有权">
           <el-switch v-model="collab.data.enableOwnerLock" />
-          <div class="opt-tip">开启后非节点创建者编辑需申请审批；历史节点归导图创建者所有</div>
+          <div class="opt-tip">开启后节点仅节点创建者和导图创建者可编辑；历史节点归导图创建者所有</div>
         </el-form-item>
         <el-form-item label="审批人超时转派(秒)">
           <el-input-number v-model="collab.data.approveTimeout1" :min="10" :max="3600" />

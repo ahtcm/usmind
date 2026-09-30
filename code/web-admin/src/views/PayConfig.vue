@@ -110,19 +110,6 @@
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="cfg-card">
-      <template #header><b>机构协作</b><span class="card-tip">创建机构/发起导图协作是否需要会员；关闭后普通用户也可创建机构和发起协作（机构管理见「机构管理」页）</span></template>
-      <el-form label-width="150px" label-position="left">
-        <el-form-item label="创建机构需要会员">
-          <el-switch v-model="form.orgCreateNeedMember" />
-        </el-form-item>
-        <el-form-item label="发起协作需要会员">
-          <el-switch v-model="form.orgInviteNeedMember" />
-          <span class="field-hint">开启时，非会员/会员到期后无法把导图加入机构协作（已有协作不受影响，续费即可恢复）</span>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <div class="save-bar">
       <el-button type="primary" :loading="saving" @click="save">保存配置</el-button>
     </div>
@@ -145,9 +132,7 @@ const form = reactive({
   smsProvider: '', smsAccessKeyId: '', smsAccessKeySecret: '', smsSignName: '', smsTemplateCode: '',
   ipGuardEnabled: true,
   ipRateLimit: 60, ipRateWindow: 60, ipAutoBlackSeconds: 3600,
-  commentRateLimit: 5, commentRateWindow: 60,
-  orgCreateNeedMember: true,
-  orgInviteNeedMember: true
+  commentRateLimit: 5, commentRateWindow: 60
 })
 
 onMounted(async () => {
@@ -178,9 +163,7 @@ onMounted(async () => {
       ipRateWindow: Number(d.ipRateWindow || 60),
       ipAutoBlackSeconds: Number(d.ipAutoBlackSeconds || 3600),
       commentRateLimit: Number(d.commentRateLimit || 5),
-      commentRateWindow: Number(d.commentRateWindow || 60),
-      orgCreateNeedMember: !!d.orgCreateNeedMember,
-      orgInviteNeedMember: !!d.orgInviteNeedMember
+      commentRateWindow: Number(d.commentRateWindow || 60)
     })
   } catch (e) { /* 忽略 */ }
 })
@@ -213,9 +196,7 @@ async function save() {
       ipRateWindow: form.ipRateWindow,
       ipAutoBlackSeconds: form.ipAutoBlackSeconds,
       commentRateLimit: form.commentRateLimit,
-      commentRateWindow: form.commentRateWindow,
-      orgCreateNeedMember: form.orgCreateNeedMember ? 1 : 0,
-      orgInviteNeedMember: form.orgInviteNeedMember ? 1 : 0
+      commentRateWindow: form.commentRateWindow
     })
     ElMessage.success('保存成功')
   } finally {

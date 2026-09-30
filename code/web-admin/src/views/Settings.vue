@@ -19,7 +19,7 @@
           <el-form label-width="140px">
             <el-form-item label="默认开启节点所有权">
               <el-switch v-model="settings.ownerLockDefault" active-value="1" inactive-value="0" />
-              <div class="opt-tip">作用于新建导图：开启后非节点创建者编辑需申请审批；历史节点归导图创建者所有</div>
+              <div class="opt-tip">作用于新建导图：开启后节点仅节点创建者和导图创建者可编辑；历史节点归导图创建者所有</div>
             </el-form-item>
           </el-form>
         </el-card>

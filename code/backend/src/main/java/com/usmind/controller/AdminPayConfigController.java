@@ -44,9 +44,7 @@ public class AdminPayConfigController {
         m.put("ipRateLimit", settingsService.getInt("ipRateLimit", 60));
         m.put("ipRateWindow", settingsService.getInt("ipRateWindow", 60));
         m.put("ipAutoBlackSeconds", settingsService.getInt("ipAutoBlackSeconds", 3600));
-        m.put("orgCreateNeedMember", settingsService.getInt("orgCreateNeedMember", 1));
-        m.put("orgInviteNeedMember", settingsService.getInt("orgInviteNeedMember", 1));
-        return Result.ok(m);
+                        return Result.ok(m);
     }
 
     @PutMapping
