@@ -901,8 +901,8 @@ function emojiSvg(e) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 
 function bindMindEvents() {
   mind.value.on('data_change', () => { if (wsApplying) return; if (Date.now() < suppressDirtyUntil) return; markDirty(); scheduleAutoSave(); scheduleBranchRainbow(); clearTimeout(sbTimer); sbTimer = setTimeout(updateScrollbars, 400) })
-  mind.value.on('view_data_change', (vd) => { try { updateScrollbars() } catch (e) {}; if (canvasTabs.value[docIndex.value]) canvasTabs.value[docIndex.value].viewData = vd; applyLazyView() })
-  mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView(); try { applyCommentFlash() } catch (e) {} })
+  mind.value.on('view_data_change', (vd) => { try { updateScrollbars() } catch (e) {}; if (canvasTabs.value[docIndex.value]) canvasTabs.value[docIndex.value].viewData = vd; applyLazyView(); try { repositionCommentBadges() } catch (e) {} })
+  mind.value.on('scale', (s) => { zoomPct.value = Math.round(s*100) + '%'; try { updateScrollbars() } catch (e) {}; applyLazyView(); try { repositionCommentBadges() } catch (e) {} })
   mind.value.on('back_forward', (cur, total) => {
     const bu = document.getElementById('btn-undo'); const br = document.getElementById('btn-redo')
     if (bu) bu.disabled = cur <= 0
@@ -3915,6 +3915,30 @@ function applyCommentFlash() {
 }
 function syncCommentFlash() {
   nextTick(() => { try { applyCommentFlash() } catch (e) {} })
+}
+/** 轻量徽标重定位：平移/缩放画布时仅更新未读徽标位置（与 applyCommentFlash 创建顺序一致），不重建、不打断呼吸灯动画 */
+function repositionCommentBadges() {
+  try {
+    const layer = document.getElementById('cmt-badge-layer')
+    if (!layer || !layer.children.length) return
+    const mapRect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    if (!mapRect) return
+    const nodeCache = mind.value.renderer ? (mind.value.renderer.nodeCache || {}) : {}
+    const uids = Object.keys(unreadNodes).filter(uid => unreadNodes[uid])
+    const badges = layer.children
+    for (let i = 0; i < badges.length && i < uids.length; i++) {
+      const uid = uids[i]
+      if (!uid) continue
+      const n = nodeCache[uid]
+      const gEl = n && n.group ? (n.group.node || n.group) : null
+      if (!gEl) continue
+      const r = gEl.getBoundingClientRect()
+      if (r.width <= 1 || r.height <= 1) continue
+      const b = badges[i]
+      b.style.left = (r.right - mapRect.left) + 'px'
+      b.style.top = (r.top - mapRect.top) + 'px'
+    }
+  } catch (e) {}
 }
 async function refreshCmtList() {
   if (!mindMapId.value || !cmtPanel.open) return

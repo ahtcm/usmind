@@ -10,6 +10,7 @@ import com.usmind.mapper.NodeCommentMapper;
 import com.usmind.mapper.SysUserMapper;
 import com.usmind.service.IpGuardService;
 import com.usmind.service.NodeCommentService;
+import com.usmind.service.OrgService;
 import com.usmind.service.SettingsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -36,16 +37,19 @@ public class NodeCommentServiceImpl implements NodeCommentService {
     private final StringRedisTemplate redisTemplate;
     private final SettingsService settingsService;
     private final IpGuardService ipGuardService;
+    private final OrgService orgService;
 
     public NodeCommentServiceImpl(NodeCommentMapper nodeCommentMapper, MindMapMapper mindMapMapper,
                                   SysUserMapper sysUserMapper, StringRedisTemplate redisTemplate,
-                                  SettingsService settingsService, IpGuardService ipGuardService) {
+                                  SettingsService settingsService, IpGuardService ipGuardService,
+                                  OrgService orgService) {
         this.nodeCommentMapper = nodeCommentMapper;
         this.mindMapMapper = mindMapMapper;
         this.sysUserMapper = sysUserMapper;
         this.redisTemplate = redisTemplate;
         this.settingsService = settingsService;
         this.ipGuardService = ipGuardService;
+        this.orgService = orgService;
     }
 
     /** 校验分享 token 与密码（不刷新 viewCount），返回导图；失败抛 403 */
@@ -215,7 +219,10 @@ public class NodeCommentServiceImpl implements NodeCommentService {
         if (mindMapId == null) throw new BusinessException(400, "导图标识缺失");
         MindMap m = mindMapMapper.selectById(mindMapId);
         if (m == null) throw new BusinessException(404, "导图不存在");
-        if (!m.getUserId().equals(userId)) throw new BusinessException(403, "无权访问该导图");
+        // 导图创建者 或 协作组织成员 可访问评论（协同编辑模式下成员也能看/回复评论、接收未读提示）
+        if (!m.getUserId().equals(userId) && !orgService.canAccessMindMap(userId, mindMapId)) {
+            throw new BusinessException(403, "无权访问该导图");
+        }
         return m;
     }
 }
