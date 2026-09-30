@@ -69,6 +69,26 @@ public class MindMapController {
         return Result.ok(mindMapService.share(SecurityUtil.currentUserId(), id, pwd));
     }
 
+    @GetMapping("/{id}/collab-config")
+    public Result<java.util.Map<String, Object>> getCollabConfig(@PathVariable Long id) {
+        MindMap m = mindMapService.get(SecurityUtil.currentUserId(), id);
+        java.util.Map<String, Object> cfg = new java.util.HashMap<>();
+        String raw = m.getCollabConfig();
+        if (raw != null && !raw.isBlank()) {
+            try {
+                cfg.putAll(new com.fasterxml.jackson.databind.ObjectMapper().readValue(raw, java.util.Map.class));
+            } catch (Exception ignored) {
+            }
+        }
+        return Result.ok(cfg);
+    }
+
+    @PutMapping("/{id}/collab-config")
+    public Result<Void> updateCollabConfig(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        mindMapService.updateCollabConfig(SecurityUtil.currentUserId(), id, body);
+        return Result.ok();
+    }
+
     @DeleteMapping("/{id}/share")
     public Result<Void> unshare(@PathVariable Long id) {
         mindMapService.unshare(SecurityUtil.currentUserId(), id);

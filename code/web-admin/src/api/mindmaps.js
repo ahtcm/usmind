@@ -19,3 +19,11 @@ export function batchDeleteMindmaps(ids) {
 export function cancelShareMindmap(id) {
   return request.delete(`/mindmaps/${id}/share`)
 }
+
+export function getCollabConfig(id) {
+  return request.get(`/mindmaps/${id}/collab-config`)
+}
+
+export function updateCollabConfig(id, cfg) {
+  return request.put(`/mindmaps/${id}/collab-config`, cfg)
+}

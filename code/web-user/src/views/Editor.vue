@@ -327,6 +327,42 @@
     </div>
   </div>
 
+  <!-- 编辑申请确认弹窗 -->
+  <div v-if="pendingEditReq" class="share-mask">
+    <div class="share-box">
+      <div class="share-title">申请编辑节点</div>
+      <div class="share-tip">该节点由其他成员创建，需要申请编辑权限。节点内容：{{ (pendingEditReq.nodeText || '（空）').slice(0, 50) }}</div>
+      <div class="share-actions">
+        <button class="math-btn math-btn-primary" @click="confirmSendEditReq">提交申请</button>
+        <button class="math-btn" @click="pendingEditReq = null">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑申请审批弹窗 -->
+  <div v-if="approveEditReq" class="share-mask">
+    <div class="share-box">
+      <div class="share-title">编辑申请审批</div>
+      <div class="share-tip">{{ approveEditReq.applicantName }} 申请编辑节点：{{ (approveEditReq.nodeText || '（空）').slice(0, 50) }}</div>
+      <div class="share-actions">
+        <button class="math-btn math-btn-primary" @click="respondEditReq(true)">同意</button>
+        <button class="math-btn" @click="respondEditReq(false)">拒绝</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑中节点被他人修改增强冲突框 -->
+  <div v-if="editConflict" class="share-mask">
+    <div class="share-box">
+      <div class="share-title">节点被其他成员修改</div>
+      <div class="share-tip">你正在编辑的节点已被其他成员更新为：{{ (editConflict.remoteText || '（空）').slice(0, 60) }}</div>
+      <div class="share-actions">
+        <button class="math-btn math-btn-primary" @click="resolveEditConflict('load')">加载最新内容</button>
+        <button class="math-btn" @click="resolveEditConflict('mine')">以我的为准</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 协作实时更新提示气泡 -->
   <div v-if="collabToast.show" class="collab-toast">
     <span class="collab-toast-text">{{ collabToast.text }}</span>
@@ -779,6 +815,18 @@ async function createMind() {
             return false
           }
         }
+        // 节点所有权：非创建者/非导图创建者（且未获授权）需申请
+        if (collabCfg.enableOwnerLock && nid) {
+          const nd = node.nodeData || {}
+          const creator = Number(nd.creatorUid) || 0
+          const isOwner = Number(mapOwnerId.value) === myUid()
+          const isCreator = creator === myUid()
+          const granted = grantedNodes[nid] && grantedNodes[nid] > Date.now()
+          if (!isOwner && !isCreator && !granted) {
+            requestEditPermission(nid, node)
+            return false
+          }
+        }
       } catch (e) {}
       return true
     },
@@ -830,6 +878,11 @@ async function createMind() {
       return svg
     }  })
   bindMindEvents()
+  // 加载协作配置（节点所有权开关/审批超时）
+  try {
+    fetch('/api/mindmaps/' + mindMapId.value + '/collab-config', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('usmind.token') || '') } })
+      .then(r => r.json()).then(j => { if (j && j.data) Object.assign(collabCfg, j.data) }).catch(() => {})
+  } catch (e) {}
   const t0name = doc.theme || themes.value[0].name
   ;[400, 1200].forEach((d) => setTimeout(() => { try { applyThemeFonts(t0name) } catch (e) {} }, d))
   mind.value.keyCommand.addShortcut('Control+z', () => mind.value.execCommand('BACK'))
@@ -987,6 +1040,20 @@ mind.value.on('hide_text_edit', () => { textEditActive.value = false; releaseNod
   // 结构类命令（创建/删除/移动/粘贴节点）执行后立即保存：让协作端秒级收到广播，无需等自动保存周期
   mind.value.on('afterExecCommand', (name) => {
     if (STRUCT_CHANGE_CMDS.indexOf(name) >= 0) scheduleStructureSave()
+    // 新建节点标记创建者：后端 get 时已给历史节点补 creatorUid（导图创建者），
+    // 这里只给仍无创建者的节点（即本次新插入的节点）补上当前用户
+    if (name && name.indexOf('INSERT') === 0) {
+      try {
+        const rn = mind.value.renderer && mind.value.renderer.root
+        if (rn) {
+          const walk = (n) => {
+            if (n && n.nodeData && !n.nodeData.creatorUid) n.nodeData.creatorUid = myUid()
+            if (n.children) n.children.forEach(walk)
+          }
+          walk(rn)
+        }
+      } catch (e) {}
+    }
   })
   // 编辑框聚焦/失焦切换快速入口
   const onEditFocusIn = (e) => {
@@ -1129,12 +1196,161 @@ async function loadLatest(silent = false) {
       docIndex.value = 0
     }
     curVersion.value = fresh.version || 0
+    mapOwnerId.value = Number(fresh.userId) || 0
     suppressDirtyUntil = Date.now() + 8000
     await loadDoc(silent)
     if (!silent) toast('已加载最新内容')
   } catch (e) {
     toast('加载最新失败: ' + e.message, 'error')
   }
+}
+
+/** 远端更新 diff 局部应用：不重建整图、保留视图 transform、不闪屏 */
+async function diffApplyLatest() {
+  try {
+    const fresh = await mindmapApi.get(mindMapId.value, { params: { _t: Date.now() } })
+    curVersion.value = fresh.version || 0
+    mapOwnerId.value = Number(fresh.userId) || 0
+    let d = fresh.data || {}
+    if (typeof d === 'string' && d) { try { d = JSON.parse(d) } catch (e2) { d = {} } }
+    // 优先主数据 root（保存主字段）；_tabs 仅作兜底，避免 API 直改后 _tabs 与主数据不一致时 diff 用了旧树
+    let remoteRoot = (d.root && d.root.data && d.root.data.uid) ? d.root : ((d.root && d.root.data) ? { data: d.root.data, children: d.root.children || [] } : (d || {}))
+    if (!remoteRoot || !(remoteRoot.uid || (remoteRoot.data && remoteRoot.data.uid))) {
+      if (d._tabs && Array.isArray(d._tabs) && d._tabs.length) {
+        const active = d._tabs[d._activeTab || 0]
+        if (active && active.data && active.data.root) remoteRoot = active.data.root
+      }
+    }
+    if (!remoteRoot || !(remoteRoot.uid || (remoteRoot.data && remoteRoot.data.uid))) return
+    const uidOf = (n) => (n && (n.uid || (n.data && n.data.uid))) || ''
+    const textOf = (n) => (n && (n.text !== undefined ? n.text : (n.data && n.data.text)))
+    const findRemoteByUid = (n, uid) => {
+      if (!n) return null
+      if (uidOf(n) === uid) return n
+      for (const c of (n.children || [])) { const f = findRemoteByUid(c, uid); if (f) return f }
+      return null
+    }
+    // 编辑中：不做树 diff（避免破坏正在编辑的本地树），只检测自己正在编辑的节点是否被远端改动→弹增强冲突框（带对方内容）
+    if (myEditNodeId) {
+      try {
+        const myNode = mind.value.renderer && mind.value.renderer.findNodeByUid(myEditNodeId)
+        if (myNode) {
+          const rd = findRemoteByUid(remoteRoot, myEditNodeId)
+          if (rd) {
+            const rtext = textOf(rd)
+            if (rtext !== undefined && myNode.nodeData.text !== rtext && !editConflict.value) {
+              editConflict.value = { nodeId: myEditNodeId, remoteText: rtext == null ? '' : rtext }
+            }
+          }
+        }
+      } catch (e) {}
+      return
+    }
+    const localRoot = mind.value.renderer && mind.value.renderer.root
+    if (!localRoot) return
+    const localMap = {}
+    const depthOf = {}
+    const walkLocal = (n, dep) => { if (!n || !n.uid) return; localMap[n.uid] = n; depthOf[n.uid] = dep; (n.children || []).forEach(c => walkLocal(c, dep + 1)) }
+    walkLocal(localRoot, 0)
+    const remoteUids = new Set()
+    const walkRemote = (n) => { if (!n) return; const u = uidOf(n); if (u) remoteUids.add(u); (n.children || []).forEach(walkRemote) }
+    walkRemote(remoteRoot)
+    // 1. 删除本地多余节点（先删深层）
+    const toRemove = Object.keys(localMap)
+      .filter(uid => !remoteUids.has(uid) && localMap[uid].parent)
+      .sort((a, b) => (depthOf[b] || 0) - (depthOf[a] || 0))
+      .map(uid => localMap[uid])
+    if (toRemove.length) {
+      wsApplying = true
+      try { toRemove.forEach(nd => { try { if (nd.parent) mind.value.renderer.removeNode(nd) } catch (e) {} }) } finally { wsApplying = false }
+    }
+    // 2. 新增节点 + 文本变更 + creatorUid 同步
+    const applyRemote = (rd, parentUid) => {
+      if (!rd) return
+      const uid = uidOf(rd)
+      if (!uid) return
+      let localNode = localMap[uid]
+      if (!localNode) {
+        const parentNode = parentUid ? localMap[parentUid] : null
+        if (parentNode) {
+          try {
+            // 引擎 insertChildNode 的 appointData 是节点 data 对象（含 uid/text/creatorUid）
+            const nodeData = (rd.data && typeof rd.data === 'object') ? rd.data : { uid: uid, text: textOf(rd) || '' }
+            const children = rd.children || []
+            wsApplying = true
+            mind.value.renderer.insertChildNode(false, [parentNode], JSON.parse(JSON.stringify(nodeData)), children)
+            wsApplying = false
+            const nn = mind.value.renderer.findNodeByUid(uid)
+            if (nn) { localMap[uid] = nn; localNode = nn }
+          } catch (e) { wsApplying = false }
+        }
+        if (!localNode) return
+      }
+      // 文本变更
+      const rtext = textOf(rd)
+      if (rtext !== undefined && localNode.nodeData.text !== rtext) {
+        if (myEditNodeId === uid) {
+          // 自己正在编辑的节点被改：弹增强冲突框（带对方内容），不静默覆盖
+          if (!editConflict.value) {
+            editConflict.value = { nodeId: uid, remoteText: rtext == null ? '' : rtext }
+          }
+        } else {
+          wsApplying = true
+          try { mind.value.renderer.setNodeText(localNode, rtext == null ? '' : rtext) } catch (e) {}
+          wsApplying = false
+        }
+      }
+      const rcreator = rd.creatorUid || (rd.data && rd.data.creatorUid)
+      if (rcreator && !localNode.nodeData.creatorUid) localNode.nodeData.creatorUid = rcreator
+      ;(rd.children || []).forEach(c => applyRemote(c, uid))
+    }
+    applyRemote(remoteRoot, null)
+    suppressDirtyUntil = Date.now() + 3000
+    try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+  } catch (e) { console.warn('diffApplyLatest err', e) }
+}
+
+/** 增强冲突框：加载最新 / 以我为准 */
+function resolveEditConflict(choice) {
+  const c = editConflict.value
+  if (!c) return
+  if (choice === 'load') {
+    const remoteText = c.remoteText == null ? '' : c.remoteText
+    try {
+      const te = mind.value.renderer.textEdit
+      if (te && te.textEditNode) {
+        te.textEditNode.textContent = remoteText
+        if (te.showTextEdit) { te.hideEditTextBox(); setTimeout(() => { try { if (te.showTextEdit) te.hideEditTextBox() } catch (e2) {} }, 0) }
+      }
+    } catch (e) {}
+    try {
+      const node = mind.value.renderer.findNodeByUid(c.nodeId)
+      if (node) {
+        wsApplying = true
+        node.nodeData.text = remoteText
+        delete node.nodeData.richText
+        mind.value.renderer.renderNode(node)
+        wsApplying = false
+      }
+    } catch (e) { wsApplying = false }
+    // 兜底：若编辑框仍未关闭，强制移除并复位状态
+    setTimeout(() => {
+      try {
+        const te = mind.value.renderer.textEdit
+        if (te && te.textEditNode && te.textEditNode.style && te.textEditNode.style.display !== 'none') {
+          te.textEditNode.style.display = 'none'
+          te.textEditNode.innerHTML = ''
+          te.showTextEdit = false
+          te.currentNode = null
+          textEditActive.value = false
+          releaseNodeLock(true)
+        }
+      } catch (e3) {}
+    }, 50)
+    try { canvasTabs.value[docIndex.value].data = mind.value.getData() } catch (e) {}
+    toast('已加载最新内容')
+  }
+  editConflict.value = null
 }
 
 function scheduleAutoSave() {
@@ -3271,6 +3487,16 @@ function connectWs() {
         applyRemoteNodeChange(msg.nodeId, msg.text, Number(msg.userId))
         return
       }
+      if (msg.event === 'node_edit_request') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        handleEditRequestMsg(msg)
+        return
+      }
+      if (msg.event === 'node_edit_result') {
+        if (String(msg.mindMapId) !== String(mindMapId.value)) return
+        handleEditResultMsg(msg)
+        return
+      }
       if (msg.event !== 'mindmap_updated') return
       if (String(msg.mindMapId) !== String(mindMapId.value)) return
       let myUidVal = 0
@@ -3278,13 +3504,8 @@ function connectWs() {
       if (myUidVal && Number(msg.updatedBy) === myUidVal) return
       const v = Number(msg.version)
       if (!v || v <= curVersion.value) return
-      if (dirty.value) {
-        collabToast.text = (msg.updatedByName || '协作成员') + ' 已更新该导图（v' + v + '）'
-        collabToast.version = v
-        collabToast.show = true
-      } else {
-        loadLatest(true)
-      }
+      // 静默 diff 局部应用：不弹提示、不全量刷新、保留视图位置（自己正在编辑的节点被改则弹增强冲突框）
+      diffApplyLatest()
     } catch (e) { console.warn('ws msg err', e) }
   }
   ws.onclose = () => { ws = null; wsSubscribed = false; scheduleWsReconnect() }
@@ -3318,6 +3539,14 @@ function disconnectWs() {
 // ============ 节点级协作：锁定 + 实时编辑推送 ============
 const nodeLocks = reactive({}) // nodeId -> { userId, userName }
 let myEditNodeId = null
+// ---- 节点所有权 + 编辑申请 ----
+const collabCfg = reactive({ enableOwnerLock: false, approveTimeout1: 120, approveTimeout2: 180, grantMinutes: 10 })
+const pendingEditReq = ref(null)   // 申请确认弹窗
+const approveEditReq = ref(null)   // 审批弹窗
+const editConflict = ref(null)     // 编辑中节点被他人修改的增强冲突框
+const grantedNodes = reactive({})  // nodeId -> 本地授权截止时间戳
+const sentEditReqs = reactive({})  // nodeId -> 已提交待审批
+const mapOwnerId = ref(0)          // 导图创建者 uid
 let myLockTimer = null
 let nodeChangeTimer = null
 let wsApplying = false
@@ -3330,6 +3559,47 @@ function sendWs(obj) {
   if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(obj)) } catch (e) {} }
 }
 
+function requestEditPermission(nid, node) {
+  if (sentEditReqs[nid]) { toast('已提交编辑申请，等待审批', 'info'); return }
+  pendingEditReq.value = { nodeId: nid, nodeText: (node.nodeData && node.nodeData.text) || '' }
+}
+function confirmSendEditReq() {
+  const req = pendingEditReq.value
+  if (!req) return
+  sendWs({ type: 'node_edit_request', mindMapId: String(mindMapId.value), nodeId: req.nodeId, nodeCreatorUid: 0, nodeText: (req.nodeText || '').slice(0, 200) })
+  sentEditReqs[req.nodeId] = true
+  pendingEditReq.value = null
+  toast('已提交编辑申请，等待审批', 'info')
+}
+function respondEditReq(approve) {
+  const req = approveEditReq.value
+  if (!req) return
+  sendWs({ type: 'node_edit_response', mindMapId: String(mindMapId.value), nodeId: req.nodeId, approve: approve ? 'yes' : 'no', applicantUid: req.applicantUid })
+  approveEditReq.value = null
+  toast(approve ? '已同意编辑申请' : '已拒绝编辑申请', approve ? 'success' : 'info')
+}
+function handleEditRequestMsg(msg) {
+  approveEditReq.value = { nodeId: msg.nodeId, nodeText: msg.nodeText || '', applicantUid: Number(msg.applicantUid), applicantName: msg.applicantName || '', reason: msg.reason || 'new' }
+}
+function handleEditResultMsg(msg) {
+  const nid = msg.nodeId
+  if (msg.result === 'pending') {
+    delete sentEditReqs[nid]
+    toast('该节点已有申请正在审批中', 'warning')
+    return
+  }
+  if (msg.result === 'sent') { toast('已提交编辑申请，等待审批', 'info'); return }
+  if (!sentEditReqs[nid]) return
+  if (msg.result === 'approved') {
+    grantedNodes[nid] = Date.now() + (collabCfg.grantMinutes || 10) * 60 * 1000
+    toast('已获授权，可编辑该节点（' + (collabCfg.grantMinutes || 10) + ' 分钟）', 'success')
+  } else if (msg.result === 'rejected') {
+    toast('编辑申请已被拒绝', 'error')
+  } else if (msg.result === 'auto_rejected') {
+    toast('申请超时未审批，已自动拒绝', 'error')
+  }
+  delete sentEditReqs[nid]
+}
 function acquireNodeLock(nid) {
   if (!nid) return
   myEditNodeId = nid
@@ -3353,9 +3623,10 @@ function pushNodeChange(node, text) {
   if (!ws || ws.readyState !== 1) return
   const nid = node && (node.uid || (node.nodeData && node.nodeData.uid))
   if (!nid) return
+  try { if (node.nodeData && !node.nodeData.creatorUid) node.nodeData.creatorUid = myUid() } catch (e) {}
   if (nodeChangeTimer) clearTimeout(nodeChangeTimer)
   nodeChangeTimer = setTimeout(() => {
-    sendWs({ type: 'node_change', mindMapId: String(mindMapId.value), nodeId: nid, text: (text == null ? '' : text).slice(0, 8000) })
+    sendWs({ type: 'node_change', mindMapId: String(mindMapId.value), nodeId: nid, text: (text == null ? '' : text).slice(0, 8000), nodeCreatorUid: Number((node.nodeData && node.nodeData.creatorUid) || 0) })
   }, 250)
 }
 
@@ -3738,6 +4009,7 @@ onMounted(async () => {
     data = await mindmapApi.get(data.id)
   }
   curVersion.value = data.version || 0
+  mapOwnerId.value = Number(data.userId) || 0
 
   // 解析数据: 后端可能返回 JSON 字符串，需先解析为对象
   let d = data.data || {}

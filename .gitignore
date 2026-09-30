@@ -73,6 +73,7 @@ __pycache__/
 **/secrets*
 **/*secret*.yml
 **/*secret*.properties
+**/*.key
 
 # ---------- 运行时数据 ----------
 /uploads/

@@ -19,4 +19,6 @@ public interface MindMapService {
     Map<String, Object> shareInfo(long userId, Long id);
     void unshare(long userId, Long id);
     MindMap getByShareToken(String token, String password);
+    /** 更新导图协作配置（节点所有权开关/审批超时/授权时长） */
+    void updateCollabConfig(long userId, Long id, java.util.Map<String, Object> cfg);
 }

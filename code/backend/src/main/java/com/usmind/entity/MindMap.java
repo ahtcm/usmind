@@ -19,6 +19,8 @@ public class MindMap {
     private String theme;
     private String viewData;
     private String manualStyles;
+    /** 协作配置 JSON：{"enableOwnerLock":bool,"approveTimeout1":120,"approveTimeout2":180,"grantMinutes":10} */
+    private String collabConfig;
     private Integer isShared;
     private String shareToken;
     private String sharePassword;

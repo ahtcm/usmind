@@ -137,8 +137,43 @@ public class MindMapServiceImpl implements MindMapService {
         m.setViewData(toJson(req.getViewData()));
         m.setManualStyles(req.getManualStyles() != null ? toJson(req.getManualStyles()) : null);
         m.setIsShared(0);
+        // 协作配置默认：全局开关（后台配置 ownerLockDefault）
+        String ownerLockDefault = settingsService.get("ownerLockDefault", "0");
+        boolean lockOn = "1".equals(ownerLockDefault);
+        m.setCollabConfig("{\"enableOwnerLock\":" + (lockOn ? "true" : "false")
+                + ",\"approveTimeout1\":120,\"approveTimeout2\":180,\"grantMinutes\":10}");
         mindMapMapper.insert(m);
         return m.getId();
+    }
+
+    @Override
+    public void updateCollabConfig(long userId, Long id, java.util.Map<String, Object> cfg) {
+        MindMap m = mindMapMapper.selectById(id);
+        if (m == null || !canAccess(userId, m)) {
+            throw new BusinessException(404, "导图不存在");
+        }
+        if (cfg == null || cfg.isEmpty()) return;
+        String cur = m.getCollabConfig();
+        com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+        java.util.Map<String, Object> merged;
+        try {
+            merged = new java.util.HashMap<>();
+            if (cur != null && !cur.isBlank()) {
+                merged.putAll(om.readValue(cur, java.util.Map.class));
+            }
+        } catch (Exception e) {
+            merged = new java.util.HashMap<>();
+        }
+        if (cfg.containsKey("enableOwnerLock")) merged.put("enableOwnerLock", cfg.get("enableOwnerLock"));
+        if (cfg.containsKey("approveTimeout1")) merged.put("approveTimeout1", cfg.get("approveTimeout1"));
+        if (cfg.containsKey("approveTimeout2")) merged.put("approveTimeout2", cfg.get("approveTimeout2"));
+        if (cfg.containsKey("grantMinutes")) merged.put("grantMinutes", cfg.get("grantMinutes"));
+        try {
+            m.setCollabConfig(om.writeValueAsString(merged));
+        } catch (Exception e) {
+            throw new BusinessException(500, "协作配置格式错误");
+        }
+        mindMapMapper.updateById(m);
     }
 
     @Override
@@ -147,7 +182,46 @@ public class MindMapServiceImpl implements MindMapService {
         if (m == null || !canAccess(userId, m)) {
             throw new BusinessException(404, "导图不存在");
         }
+        fillCreatorUid(m);
         return m;
+    }
+
+    /** 历史节点所有权兜底：无 creatorUid 的节点归导图创建者所有（仅内存返回，保存时自然持久化） */
+    private void fillCreatorUid(MindMap m) {
+        try {
+            String data = m.getData();
+            if (data == null || data.isBlank()) return;
+            long owner = m.getUserId() == null ? 0 : m.getUserId();
+            if (owner <= 0) return;
+            com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = om.readTree(data);
+            if (root == null) return;
+            // 数据包装：{ root:{data,children}, _tabs, _activeTab }，从 root 字段进入
+            com.fasterxml.jackson.databind.JsonNode treeRoot = root.path("root");
+            if (treeRoot.isMissingNode() || treeRoot.isNull()) treeRoot = root;
+            boolean changed = fillCreatorRec(treeRoot, owner);
+            if (changed) m.setData(om.writeValueAsString(root));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private boolean fillCreatorRec(com.fasterxml.jackson.databind.JsonNode n, long owner) {
+        boolean changed = false;
+        if (n.isObject()) {
+            // 节点数据在 data 层（simple-mind-map 结构：{ data:{text,uid,...}, children:[...] }）
+            com.fasterxml.jackson.databind.JsonNode dataNode = n.get("data");
+            if (dataNode != null && dataNode.isObject() && !dataNode.has("creatorUid")) {
+                ((com.fasterxml.jackson.databind.node.ObjectNode) dataNode).put("creatorUid", owner);
+                changed = true;
+            }
+            com.fasterxml.jackson.databind.JsonNode children = n.get("children");
+            if (children != null && children.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode c : children) {
+                    if (fillCreatorRec(c, owner)) changed = true;
+                }
+            }
+        }
+        return changed;
     }
 
     @Override

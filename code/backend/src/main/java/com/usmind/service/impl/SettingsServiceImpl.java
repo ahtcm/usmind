@@ -103,6 +103,8 @@ public class SettingsServiceImpl implements SettingsService {
         putDefaultIfAbsent("uploadVipMaxMb", "200");
         // 画布个数限制
         putDefaultIfAbsent("mindmapFreeCount", "5");
+        // 节点所有权默认开关（0=关 1=开，作用于新建导图）
+        putDefaultIfAbsent("ownerLockDefault", "0");
         putDefaultIfAbsent("mindmapVipCount", "200");
         // IP 防护
         putDefaultIfAbsent("ipGuardEnabled", "1");

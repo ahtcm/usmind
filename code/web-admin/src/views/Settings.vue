@@ -15,6 +15,16 @@
         </el-card>
 
         <el-card shadow="never" style="margin-top: 16px">
+          <template #header><span>节点所有权（机构协作）</span></template>
+          <el-form label-width="140px">
+            <el-form-item label="默认开启节点所有权">
+              <el-switch v-model="settings.ownerLockDefault" active-value="1" inactive-value="0" />
+              <div class="opt-tip">作用于新建导图：开启后非节点创建者编辑需申请审批；历史节点归导图创建者所有</div>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <el-card shadow="never" style="margin-top: 16px">
           <template #header><span>文件上传限制</span></template>
           <el-form label-width="140px">
             <el-form-item label="最大上传大小(MB)">
@@ -63,6 +73,7 @@ const settings = reactive({
   jwtIssuer: 'usmind',
   maxUploadSize: 50,
   allowTypes: 'jpg,jpeg,png,gif,pdf,doc,docx,xlsx,pptx,mp4',
+  ownerLockDefault: '0',
   aiApiKey: '',
   aiModel: '',
   aiEndpoint: ''

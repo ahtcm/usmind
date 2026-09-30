@@ -39,9 +39,10 @@
         <el-table-column prop="updatedAt" label="更新时间" width="170">
           <template #default="{ row }">{{ formatTime(row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openDetail(row)">详情</el-button>
+            <el-button size="small" type="primary" @click="openCollab(row)">协作设置</el-button>
             <el-button v-if="row.isShared" size="small" type="warning" @click="handleCancelShare(row)">取消分享</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -80,6 +81,32 @@
         class="json-box"
       />
     </el-dialog>
+
+    <!-- 协作设置弹窗 -->
+    <el-dialog v-model="collab.visible" title="协作设置" width="520px">
+      <el-form label-width="150px" v-if="collab.data">
+        <el-form-item label="节点所有权">
+          <el-switch v-model="collab.data.enableOwnerLock" />
+          <div class="opt-tip">开启后非节点创建者编辑需申请审批；历史节点归导图创建者所有</div>
+        </el-form-item>
+        <el-form-item label="审批人超时转派(秒)">
+          <el-input-number v-model="collab.data.approveTimeout1" :min="10" :max="3600" />
+          <div class="opt-tip">节点创建者未在此时长内审批则转派导图创建者（默认 120 秒）</div>
+        </el-form-item>
+        <el-form-item label="超时自动拒绝(秒)">
+          <el-input-number v-model="collab.data.approveTimeout2" :min="10" :max="3600" />
+          <div class="opt-tip">超过该时长未审批自动拒绝（默认 180 秒）</div>
+        </el-form-item>
+        <el-form-item label="授权编辑时长(分钟)">
+          <el-input-number v-model="collab.data.grantMinutes" :min="1" :max="600" />
+          <div class="opt-tip">审批通过后申请人可编辑该节点的时长</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="collab.visible = false">取消</el-button>
+        <el-button type="primary" :loading="collab.saving" @click="saveCollab">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -95,6 +122,7 @@ const query = reactive({ page: 1, size: 10, keyword: '' })
 const selectedIds = ref([])
 
 const detail = reactive({ visible: false, data: null, json: '' })
+const collab = reactive({ visible: false, data: null, saving: false })
 
 function formatTime(t) {
   if (!t) return '—'
@@ -142,6 +170,38 @@ async function handleDelete(row) {
 
 function handleSelectionChange(rows) {
   selectedIds.value = rows.map(r => r.id)
+}
+
+async function openCollab(row) {
+  collab.visible = true
+  collab.data = { enableOwnerLock: false, approveTimeout1: 120, approveTimeout2: 180, grantMinutes: 10, id: row.id, name: row.name }
+  try {
+    const cfg = await getCollabConfig(row.id)
+    if (cfg && typeof cfg === 'object') {
+      collab.data.enableOwnerLock = !!cfg.enableOwnerLock
+      if (cfg.approveTimeout1) collab.data.approveTimeout1 = cfg.approveTimeout1
+      if (cfg.approveTimeout2) collab.data.approveTimeout2 = cfg.approveTimeout2
+      if (cfg.grantMinutes) collab.data.grantMinutes = cfg.grantMinutes
+    }
+  } catch (e) {}
+}
+
+async function saveCollab() {
+  const d = collab.data
+  if (!d) return
+  collab.saving = true
+  try {
+    await updateCollabConfig(d.id, {
+      enableOwnerLock: d.enableOwnerLock,
+      approveTimeout1: d.approveTimeout1,
+      approveTimeout2: d.approveTimeout2,
+      grantMinutes: d.grantMinutes
+    })
+    ElMessage.success('协作设置已保存')
+    collab.visible = false
+  } finally {
+    collab.saving = false
+  }
 }
 
 async function handleBatchDelete() {
