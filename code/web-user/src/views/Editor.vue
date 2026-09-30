@@ -299,7 +299,7 @@
           <div class="cmt-head">
             <span class="cmt-src" :class="c.source === 'org' ? 'cmt-src-org' : 'cmt-src-share'">{{ c.source === 'org' ? '组织' : '分享' }}</span>
             <b>{{ c.userName }}</b>
-            <span v-if="c.isAuthor === 1" class="cmt-author-tag">我</span>
+            <span v-if="c.isAuthor === 1 && c.userId && myUid() === Number(c.userId)" class="cmt-author-tag">我</span>
             <span class="cmt-time">{{ fmtCmtTime(c.createdAt) }}</span>
           </div>
           <div class="cmt-body">{{ c.content }}</div>
