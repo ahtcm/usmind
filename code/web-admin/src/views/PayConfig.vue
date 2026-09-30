@@ -58,6 +58,10 @@
         <el-form-item label="图形验证码">
           <el-switch v-model="form.authCaptchaEnabled" />
         </el-form-item>
+        <el-form-item label="登录图形验证码">
+          <el-switch v-model="form.authLoginCaptchaEnabled" />
+          <span class="field-hint">登录页独立开关，关闭后登录不校验验证码（前端同步隐藏）</span>
+        </el-form-item>
         <el-form-item label="短信验证码">
           <el-switch v-model="form.authSmsEnabled" />
         </el-form-item>
@@ -128,6 +132,7 @@ const form = reactive({
   wechatLoginEnabled: false,
   wechatLoginAppId: '', wechatLoginSecret: '', wechatLoginRedirectUri: '',
   authCaptchaEnabled: true,
+  authLoginCaptchaEnabled: true,
   authSmsEnabled: false,
   smsProvider: '', smsAccessKeyId: '', smsAccessKeySecret: '', smsSignName: '', smsTemplateCode: '',
   ipGuardEnabled: true,
@@ -152,6 +157,7 @@ onMounted(async () => {
       wechatLoginSecret: d.wechatLoginSecret || '',
       wechatLoginRedirectUri: d.wechatLoginRedirectUri || '',
       authCaptchaEnabled: !!d.authCaptchaEnabled,
+      authLoginCaptchaEnabled: !!d.authLoginCaptchaEnabled,
       authSmsEnabled: !!d.authSmsEnabled,
       smsProvider: d.smsProvider || '',
       smsAccessKeyId: d.smsAccessKeyId || '',
@@ -185,6 +191,7 @@ async function save() {
       wechatLoginSecret: form.wechatLoginSecret,
       wechatLoginRedirectUri: form.wechatLoginRedirectUri,
       authCaptchaEnabled: form.authCaptchaEnabled ? 1 : 0,
+      authLoginCaptchaEnabled: form.authLoginCaptchaEnabled ? 1 : 0,
       authSmsEnabled: form.authSmsEnabled ? 1 : 0,
       smsProvider: form.smsProvider,
       smsAccessKeyId: form.smsAccessKeyId,

@@ -31,6 +31,8 @@ public class ClientConfigController {
         m.put("feature", memberService.featureConfig());
         // 登录相关开关（客户端据此决定是否显示图形验证码 / 验证码输入）
         m.put("authCaptchaEnabled", settingsService.getInt("authCaptchaEnabled", 1) == 1);
+        // 登录图形验证码独立开关（客户端据此决定登录页是否显示验证码）
+        m.put("authLoginCaptchaEnabled", settingsService.getInt("authLoginCaptchaEnabled", 1) == 1);
         m.put("authSmsEnabled", settingsService.getInt("authSmsEnabled", 0) == 1);
         m.put("wechatLoginEnabled", settingsService.getInt("wechatLoginEnabled", 0) == 1);
         m.put("memberEnabled", settingsService.getInt("memberEnabled", 1) == 1);

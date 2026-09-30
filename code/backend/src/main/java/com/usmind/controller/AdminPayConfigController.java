@@ -34,6 +34,8 @@ public class AdminPayConfigController {
         m.put("wechatLoginSecret", settingsService.get("wechatLoginSecret", ""));
         m.put("wechatLoginRedirectUri", settingsService.get("wechatLoginRedirectUri", ""));
         m.put("authCaptchaEnabled", settingsService.getInt("authCaptchaEnabled", 1));
+        // 登录图形验证码独立开关（后台可配，前端登录页同步）
+        m.put("authLoginCaptchaEnabled", settingsService.getInt("authLoginCaptchaEnabled", 1));
         m.put("authSmsEnabled", settingsService.getInt("authSmsEnabled", 0));
         m.put("smsProvider", settingsService.get("smsProvider", ""));
         m.put("smsAccessKeyId", settingsService.get("smsAccessKeyId", ""));

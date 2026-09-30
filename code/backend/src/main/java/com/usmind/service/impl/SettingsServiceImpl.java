@@ -85,8 +85,9 @@ public class SettingsServiceImpl implements SettingsService {
         putDefaultIfAbsent("wechatApiKey", "");
         putDefaultIfAbsent("wechatPrivateKey", "");
         putDefaultIfAbsent("wechatNotifyUrl", "");
-        // 注册 / 验证码（图形验证码默认开，短信验证码默认关）
+        // 注册 / 验证码（图形验证码默认开，登录图形验证码默认开，短信验证码默认关）
         putDefaultIfAbsent("authCaptchaEnabled", "1");
+        putDefaultIfAbsent("authLoginCaptchaEnabled", "1");
         putDefaultIfAbsent("authSmsEnabled", "0");
         putDefaultIfAbsent("smsProvider", "");
         putDefaultIfAbsent("smsAccessKeyId", "");
@@ -176,6 +177,9 @@ public class SettingsServiceImpl implements SettingsService {
         m.put("aiModel", get("aiModel", ""));
         m.put("aiEndpoint", get("aiEndpoint", ""));
         m.put("attachTextColor", get("attachTextColor", "#e53935"));
+        m.put("authCaptchaEnabled", getInt("authCaptchaEnabled", 1));
+        m.put("authLoginCaptchaEnabled", getInt("authLoginCaptchaEnabled", 1));
+        m.put("authSmsEnabled", getInt("authSmsEnabled", 0));
         m.put("memberEnabled", getInt("memberEnabled", 1));
     m.put("orgCreateNeedMember", getInt("orgCreateNeedMember", 1));
     m.put("orgInviteNeedMember", getInt("orgInviteNeedMember", 1));
@@ -236,7 +240,7 @@ public class SettingsServiceImpl implements SettingsService {
             "memberThemeIds", "memberExportFormats",
             "uploadFreeCount", "uploadFreeMaxMb", "uploadVipCount", "uploadVipMaxMb",
             "mindmapFreeCount", "mindmapVipCount",
-            "wechatPayEnabled", "authCaptchaEnabled", "authSmsEnabled",
+            "wechatPayEnabled", "authCaptchaEnabled", "authLoginCaptchaEnabled", "authSmsEnabled",
             "memberEnabled",
             "orgCreateNeedMember", "orgInviteNeedMember",
             "wechatLoginEnabled", "wechatLoginAppId", "wechatLoginSecret", "wechatLoginRedirectUri",

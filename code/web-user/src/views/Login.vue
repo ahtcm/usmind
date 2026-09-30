@@ -17,6 +17,13 @@
           <label>密码</label>
           <input v-model="password" type="password" placeholder="请输入密码" @keyup.enter="doLogin" />
         </div>
+        <div class="field" v-if="loginCaptchaEnabled">
+          <label>图形验证码</label>
+          <div class="captcha-row">
+            <input v-model="loginCaptchaCode" type="text" placeholder="输入图形验证码" @keyup.enter="doLogin" />
+            <img v-if="captchaImg" :src="captchaImg" class="captcha-img" title="点击刷新" @click="loadCaptcha" />
+          </div>
+        </div>
         <button class="btn-login" @click="doLogin" :disabled="loading">{{ loading ? '登录中...' : '登 录' }}</button>
         <div v-if="wechatLoginEnabled" class="wx-row">
           <div class="wx-divider"><span>其他登录方式</span></div>
@@ -94,6 +101,8 @@ const password = ref('')
 const err = ref('')
 const loading = ref(false)
 const captchaEnabled = ref(false)
+const loginCaptchaEnabled = ref(false)
+const loginCaptchaCode = ref('')
 const captchaImg = ref('')
 const captchaUuid = ref('')
 const smsEnabled = ref(false)
@@ -121,9 +130,10 @@ onMounted(async () => {
   try {
     const c = await configApi.client()
     captchaEnabled.value = !!c.authCaptchaEnabled
+    loginCaptchaEnabled.value = !!c.authLoginCaptchaEnabled
     wechatLoginEnabled.value = !!c.wechatLoginEnabled
     smsEnabled.value = !!c.authSmsEnabled
-    if (captchaEnabled.value) loadCaptcha()
+    if (captchaEnabled.value || loginCaptchaEnabled.value) loadCaptcha()
   } catch (e) { /* 忽略 */ }
 })
 
@@ -190,15 +200,28 @@ async function doLogin() {
     err.value = '请输入用户名和密码'
     return
   }
+  if (loginCaptchaEnabled.value && !loginCaptchaCode.value) {
+    err.value = '请输入图形验证码'
+    return
+  }
   loading.value = true
   err.value = ''
   try {
-    const data = await authApi.login({ username: username.value, password: password.value })
+    const data = await authApi.login({
+      username: username.value,
+      password: password.value,
+      captchaUuid: loginCaptchaEnabled.value ? captchaUuid.value : undefined,
+      captchaCode: loginCaptchaEnabled.value ? loginCaptchaCode.value : undefined
+    })
     userStore.setToken(data.token)
     userStore.setUser(data.user)
     router.push(route.query.redirect || '/maps')
   } catch (e) {
     err.value = e.message || '登录失败'
+    if (loginCaptchaEnabled.value) {
+      loginCaptchaCode.value = ''
+      loadCaptcha()
+    }
   } finally {
     loading.value = false
   }

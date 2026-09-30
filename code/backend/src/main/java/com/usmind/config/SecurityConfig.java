@@ -77,7 +77,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/captcha", "/api/auth/send-code", "/api/auth/wechat/**").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/admin-login", "/api/auth/register", "/api/auth/captcha", "/api/auth/send-code", "/api/auth/wechat/**").permitAll()
                         .requestMatchers("/api/log/report").permitAll()
                         .requestMatchers("/api/config/client", "/api/member/plans", "/api/pay/wechat/notify").permitAll()
                         .requestMatchers("/api/share/**").permitAll()

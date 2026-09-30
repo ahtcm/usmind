@@ -71,6 +71,21 @@ public class AuthController {
 
     @PostMapping("/login")
     public Result<Map<String, Object>> login(@RequestBody LoginRequest req) {
+        // 登录图形验证码（后台可关 authLoginCaptchaEnabled，前端同步显示）
+        if (settingsService.getInt("authLoginCaptchaEnabled", 1) == 1) {
+            String cuuid = req.getCaptchaUuid();
+            String ccode = req.getCaptchaCode();
+            if (cuuid == null || cuuid.isBlank() || ccode == null || ccode.isBlank()
+                    || !captchaService.verify(cuuid, ccode)) {
+                throw new com.usmind.common.BusinessException(400, "图形验证码错误或已过期");
+            }
+        }
+        return Result.ok(authService.login(req));
+    }
+
+    /** 管理后台登录：不校验图形验证码（后台页面无验证码 UI，ADMIN 角色 JWT 保护） */
+    @PostMapping("/admin-login")
+    public Result<Map<String, Object>> adminLogin(@RequestBody LoginRequest req) {
         return Result.ok(authService.login(req));
     }
 
