@@ -61,9 +61,27 @@ public class RequestLogFilter extends OncePerRequestFilter {
             "origin", "referer", "user-agent", "x-forwarded-for", "x-request-id"
     };
 
-    public RequestLogFilter(JwtUtil jwtUtil, RequestLogMapper requestLogMapper) {
+    private final com.usmind.service.SettingsService settingsService;
+
+    public RequestLogFilter(JwtUtil jwtUtil, RequestLogMapper requestLogMapper,
+                            com.usmind.service.SettingsService settingsService) {
         this.jwtUtil = jwtUtil;
         this.requestLogMapper = requestLogMapper;
+        this.settingsService = settingsService;
+    }
+
+    /** 判断某级别是否被后台配置为记录（多选，逗号分隔；空=不记录） */
+    private boolean shouldRecord(String level) {
+        try {
+            String cfg = settingsService.get("logRecordLevels", "info,warn,error");
+            if (cfg == null || cfg.isBlank()) return false;
+            for (String s2 : cfg.split(",")) {
+                if (s2.trim().equalsIgnoreCase(level)) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return true;
+        }
     }
 
     @Override
@@ -199,6 +217,7 @@ public class RequestLogFilter extends OncePerRequestFilter {
                            int status, long cost, String ip, String ua,
                            String reqHeaders, String reqBody, String respBody,
                            String errMsg, String detail, int success, String level, int bizCode) {
+        if (!shouldRecord(level)) return;
         try {
             RequestLog r = new RequestLog();
             r.setUserId(userId);

@@ -183,6 +183,9 @@ public class SettingsServiceImpl implements SettingsService {
         m.put("wechatLoginAppId", get("wechatLoginAppId", ""));
         m.put("wechatLoginSecret", get("wechatLoginSecret", ""));
         m.put("wechatLoginRedirectUri", get("wechatLoginRedirectUri", ""));
+        m.put("logRecordLevels", get("logRecordLevels", "info,warn,error"));
+        m.put("logRetainDays", getInt("logRetainDays", 90));
+        m.put("logCleanTime", get("logCleanTime", "03:00"));
         return m;
     }
 
@@ -237,7 +240,8 @@ public class SettingsServiceImpl implements SettingsService {
             "memberEnabled",
             "orgCreateNeedMember", "orgInviteNeedMember",
             "wechatLoginEnabled", "wechatLoginAppId", "wechatLoginSecret", "wechatLoginRedirectUri",
-            "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds", "commentRateLimit", "commentRateWindow"
+            "ipGuardEnabled", "ipRateLimit", "ipRateWindow", "ipAutoBlackSeconds", "commentRateLimit", "commentRateWindow",
+            "logRecordLevels", "logRetainDays", "logCleanTime"
         };
         for (String k : memberKeys) {
             if (body.containsKey(k) && body.get(k) != null) {

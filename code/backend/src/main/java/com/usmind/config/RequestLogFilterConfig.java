@@ -3,6 +3,7 @@ package com.usmind.config;
 import com.usmind.common.JwtUtil;
 import com.usmind.filter.RequestLogFilter;
 import com.usmind.mapper.RequestLogMapper;
+import com.usmind.service.SettingsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,7 +16,8 @@ import org.springframework.context.annotation.Configuration;
 public class RequestLogFilterConfig {
 
     @Bean
-    public RequestLogFilter requestLogFilter(JwtUtil jwtUtil, RequestLogMapper requestLogMapper) {
-        return new RequestLogFilter(jwtUtil, requestLogMapper);
+    public RequestLogFilter requestLogFilter(JwtUtil jwtUtil, RequestLogMapper requestLogMapper,
+                                             SettingsService settingsService) {
+        return new RequestLogFilter(jwtUtil, requestLogMapper, settingsService);
     }
 }

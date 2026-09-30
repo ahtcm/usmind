@@ -21,10 +21,13 @@ public class LogController {
 
     private final RequestLogMapper requestLogMapper;
     private final JwtUtil jwtUtil;
+    private final com.usmind.service.SettingsService settingsService;
 
-    public LogController(RequestLogMapper requestLogMapper, JwtUtil jwtUtil) {
+    public LogController(RequestLogMapper requestLogMapper, JwtUtil jwtUtil,
+                         com.usmind.service.SettingsService settingsService) {
         this.requestLogMapper = requestLogMapper;
         this.jwtUtil = jwtUtil;
+        this.settingsService = settingsService;
     }
 
     @PostMapping("/report")
@@ -56,6 +59,16 @@ public class LogController {
             r.setSource("frontend");
             String level = body.get("level") == null ? "info" : String.valueOf(body.get("level"));
             r.setLevel("error".equals(level) || "warn".equals(level) ? level : "info");
+            // 前端日志级别过滤：后台配置记录哪些级别（多选），不含该级别则不落库
+            try {
+                String cfg = settingsService.get("logRecordLevels", "info,warn,error");
+                if (cfg == null || cfg.isBlank()) return Result.ok();
+                boolean hit = false;
+                for (String c : cfg.split(",")) {
+                    if (c.trim().equalsIgnoreCase(r.getLevel())) { hit = true; break; }
+                }
+                if (!hit) return Result.ok();
+            } catch (Exception ignored) { }
             r.setSuccess("error".equals(level) ? 0 : 1);
             r.setCostMs(0);
             String msg = body.get("message") == null ? "" : String.valueOf(body.get("message"));
