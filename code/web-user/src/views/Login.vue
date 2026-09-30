@@ -60,6 +60,13 @@
           <label>手机号{{ smsEnabled ? '（必填）' : '（可选）' }}</label>
           <input v-model="reg.phone" type="text" placeholder="用于找回密码" />
         </div>
+        <div class="field" v-if="captchaEnabled">
+          <label>图形验证码</label>
+          <div class="captcha-row">
+            <input v-model="reg.captchaCode" type="text" placeholder="先输入图形验证码" />
+            <img v-if="captchaImg" :src="captchaImg" class="captcha-img" title="点击刷新" @click="loadCaptcha" />
+          </div>
+        </div>
         <div class="field" v-if="smsEnabled">
           <label>短信验证码</label>
           <div class="sms-row">
@@ -70,13 +77,6 @@
         <div class="field">
           <label>邮箱（可选）</label>
           <input v-model="reg.email" type="text" placeholder="用于找回密码" />
-        </div>
-        <div class="field" v-if="captchaEnabled">
-          <label>图形验证码</label>
-          <div class="captcha-row">
-            <input v-model="reg.captchaCode" type="text" placeholder="输入右侧验证码" />
-            <img v-if="captchaImg" :src="captchaImg" class="captcha-img" title="点击刷新" @click="loadCaptcha" />
-          </div>
         </div>
         <button class="btn-login" @click="doRegister" :disabled="loading">{{ loading ? '注册中...' : '注 册' }}</button>
       </template>
@@ -168,9 +168,14 @@ async function onAvatarPick(e) {
 
 async function sendSmsCode() {
   if (!reg.value.phone || reg.value.phone.length < 6) { err.value = '请先输入正确的手机号'; return }
+  if (captchaEnabled.value && !reg.value.captchaCode) { err.value = '请先输入图形验证码'; return }
   err.value = ''
   try {
-    await request.post('/auth/send-code', { phone: reg.value.phone })
+    await request.post('/auth/send-code', {
+      phone: reg.value.phone,
+      captchaUuid: captchaEnabled.value ? captchaUuid.value : undefined,
+      captchaCode: captchaEnabled.value ? reg.value.captchaCode : undefined
+    })
     smsCountdown.value = 60
     if (smsTimer) clearInterval(smsTimer)
     smsTimer = setInterval(() => {
@@ -179,6 +184,7 @@ async function sendSmsCode() {
     }, 1000)
   } catch (e) {
     err.value = (e && e.message) || '验证码发送失败'
+    if ((e && e.message || '').includes('图形验证码')) loadCaptcha()
   }
 }
 
