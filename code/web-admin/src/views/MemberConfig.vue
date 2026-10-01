@@ -82,20 +82,20 @@
         </div>
       </template>
       <el-table :data="plans" border size="small" v-loading="planLoading">
-        <el-table-column prop="name" label="名称" width="150" />
-        <el-table-column prop="level" label="级别" width="70" />
-        <el-table-column label="现价" width="110">
+        <el-table-column prop="name" label="名称" min-width="150" flex="1" />
+        <el-table-column prop="level" label="级别" min-width="70" />
+        <el-table-column label="现价" min-width="110">
           <template #default="{ row }">¥{{ Number(row.price || 0).toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column label="原价" width="110">
+        <el-table-column label="原价" min-width="110">
           <template #default="{ row }">¥{{ Number(row.originalPrice || 0).toFixed(2) }}</template>
         </el-table-column>
-        <el-table-column label="折扣" width="90">
+        <el-table-column label="折扣" min-width="90">
           <template #default="{ row }">{{ row.discountPercent ? row.discountPercent + '%' : '—' }}</template>
         </el-table-column>
-        <el-table-column prop="days" label="天数" width="80" />
-        <el-table-column prop="sort" label="排序" width="70" />
-        <el-table-column label="启用" width="80">
+        <el-table-column prop="days" label="天数" min-width="80" />
+        <el-table-column prop="sort" label="排序" min-width="70" />
+        <el-table-column label="启用" min-width="80">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
           </template>
@@ -137,18 +137,18 @@
         <el-button type="warning" plain :loading="exporting" @click="exportCodes">批量导出（Excel/CSV）</el-button>
       </div>
       <el-table :data="codes" border size="small" v-loading="codeLoading">
-        <el-table-column prop="code" label="兑换码" width="185" />
-        <el-table-column prop="planName" label="套餐" width="100" />
-        <el-table-column prop="days" label="时长(天)" width="80" />
-        <el-table-column label="状态" width="90">
+        <el-table-column prop="code" label="兑换码" min-width="185" flex="1" />
+        <el-table-column prop="planName" label="套餐" min-width="100" />
+        <el-table-column prop="days" label="时长(天)" min-width="80" />
+        <el-table-column label="状态" min-width="90">
           <template #default="{ row }">
             <el-tag :type="row.status === 'used' ? 'success' : row.status === 'disabled' ? 'info' : 'warning'" size="small">
               {{ row.status === 'used' ? '已兑换' : row.status === 'disabled' ? '已停用' : '可用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="usedByName" label="使用者" width="120" show-overflow-tooltip />
-        <el-table-column prop="usedAt" label="兑换时间" width="165">
+        <el-table-column prop="usedByName" label="使用者" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="usedAt" label="兑换时间" min-width="165">
           <template #default="{ row }">{{ row.usedAt ? String(row.usedAt).replace('T', ' ').slice(0, 19) : '—' }}</template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
@@ -406,4 +406,10 @@ async function save() {
 .card-header .card-tip { font-weight: normal; font-size: 12px; color: #909399; margin-left: 12px; }
 .redeem-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 10px; }
+:deep(.el-table__inner-wrapper table),
+:deep(.el-table__header-wrapper table),
+:deep(.el-table__body-wrapper table) {
+  width: 100% !important;
+  table-layout: fixed;
+}
 </style>

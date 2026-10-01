@@ -18,19 +18,19 @@
       </div>
 
       <el-table v-loading="loading" :data="tableData" border>
-        <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column prop="username" label="用户名" width="130" />
-        <el-table-column prop="nickname" label="昵称" width="120" />
-        <el-table-column label="会员等级" width="100">
+        <el-table-column prop="id" label="ID" min-width="70" />
+        <el-table-column prop="username" label="用户名" min-width="130" />
+        <el-table-column prop="nickname" label="昵称" min-width="120" />
+        <el-table-column label="会员等级" min-width="100">
           <template #default="{ row }">
             <el-tag v-if="row.memberLevel > 0" type="warning">Lv{{ row.memberLevel }}</el-tag>
             <el-tag v-else type="info">普通</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="会员到期" width="170">
+        <el-table-column label="会员到期" min-width="170">
           <template #default="{ row }">{{ formatTime(row.memberExpire) }}</template>
         </el-table-column>
-        <el-table-column label="会员来源" width="110">
+        <el-table-column label="会员来源" min-width="110">
           <template #default="{ row }">
             <template v-if="row.memberLevel > 0">
               <el-tag v-if="row.memberSource === 'redeem'" type="success" size="small">兑换码</el-tag>
@@ -40,7 +40,7 @@
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column prop="source" label="注册来源" width="100" />
+        <el-table-column prop="source" label="注册来源" min-width="100" />
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="warning" @click="openGrant(row)">开通/续期</el-button>
@@ -146,3 +146,12 @@ async function cancelMember(row) {
 
 onMounted(loadData)
 </script>
+
+<style scoped>
+:deep(.el-table__inner-wrapper table),
+:deep(.el-table__header-wrapper table),
+:deep(.el-table__body-wrapper table) {
+  width: 100% !important;
+  table-layout: fixed;
+}
+</style>
