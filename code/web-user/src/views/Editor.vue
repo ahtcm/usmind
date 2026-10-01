@@ -238,7 +238,6 @@
       <template v-if="ctxMode === 'node'">
         <button data-act="insert-child" @click="ctxAct('insert-child')">插入子主题</button>
         <button data-act="insert-sibling" @click="ctxAct('insert-sibling')">插入同级主题</button>
-        <button data-act="edit" @click="ctxAct('edit')">编辑节点</button>
         <div class="ctx-sep"></div>
         <button data-act="insert-image" @click="ctxAct('insert-image')">插入图片</button>
         <button data-act="insert-audio" @click="ctxAct('insert-audio')">插入音频</button>
@@ -2407,10 +2406,6 @@ function ctxAct(act) {
     mind.value.execCommand('INSERT_CHILD_NODE', node)
   } else if (act === 'insert-sibling') {
     mind.value.execCommand('INSERT_NODE')
-  } else if (act === 'edit') {
-    if (node.getData('richText') === true) { openRichEdit(node); return }
-    mind.value.execCommand('SET_NODE_ACTIVE', [node])
-    try { mind.value.renderer.textEdit.show({ node }) } catch (err) { mind.value.renderer.startTextEdit() }
   } else if (act === 'copy') {
     mind.value.execCommand('SET_NODE_ACTIVE', node, true)
     doCopyNode(node)
