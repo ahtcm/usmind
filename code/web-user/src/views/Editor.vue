@@ -831,6 +831,13 @@ async function createMind() {
     // 协作锁：被他人锁定的节点不允许进入文本编辑（TextEdit 官方钩子）
     beforeTextEdit: (node) => {
       try {
+        // 公式节点：双击走公式编辑弹窗，禁止库自动进入文本编辑（避免编辑框显示 SVG 源码乱码）
+        const ndText = (node.nodeData && node.nodeData.text) || ''
+        const getText = (() => { try { return node.getData ? node.getData('text') : '' } catch (e) { return '' } })()
+        const text = ndText || getText || ''
+        if (text && (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0)) {
+          return false
+        }
         const nid = node.uid || (node.nodeData && node.nodeData.uid)
         if (nid && myEditNodeId !== nid) {
           const lk = nodeLocks[nid]
