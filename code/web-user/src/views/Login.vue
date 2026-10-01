@@ -3,8 +3,8 @@
     <div class="login-box">
       <h2>USMIND 思维导图</h2>
       <div class="login-tabs">
-        <button :class="{ active: mode === 'login' }" @click="mode = 'login'">登 录</button>
-        <button :class="{ active: mode === 'register' }" @click="mode = 'register'">注 册</button>
+        <button :class="{ active: mode === 'login' }" @click="switchMode('login')">登 录</button>
+        <button :class="{ active: mode === 'register' }" @click="switchMode('register')">注 册</button>
       </div>
 
       <!-- 登录 -->
@@ -187,6 +187,16 @@ async function sendSmsCode() {
   }
 }
 
+function switchMode(m) {
+  mode.value = m
+  // 登录/注册共用验证码：切换时重新生成，避免一侧提交消耗后另一侧校验必失败
+  if (captchaEnabled.value || loginCaptchaEnabled.value) {
+    loginCaptchaCode.value = ''
+    reg.value.captchaCode = ''
+    loadCaptcha()
+  }
+}
+
 async function loadCaptcha() {
   try {
     const d = await authApi.captcha()
@@ -240,9 +250,10 @@ async function doRegister() {
   loading.value = true
   err.value = ''
   try {
-    await authApi.register({
+    const data = await authApi.register({
       username: r.username,
       password: r.password,
+      confirmPassword: r.password2,
       nickname: r.nickname || undefined,
       phone: r.phone || undefined,
       email: r.email || undefined,
@@ -251,8 +262,7 @@ async function doRegister() {
       captchaCode: r.captchaCode || undefined,
       smsCode: r.smsCode || undefined
     })
-    // 注册成功自动登录
-    const data = await authApi.login({ username: r.username, password: r.password })
+    // 注册即登录：后端注册接口直接签发 token，不再二次请求登录（避免验证码校验拦截）
     userStore.setToken(data.token)
     userStore.setUser(data.user)
     router.push('/maps')

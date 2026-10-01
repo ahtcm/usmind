@@ -91,8 +91,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public Result<Map<String, Object>> register(@RequestBody RegisterRequest req) {
-        Long id = authService.register(req);
-        return Result.ok(Map.of("id", id, "username", req.getUsername()));
+        return Result.ok(authService.register(req));
     }
 
     @GetMapping("/wechat/url")

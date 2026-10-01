@@ -6,9 +6,9 @@ import java.util.Map;
 
 public interface AuthService {
     Map<String, Object> login(LoginRequest req);
-    Long register(String username, String password, String nickname);
+    Map<String, Object> register(String username, String password, String nickname);
 
-    Long register(com.usmind.dto.RegisterRequest req);
+    Map<String, Object> register(com.usmind.dto.RegisterRequest req);
     Map<String, Object> info(Long userId);
     void updateProfile(Long userId, Map<String, Object> body);
     void logout(String token);

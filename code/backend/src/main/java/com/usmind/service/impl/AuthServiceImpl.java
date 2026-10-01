@@ -114,16 +114,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Long register(String username, String password, String nickname) {
+    public Map<String, Object> register(String username, String password, String nickname) {
         return register(new com.usmind.dto.RegisterRequest() {{
             setUsername(username);
             setPassword(password);
+            setConfirmPassword(password);
             setNickname(nickname);
         }});
     }
 
     @Override
-    public Long register(com.usmind.dto.RegisterRequest req) {
+    public Map<String, Object> register(com.usmind.dto.RegisterRequest req) {
         String username = req.getUsername();
         String password = req.getPassword();
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
@@ -133,14 +134,21 @@ public class AuthServiceImpl implements AuthService {
         if (password.length() < 6 || !password.matches(".*[A-Za-z].*") || !password.matches(".*\\d.*")) {
             throw new BusinessException(400, "密码至少 6 位且需包含字母和数字");
         }
-        // 图形验证码（后台可开关）
-        if (captchaService.enabled()) {
+        // 确认密码一致性（防止绕过前端直接调用）
+        String confirm = req.getConfirmPassword();
+        if (confirm == null || !confirm.equals(password)) {
+            throw new BusinessException(400, "两次输入的密码不一致");
+        }
+        boolean smsOn = settingsService.getInt("authSmsEnabled", 0) == 1;
+        // 图形验证码：短信开启时图形验证码已在"获取验证码"时前置校验并一次性消耗，
+        // 注册环节直接以短信验证码为准，避免同一验证码二次校验必失败
+        if (!smsOn && captchaService.enabled()) {
             if (!captchaService.verify(req.getCaptchaUuid(), req.getCaptchaCode())) {
                 throw new BusinessException(400, "图形验证码错误或已过期");
             }
         }
         // 短信验证码（后台可开关；服务商未接入时 send-code 会拒绝发码，注册校验同样拦截）
-        if (settingsService.getInt("authSmsEnabled", 0) == 1) {
+        if (smsOn) {
             if (req.getPhone() == null || req.getPhone().isBlank()) {
                 throw new BusinessException(400, "请输入手机号");
             }
@@ -179,7 +187,15 @@ public class AuthServiceImpl implements AuthService {
         if (req.getAvatar() != null && !req.getAvatar().isBlank()) u.setAvatar(req.getAvatar());
         u.setCreatedAt(LocalDateTime.now());
         userMapper.insert(u);
-        return u.getId();
+        // 注册即登录：直接签发 token，避免注册成功后自动登录再走验证码校验（否则必报"图形验证码错误"）
+        String token = jwtUtil.generateToken(u.getUsername(), u.getId(), u.getRole());
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", u.getId());
+        data.put("username", u.getUsername());
+        data.put("token", token);
+        data.put("user", userMap(u));
+        data.put("member", memberService.memberInfo(u.getId()));
+        return data;
     }
 
     @Override
