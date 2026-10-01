@@ -30,7 +30,7 @@
         </el-select>
         <el-date-picker v-model="dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 260px" />
         <el-button type="primary" @click="handleSearch">搜索</el-button>
-        <el-button @click="handleReset">重置</el-button>
+        <el-button type="danger" @click="handleClearAll">删除全部日志</el-button>
       </div>
 
       <el-table v-loading="loading" :data="tableData" border>
@@ -140,8 +140,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { getLogList, getInterfaceList, getLogDetail } from '@/api/logs'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getLogList, getInterfaceList, getLogDetail, clearAllLogs } from '@/api/logs'
 
 const loading = ref(false)
 const tableData = ref([])
@@ -205,14 +205,16 @@ function handleSearch() {
   loadData()
 }
 
-function handleReset() {
-  query.username = ''
-  query.path = ''
-  query.level = ''
-  query.success = null
-  query.source = ''
-  dateRange.value = null
-  handleSearch()
+async function handleClearAll() {
+  await ElMessageBox.confirm('确定删除全部请求日志吗？此操作不可恢复！', '删除全部日志', {
+    type: 'warning',
+    confirmButtonText: '删除全部'
+  })
+  try {
+    await clearAllLogs()
+    ElMessage.success('已清空全部日志')
+    handleSearch()
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 async function openDetail(row) {

@@ -3,9 +3,11 @@
     <el-card shadow="never">
       <div class="toolbar">
         <span style="color: #606266">共 {{ list.length }} 个存储配置</span>
-        <el-button type="warning" :loading="migrating" @click="handleMigrate">迁移本地文件</el-button>
-        <el-button type="primary" :icon="Plus" @click="openCreate">新增配置</el-button>
-        <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
+        <div class="toolbar-actions">
+          <el-button v-if="selectedIds.length" type="danger" @click="handleBatchDelete">批量删除 ({{ selectedIds.length }})</el-button>
+          <el-button type="warning" :loading="migrating" @click="handleMigrate">迁移本地文件</el-button>
+          <el-button type="primary" :icon="Plus" @click="openCreate">新增配置</el-button>
+        </div>
       </div>
 
       <el-table v-loading="loading" :data="list" border :row-class-name="rowClass" @selection-change="handleSelectionChange">
@@ -243,6 +245,16 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
 :deep(.active-row) {
   background: #f0f9eb !important;
 }

@@ -71,6 +71,13 @@ public class AdminLogController {
         return Result.ok(paths);
     }
 
+    /** 清空全部请求日志（危险操作，前端二次确认） */
+    @DeleteMapping
+    public Result<Void> clearAll() {
+        requestLogMapper.delete(new LambdaQueryWrapper<>());
+        return Result.ok(null);
+    }
+
     /** 日志详情：该条记录 + 同 path 最近的前端上报记录（前后端日志对照） */
     @GetMapping("/{id}")
     public Result<Map<String, Object>> detail(@PathVariable Long id) {

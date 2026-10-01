@@ -11,3 +11,7 @@ export function getInterfaceList(keyword) {
 export function getLogDetail(id) {
   return request.get(`/admin/logs/${id}`)
 }
+
+export function clearAllLogs() {
+  return request.delete('/admin/logs')
+}
