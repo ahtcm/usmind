@@ -37,18 +37,18 @@
       </div>
 
       <div class="plan-grid">
-        <div v-for="p in filteredPlans" :key="p.id" class="plan-card" :class="{ featured: p.days >= 365 }" @click="selectPlan(p)">
+        <div v-for="p in filteredPlans" :key="p.id" class="plan-card" :class="{ selected: selected?.id === p.id, featured: p.days >= 365 }" @click="selectPlan(p)">
           <div class="plan-name">
             {{ p.name }}
             <span v-if="p.discountPercent > 0" class="plan-tag">-{{ p.discountPercent }}%</span>
           </div>
-          <div class="plan-price">
-            ¥{{ Number(p.price || 0).toFixed(2) }}
+          <div class="plan-price">¥{{ Number(p.price || 0).toFixed(2) }}</div>
+          <div class="plan-original-row">
             <span v-if="p.originalPrice > 0 && Number(p.originalPrice) > Number(p.price)" class="plan-original">¥{{ Number(p.originalPrice).toFixed(2) }}</span>
           </div>
           <div class="plan-days">{{ p.days }} 天有效</div>
           <button class="plan-btn" :class="{ active: selected?.id === p.id }">
-            {{ selected?.id === p.id ? '已选择' : '选择套餐' }}
+            {{ selected?.id === p.id ? '✓ 已选择' : '选择套餐' }}
           </button>
         </div>
       </div>
@@ -214,15 +214,20 @@ function pollStatus(outTradeNo) {
 .ms-badge { background: linear-gradient(135deg, #f0b429, #f08c2e); color: #1a1c20; font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 8px; flex-shrink: 0; }
 .ms-name { font-size: 14px; font-weight: 600; }
 .ms-expire { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
-.plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-.plan-card { background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all .15s; }
+.plan-grid { display: flex; gap: 10px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }
+.plan-grid::-webkit-scrollbar { display: none; }
+.plan-card { flex: 0 0 150px; width: 150px; display: flex; flex-direction: column; min-height: 170px; background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all .18s; }
+.plan-card:hover { border-color: #4a5262; transform: translateY(-2px); }
+.plan-card.selected { border-color: rgba(240,180,41,.65); box-shadow: 0 0 0 1px rgba(240,180,41,.35), 0 8px 20px rgba(0,0,0,.35); }
+.plan-original-row { height: 18px; display: flex; align-items: center; justify-content: center; }
 .plan-card:hover { border-color: #4a5262; transform: translateY(-2px); }
 .plan-card.featured { border-color: rgba(240,180,41,.5); }
-.plan-name { font-size: 13px; font-weight: 600; }
+.plan-name { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.plan-tag { flex-shrink: 0; }
 .plan-price { font-size: 20px; font-weight: 800; color: #f0b429; margin: 8px 0 2px; }
 .plan-days { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
-.plan-btn { width: 100%; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 7px 0; font-size: 12px; cursor: pointer; }
-.plan-btn.active { background: var(--accent); border-color: transparent; color: #fff; }
+.plan-btn { width: 100%; margin-top: auto; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 7px 0; font-size: 12px; cursor: pointer; }
+.plan-btn.active { background: linear-gradient(135deg, #f0b429, #f08c2e); border-color: transparent; color: #1a1c20; font-weight: 700; }
 .pay-area { margin-top: 4px; }
 .pay-btn { width: 100%; background: linear-gradient(135deg, #07c160, #06ad56); border: none; color: #fff; border-radius: 10px; padding: 12px 0; font-size: 15px; font-weight: 700; cursor: pointer; }
 .pay-btn:disabled { opacity: .5; cursor: not-allowed; }
