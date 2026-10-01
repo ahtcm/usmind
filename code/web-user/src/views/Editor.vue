@@ -269,12 +269,13 @@
   <!-- 数学公式弹窗 -->
   <div v-if="mathDialog" class="math-mask" @click.self="mathDialog = false">
     <div class="math-dialog">
-      <div class="math-title">{{ mathEditMode ? '编辑数学公式（LaTeX）' : '插入数学公式（LaTeX）' }}</div>
+      <div class="math-title">插入数学公式</div>
+      <input v-model="mathTitle" class="math-title-input" placeholder="标题（显示在公式前，默认：公式）" @input="updateMathPreview" />
       <textarea v-model="mathInput" class="math-input" rows="3" placeholder="例如：E = mc^2  或  \frac{a}{b} + \sqrt{x}" @input="updateMathPreview"></textarea>
       <div class="math-preview">
         <span class="math-preview-label">预览</span>
-        <span v-if="mathPreview" v-html="mathPreview"></span>
-        <span v-else class="math-preview-empty">输入 LaTeX 后实时预览</span>
+        <span v-if="mathPreview" class="math-preview-content" v-html="mathPreview"></span>
+        <span v-else class="math-preview-empty">输入标题和 LaTeX 后实时预览</span>
       </div>
       <div class="math-actions">
         <button class="math-btn" @click="mathCancel">取消</button>
@@ -647,6 +648,7 @@ const richMathInput = ref('')
 const richMathPreviewHtml = ref('')
 const mathNode = ref(null)
 const mathInput = ref('')
+const mathTitle = ref('公式')
 const mathPreview = ref('')
 const textEditActive = ref(false)
 const ctxHidden = ref(true)
@@ -1981,7 +1983,12 @@ function updateMathPreview() {
   const raw = mathInput.value.trim()
   if (!raw) { mathPreview.value = ''; return }
   loadMathJax().then(() => {
-    mathPreview.value = tex2svgHtml(raw, true)
+    try {
+      const html = tex2svgHtml(raw, true)
+      const title = (mathTitle.value || '').trim() || '公式'
+      const escTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      mathPreview.value = escTitle + ' ' + html
+    } catch (e) { mathPreview.value = '' }
   }).catch(() => { mathPreview.value = '' })
 }
 
@@ -2126,13 +2133,17 @@ function openMathEdit(node) {
   }
   mathNode.value = node
   mathInput.value = latex
+  mathTitle.value = '公式'
   mathPreview.value = ''
   mathEditMode.value = true
   mathDialog.value = true
-  // 打开即预览已有公式（不依赖用户再次编辑）
+  // 打开即预览已有公式（不依赖用户再次编辑）：标题 + 公式
   if (latex && latex.trim()) {
     loadMathJax().then(() => {
-      try { mathPreview.value = tex2svgHtml(latex.trim(), true) } catch (e) { mathPreview.value = '' }
+      try {
+        const escTitle = (mathTitle.value || '公式').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        mathPreview.value = escTitle + ' ' + tex2svgHtml(latex.trim(), true)
+      } catch (e) { mathPreview.value = '' }
     }).catch(() => { mathPreview.value = '' })
   }
   setTimeout(() => { try { const el = document.querySelector('.math-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) } } catch (err) {} }, 50)
@@ -2150,6 +2161,7 @@ function openMathQuick() {
   if (!node) { toast('请先选中一个节点'); return }
   mathNode.value = node
   mathInput.value = ''
+  mathTitle.value = '公式'
   mathPreview.value = ''
   mathEditMode.value = false
   // 保存当前编辑框文本（点击按钮会失焦导致编辑框隐藏，插入时用记忆内容兜底）
@@ -2170,89 +2182,52 @@ function openMathQuick() {
 async function insertMathToNode() {
   const node = mathNode.value
   const raw = mathInput.value.trim()
+  let title = (mathTitle.value || '').trim() || '公式'
   try { await loadMathJax() } catch (e) {}
   if (!node || !raw) { mathDialog.value = false; return }
-  // 编辑模式：替换节点内已有 KaTeX 公式
-  if (mathEditMode.value) {
-    let editHtml = ''
-    try {
-      editHtml = tex2svgHtml(raw, true)
-    } catch (err) {
-      editHtml = '<span style="color:#e74c3c">[公式错误]</span>'
-    }
-    const oldText = node.nodeData.text || ''
-    if (oldText.indexOf('katex') >= 0 || oldText.indexOf('mjx-container') >= 0) {
-      const replaced = replaceKatexInText(oldText, editHtml)
-      if (replaced) {
-        mind.value.renderer.setNodeDataRender(node, { text: replaced, richText: true }, true)
-        mathEditMode.value = false
-        mathDialog.value = false
-        saveDoc()
-        // 不调用全量 render()：全量重渲染会使 MathJax SVG 失效（公式空白/模糊），刷新后才恢复
-        return
-      }
-    }
-    mathEditMode.value = false
-  }
-  // 编辑模式但节点内没有公式元素（纯源码/文字节点）：整体替换为公式，防止源码与新公式混合
-  if (mathEditMode.value) {
-    let editHtml = ''
-    try { editHtml = tex2svgHtml(raw, true) } catch (err) { editHtml = '<span style="color:#e74c3c">[公式错误]</span>' }
-    mind.value.renderer.setNodeDataRender(node, { text: editHtml, richText: true }, true)
-    mathEditMode.value = false
-    mathDialog.value = false
-    saveDoc()
-    return
-  }
   let html = ''
-  try {
-    html = tex2svgHtml(raw, true)
-  } catch (err) {
-    html = '<span style="color:#e74c3c">[公式错误]</span>'
-  }
-  // 1. 正在编辑 → 插入光标处
+  try { html = tex2svgHtml(raw, true) } catch (err) { html = '<span style="color:#e74c3c">[公式错误]</span>' }
+  const escTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const titleHtml = escTitle + ' '
+  // 编辑态（TextEdit 正在编辑且有实际内容）：标题+公式插入光标处；空/占位节点：整体替换为 标题+公式
   const te = mind.value.renderer.textEdit
   if (te && te.textEditNode && te.showTextEdit) {
-    // 编辑态：恢复保存的选区后用 Range 插入（execCommand 会因失焦丢失选区而清空内容）
     const teNode = te.textEditNode
-    teNode.focus()
-    let range = null
-    if (savedMathRange && savedMathRange.commonAncestorContainer && teNode.contains && teNode.contains(savedMathRange.commonAncestorContainer)) {
-      range = savedMathRange
-    } else {
-      range = document.createRange()
-      range.selectNodeContents(teNode)
-      range.collapse(false)
-    }
-    const sel = window.getSelection()
-    sel.removeAllRanges()
-    sel.addRange(range)
-    try {
-      const frag = range.createContextualFragment(html)
-      range.insertNode(frag)
-      const after = document.createRange()
-      after.selectNodeContents(teNode)
-      after.collapse(false)
+    let curText = ''
+    try { curText = (teNode.innerText || '').trim() } catch (e) {}
+    const isPlaceholder = curText === '' || curText === '新主题' || curText === '这里可以输入文字'
+    if (!isPlaceholder) {
+      teNode.focus()
+      let range = null
+      if (savedMathRange && savedMathRange.commonAncestorContainer && teNode.contains && teNode.contains(savedMathRange.commonAncestorContainer)) {
+        range = savedMathRange
+      } else {
+        range = document.createRange()
+        range.selectNodeContents(teNode)
+        range.collapse(false)
+      }
+      const sel = window.getSelection()
       sel.removeAllRanges()
-      sel.addRange(after)
-    } catch (err) { console.warn('公式插入失败', err) }
-    teNode.dispatchEvent(new InputEvent('input', { bubbles: true }))
-  } else {
-    // 2. 未编辑 → 追加到节点文字末尾（转富文本）
-    const oldText = mathEditText || node.nodeData.text || ''
-    const isRich = node.nodeData.richText === true
-    let newText
-    if (isRich) {
-      newText = oldText + html
-    } else {
-      const esc = oldText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      newText = esc + html
+      sel.addRange(range)
+      try {
+        const frag = range.createContextualFragment(titleHtml + html)
+        range.insertNode(frag)
+        const after = document.createRange()
+        after.selectNodeContents(teNode)
+        after.collapse(false)
+        sel.removeAllRanges()
+        sel.addRange(after)
+      } catch (err) { console.warn('公式插入失败', err) }
+      teNode.dispatchEvent(new InputEvent('input', { bubbles: true }))
+      mathDialog.value = false
+      saveDoc()
+      return
     }
-    mind.value.renderer.setNodeDataRender(node, { text: newText, richText: true }, true)
   }
+  // 整体替换：标题 + 公式（notRender=true 避免尺寸变化触发全量渲染导致 MathJax SVG 失效）
+  mind.value.renderer.setNodeDataRender(node, { text: titleHtml + html, richText: true }, true)
   mathDialog.value = false
   saveDoc()
-  // 不调用全量 render()：全量重渲染会使 MathJax SVG 失效（公式空白/模糊），刷新后才恢复。
 }
 
 async function insertEmoji(e) {
@@ -4696,10 +4671,13 @@ onBeforeUnmount(() => {
 .math-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 3000; display: flex; align-items: center; justify-content: center; }
 .math-dialog { width: 460px; max-width: 90vw; background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 .math-title { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.math-title-input { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; padding: 7px 10px; font-size: 14px; outline: none; margin-bottom: 8px; }
+.math-title-input:focus { border-color: #5b8ff9; }
 .math-input { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; font-size: 14px; font-family: Consolas, Menlo, monospace; resize: vertical; outline: none; }
 .math-input:focus { border-color: #5b8ff9; }
-.math-preview { min-height: 44px; margin-top: 10px; padding: 10px 12px; background: #f7f8fa; border-radius: 8px; display: flex; align-items: center; gap: 10px; overflow-x: auto; }
+.math-preview { min-height: 44px; margin-top: 10px; padding: 10px 12px; background: #fff; border: 1px solid #eee; border-radius: 8px; display: flex; align-items: center; gap: 10px; overflow-x: auto; flex-wrap: wrap; }
 .math-preview-label { font-size: 12px; color: #909399; white-space: nowrap; }
+.math-preview-content { color: #303133; font-size: 14px; line-height: 1.5; }
 .math-preview-empty { color: #b0b3ba; font-size: 13px; }
 .math-actions { margin-top: 14px; display: flex; justify-content: flex-end; gap: 10px; }
 .math-btn { padding: 6px 18px; border-radius: 8px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-size: 14px; }
