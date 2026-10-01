@@ -2133,7 +2133,27 @@ function openMathEdit(node) {
   }
   mathNode.value = node
   mathInput.value = latex
-  mathTitle.value = '公式'
+  // 标题 = 节点中公式前的实际文字（主题）；无主题则默认“公式”。优先取渲染 DOM（库可能清洗 text）
+  let titleSrc = text
+  try {
+    const g = node.group || node.node
+    if (g && g.querySelector) {
+      const fo = g.querySelector('foreignObject')
+      const wrap = fo ? fo.querySelector('.smm-richtext-node-wrap') : null
+      if (wrap && wrap.innerHTML) titleSrc = wrap.innerHTML
+    }
+  } catch (e) {}
+  let titleText = ''
+  try {
+    const div = document.createElement('div')
+    div.innerHTML = titleSrc
+    div.querySelectorAll('mjx-container, [data-math-latex]').forEach(el => el.remove())
+    titleText = (div.textContent || '').replace(/\s+/g, ' ').trim()
+  } catch (e) { titleText = '' }
+  if (!titleText || titleText === '新主题' || titleText === '这里可以输入文字' || titleText === '空') {
+    titleText = '公式'
+  }
+  mathTitle.value = titleText
   mathPreview.value = ''
   mathEditMode.value = true
   mathDialog.value = true
