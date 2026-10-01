@@ -22,6 +22,13 @@ if not exist "node_modules" (
     call "%NPM%" install
 )
 
+echo [Patch] Apply simple-mind-map patches (idempotent)...
+python "%ROOT%\script\python\patch_root_expand.py"
+if %errorlevel% neq 0 (
+    echo [Error] Patch failed
+    exit /b 1
+)
+
 echo [Build] Vite build...
 call "%NPM%" run build
 
