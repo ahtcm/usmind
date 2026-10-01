@@ -2184,7 +2184,7 @@ async function insertMathToNode() {
     if (oldText.indexOf('katex') >= 0 || oldText.indexOf('mjx-container') >= 0) {
       const replaced = replaceKatexInText(oldText, editHtml)
       if (replaced) {
-        mind.value.renderer.setNodeDataRender(node, { text: replaced, richText: true })
+        mind.value.renderer.setNodeDataRender(node, { text: replaced, richText: true }, true)
         mathEditMode.value = false
         mathDialog.value = false
         saveDoc()
@@ -2198,7 +2198,7 @@ async function insertMathToNode() {
   if (mathEditMode.value) {
     let editHtml = ''
     try { editHtml = tex2svgHtml(raw, true) } catch (err) { editHtml = '<span style="color:#e74c3c">[公式错误]</span>' }
-    mind.value.renderer.setNodeDataRender(node, { text: editHtml, richText: true })
+    mind.value.renderer.setNodeDataRender(node, { text: editHtml, richText: true }, true)
     mathEditMode.value = false
     mathDialog.value = false
     saveDoc()
@@ -2248,7 +2248,7 @@ async function insertMathToNode() {
       const esc = oldText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       newText = esc + html
     }
-    mind.value.renderer.setNodeDataRender(node, { text: newText, richText: true })
+    mind.value.renderer.setNodeDataRender(node, { text: newText, richText: true }, true)
   }
   mathDialog.value = false
   saveDoc()
