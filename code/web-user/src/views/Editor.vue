@@ -277,7 +277,7 @@
         <span v-else class="math-preview-empty">输入 LaTeX 后实时预览</span>
       </div>
       <div class="math-actions">
-        <button class="math-btn" @click="mathDialog = false">取消</button>
+        <button class="math-btn" @click="mathCancel">取消</button>
         <button class="math-btn math-btn-primary" @click="insertMathToNode">插入</button>
       </div>
     </div>
@@ -2128,6 +2128,12 @@ function openMathEdit(node) {
   setTimeout(() => { try { const el = document.querySelector('.math-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) } } catch (err) {} }, 50)
 }
 
+function mathCancel() {
+  mathDialog.value = false
+  // 关闭弹窗后延迟重渲染，恢复弹窗操作可能引起的公式渲染异常
+  setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 400)
+}
+
 function openMathQuick() {
   const renderer = mind.value.renderer
   let node = null
@@ -2179,6 +2185,17 @@ async function insertMathToNode() {
       }
     }
     mathEditMode.value = false
+  }
+  // 编辑模式但节点内没有公式元素（纯源码/文字节点）：整体替换为公式，防止源码与新公式混合
+  if (mathEditMode.value) {
+    let editHtml = ''
+    try { editHtml = tex2svgHtml(raw, true) } catch (err) { editHtml = '<span style="color:#e74c3c">[公式错误]</span>' }
+    mind.value.renderer.setNodeDataRender(node, { text: editHtml, richText: true })
+    mathEditMode.value = false
+    mathDialog.value = false
+    saveDoc()
+    setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 400)
+    return
   }
   let html = ''
   try {
