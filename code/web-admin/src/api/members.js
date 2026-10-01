@@ -32,6 +32,9 @@ export function createRedeemCodes(data) {
 export function deleteRedeemCode(id) {
   return request.delete(`/admin/redeem-codes/${id}`)
 }
+export function exportRedeemCodes(status) {
+  return request.get('/admin/redeem-codes/export', { params: { status: status || '' }, responseType: 'blob' })
+}
 
 // IP 黑白名单
 export function getIpRules(params) {

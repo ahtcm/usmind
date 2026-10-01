@@ -125,7 +125,7 @@
 <script setup>
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { User, Medal, TrendCharts, Wallet, Coin, AlarmClock, Money, UserFilled, Refresh, Ticket } from '@element-plus/icons-vue'
+import { User, Medal, TrendCharts, Wallet, Coin, AlarmClock, Money, UserFilled, Refresh, Ticket, Document, List } from '@element-plus/icons-vue'
 import { getUserList } from '@/api/users'
 import { getMindmapList } from '@/api/mindmaps'
 import { getDashboardStats, getBusinessStats } from '@/api/settings'
@@ -139,7 +139,7 @@ const planRef = ref(null)
 const sourceRef = ref(null)
 let trendChart = null, levelChart = null, planChart = null, sourceChart = null
 
-const stats = reactive({ totalUsers: 0, newUsers: 0, totalVips: 0, newVips: 0, vipRate: 0, totalIncome: 0, todayIncome: 0, paidOrders: 0, expireSoonVips: 0, redeemVipCount: 0 })
+const stats = reactive({ totalUsers: 0, newUsers: 0, totalVips: 0, newVips: 0, vipRate: 0, totalIncome: 0, todayIncome: 0, paidOrders: 0, expireSoonVips: 0, redeemVipCount: 0, cumIncome: 0, cumPaidOrders: 0, totalMindmaps: 0 })
 const storage = reactive({ type: '', used: '', bucket: '' })
 const recentUsers = ref([])
 const recentMindmaps = ref([])
@@ -155,7 +155,10 @@ const statCards = ref([
   { label: '区间新增注册', value: 0, sub: '', icon: UserFilled, color: '#0e7c86' },
   { label: '区间新增付费', value: 0, sub: '', icon: Coin, color: '#8b5cf6' },
   { label: '30天内到期', value: 0, sub: '', icon: AlarmClock, color: '#f56c6c' },
-  { label: '兑换码会员', value: 0, sub: '', icon: Ticket, color: '#07c160' }
+  { label: '兑换码会员', value: 0, sub: '', icon: Ticket, color: '#07c160' },
+  { label: '累计收入', value: 0, sub: '', icon: Wallet, color: '#e6a23c' },
+  { label: '累计支付订单', value: 0, sub: '', icon: List, color: '#8b5cf6' },
+  { label: '平台导图', value: 0, sub: '', icon: Document, color: '#3a8ee6' }
 ])
 
 function planName(id) {
@@ -199,6 +202,9 @@ async function loadBusiness() {
     stats.paidOrders = d.paidOrders ?? 0
     stats.expireSoonVips = d.expireSoonVips ?? 0
     stats.redeemVipCount = d.redeemVipCount ?? 0
+    stats.cumIncome = d.cumIncome ?? 0
+    stats.cumPaidOrders = d.cumPaidOrders ?? 0
+    stats.totalMindmaps = d.totalMindmaps ?? 0
     recentOrders.value = d.recentOrders || []
     // 套餐名
     d.planDist && d.planDist.forEach(p => { planNameMap[p.name] = p.name })
@@ -221,6 +227,12 @@ async function loadBusiness() {
     statCards.value[7].sub = '30天内到期提醒'
     statCards.value[8].value = stats.redeemVipCount
     statCards.value[8].sub = '兑换码开通会员'
+    statCards.value[9].value = fmtMoney(stats.cumIncome)
+    statCards.value[9].sub = '历史总营收'
+    statCards.value[10].value = stats.cumPaidOrders
+    statCards.value[10].sub = '历史已支付单数'
+    statCards.value[11].value = stats.totalMindmaps
+    statCards.value[11].sub = '用户创建的导图总数'
     await nextTick()
     renderTrend(d.trend || [])
     renderPie(levelRef.value, levelChart, d.levelDist || [], ['#f0b429', '#8b5cf6', '#3a8ee6', '#67c23a', '#e6a23c'])

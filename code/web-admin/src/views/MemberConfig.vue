@@ -76,11 +76,11 @@
     <!-- 会员价格管理 -->
     <el-card shadow="never" class="cfg-card">
       <template #header>
-        <b>会员价格管理</b><span class="card-tip">修改现价 / 原价 / 折扣后，客户端会员中心实时生效</span>
+        <div class="card-header">
+          <span><b>会员价格管理</b><span class="card-tip">修改现价 / 原价 / 折扣后，客户端会员中心实时生效</span></span>
+          <el-button size="small" type="primary" @click="openPlanDialog()">新增套餐</el-button>
+        </div>
       </template>
-      <div class="card-actions">
-        <el-button size="small" type="primary" @click="openPlanDialog()">新增套餐</el-button>
-      </div>
       <el-table :data="plans" border size="small" v-loading="planLoading">
         <el-table-column prop="name" label="名称" width="150" />
         <el-table-column prop="level" label="级别" width="70" />
@@ -112,7 +112,10 @@
     <!-- 兑换码管理 -->
     <el-card shadow="never" class="cfg-card">
       <template #header>
-        <b>会员兑换码</b><span class="card-tip">一次性兑换码；用户端输入兑换码即可开通会员（可设定兑换时长），已兑换码标注使用者</span>
+        <div class="card-header">
+          <span><b>会员兑换码</b><span class="card-tip">一次性兑换码；用户端输入兑换码即可开通会员（可设定兑换时长），已兑换码标注使用者</span></span>
+          <el-button type="primary" :loading="genLoading" @click="createCodes">生成兑换码</el-button>
+        </div>
       </template>
       <div class="redeem-toolbar">
         <el-select v-model="gen.planId" placeholder="选择套餐（可空=自定义时长）" clearable filterable style="width: 200px">
@@ -123,7 +126,6 @@
         <el-input-number v-model="gen.count" :min="1" :max="100" />
         <span class="field-hint">个</span>
         <el-input v-model="gen.remark" placeholder="备注（如：活动赠送）" style="width: 180px" clearable />
-        <el-button type="primary" :loading="genLoading" @click="createCodes">生成兑换码</el-button>
       </div>
       <div class="redeem-toolbar">
         <el-select v-model="codeQuery.status" placeholder="全部状态" clearable style="width: 140px" @change="loadCodes">
@@ -132,6 +134,7 @@
           <el-option label="已停用" value="disabled" />
         </el-select>
         <span class="field-hint">共 <b>{{ codeTotal }}</b> 个</span>
+        <el-button type="warning" plain :loading="exporting" @click="exportCodes">批量导出（Excel/CSV）</el-button>
       </div>
       <el-table :data="codes" border size="small" v-loading="codeLoading">
         <el-table-column prop="code" label="兑换码" width="185" />
@@ -215,7 +218,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSettings, saveSettings } from '@/api/settings'
 import { themeApi } from '@/api/themes'
-import { getMemberPlans, createMemberPlan, updateMemberPlan, deleteMemberPlan, getRedeemCodes, createRedeemCodes, deleteRedeemCode } from '@/api/members'
+import { getMemberPlans, createMemberPlan, updateMemberPlan, deleteMemberPlan, getRedeemCodes, createRedeemCodes, deleteRedeemCode, exportRedeemCodes } from '@/api/members'
 
 const saving = ref(false)
 const memberThemeIds = ref([])
@@ -244,6 +247,7 @@ const codes = ref([])
 const codeLoading = ref(false)
 const codeTotal = ref(0)
 const codeQuery = reactive({ page: 1, size: 10, status: '' })
+const exporting = ref(false)
 
 async function loadPlans() {
   planLoading.value = true
@@ -326,6 +330,21 @@ async function loadCodes() {
   } finally { codeLoading.value = false }
 }
 
+async function exportCodes() {
+  exporting.value = true
+  try {
+    const res = await exportRedeemCodes(codeQuery.status)
+    const blob = res.data
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '会员兑换码_' + (codeQuery.status || '全部') + '_' + Date.now() + '.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e) { /* 拦截器已提示 */ } finally { exporting.value = false }
+}
+
 async function removeCode(row) {
   await ElMessageBox.confirm(`确定删除兑换码「${row.code}」吗？`, '删除确认', { type: 'warning' })
   await deleteRedeemCode(row.id)
@@ -383,7 +402,8 @@ async function save() {
 .card-tip { font-weight: normal; font-size: 12px; color: #909399; margin-left: 12px; }
 .field-hint { font-size: 12px; color: #909399; margin-left: 10px; }
 .save-bar { margin-top: 8px; }
-.card-actions { margin-bottom: 10px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.card-header .card-tip { font-weight: normal; font-size: 12px; color: #909399; margin-left: 12px; }
 .redeem-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 10px; }
 </style>

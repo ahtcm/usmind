@@ -159,6 +159,18 @@ public class StatsServiceImpl implements StatsService {
         data.put("paidOrders", paidCnt);
         data.put("expireSoonVips", expireSoon);
 
+        // 历史累计（不限定区间）：累计收入 / 累计支付订单 / 平台导图总数
+        ow = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        ow.eq("status", "paid");
+        ow.select("COALESCE(SUM(amount),0) as income", "COUNT(*) as cnt");
+        List<Map<String, Object>> cumAgg = payOrderMapper.selectMaps(ow);
+        double cumIncome = cumAgg.isEmpty() ? 0 : Double.parseDouble(String.valueOf(cumAgg.get(0).get("income")));
+        long cumPaidOrders = cumAgg.isEmpty() ? 0 : Long.parseLong(String.valueOf(cumAgg.get(0).get("cnt")));
+        long totalMindmaps = mindMapMapper.selectCount(null);
+        data.put("cumIncome", Math.round(cumIncome * 100) / 100.0);
+        data.put("cumPaidOrders", cumPaidOrders);
+        data.put("totalMindmaps", totalMindmaps);
+
         // 兑换码会员数（会员来源标注：pay 支付 / redeem 兑换码 / admin 后台开通）
         long redeemVips = userMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUser>()
                 .gt("member_level", 0).gt("member_expire", now).eq("member_source", "redeem"));

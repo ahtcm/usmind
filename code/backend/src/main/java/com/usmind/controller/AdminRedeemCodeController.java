@@ -13,6 +13,7 @@ import com.usmind.mapper.RedeemCodeMapper;
 import com.usmind.mapper.SysUserMapper;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -127,6 +128,51 @@ public class AdminRedeemCodeController {
         data.put("days", days);
         data.put("level", level);
         return Result.ok(data);
+    }
+
+    /** 批量导出（筛选后全部，CSV 格式，Excel 可直接打开） */
+    @GetMapping("/export")
+    public void export(@RequestParam(required = false) String status, HttpServletResponse response) throws Exception {
+        LambdaQueryWrapper<RedeemCode> qw = new LambdaQueryWrapper<RedeemCode>()
+                .orderByDesc(RedeemCode::getId);
+        if (status != null && !status.isEmpty()) qw.eq(RedeemCode::getStatus, status);
+        List<RedeemCode> all = redeemCodeMapper.selectList(qw);
+        StringBuilder sb = new StringBuilder();
+        sb.append("\uFEFF兑换码,套餐,时长(天),级别,状态,使用者,兑换时间,备注\n");
+        for (RedeemCode rc : all) {
+            String planName = "";
+            if (rc.getPlanId() != null) {
+                MemberPlan plan = planMapper.selectById(rc.getPlanId());
+                planName = plan == null ? "" : plan.getName();
+            }
+            String usedByName = "";
+            String usedAt = "";
+            if (rc.getUsedBy() != null) {
+                SysUser u = userMapper.selectById(rc.getUsedBy());
+                usedByName = u == null ? "" : (u.getNickname() == null || u.getNickname().isBlank() ? u.getUsername() : u.getNickname());
+                usedAt = rc.getUsedAt() == null ? "" : rc.getUsedAt().toString().replace("T", " ").substring(0, 19);
+            }
+            String statusLabel = "active".equals(rc.getStatus()) ? "可用" : "used".equals(rc.getStatus()) ? "已兑换" : "已停用";
+            sb.append(rc.getCode()).append(",")
+              .append(csv(planName)).append(",")
+              .append(rc.getDays() == null ? "" : rc.getDays()).append(",")
+              .append(rc.getLevel() == null ? "" : rc.getLevel()).append(",")
+              .append(statusLabel).append(",")
+              .append(csv(usedByName)).append(",")
+              .append(usedAt).append(",")
+              .append(csv(rc.getRemark() == null ? "" : rc.getRemark())).append("\n");
+        }
+        byte[] bytes = sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=redeem-codes-" + System.currentTimeMillis() + ".csv");
+        response.getOutputStream().write(bytes);
+        response.getOutputStream().flush();
+    }
+
+    private static String csv(String s) {
+        if (s == null) return "";
+        s = s.replace("\"", "\"\"");
+        return s.contains(",") || s.contains("\n") ? "\"" + s + "\"" : s;
     }
 
     @DeleteMapping("/{id}")
