@@ -312,6 +312,10 @@ async function submitPassword() {
   background: #f0f2f5;
   overflow-y: auto;
   padding: 12px;
+  scrollbar-width: none;
+}
+.main-content::-webkit-scrollbar {
+  display: none;
 }
 .mobile-drawer :deep(.el-drawer__body) {
   padding: 0;
