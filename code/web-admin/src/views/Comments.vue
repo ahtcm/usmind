@@ -2,7 +2,7 @@
   <div class="page-container">
     <el-card shadow="never">
       <div class="toolbar">
-        <el-select v-model="query.source" placeholder="全部来源" clearable style="width: 120px" @change="handleSearch">
+        <el-select v-model="query.source" placeholder="全部来源" clearable style="width: 105px" @change="handleSearch">
           <el-option label="分享页" value="share" />
           <el-option label="组织内" value="org" />
         </el-select>
@@ -11,7 +11,7 @@
           placeholder="全部脑图"
           clearable
           filterable
-          style="width: 180px"
+          style="width: 150px"
           @change="handleSearch"
         >
           <el-option v-for="m in mindMaps" :key="m.id" :label="m.name" :value="m.id" />
@@ -21,7 +21,7 @@
           placeholder="全部组织"
           clearable
           filterable
-          style="width: 160px"
+          style="width: 130px"
           @change="handleSearch"
         >
           <el-option v-for="o in orgs" :key="o.id" :label="o.name" :value="o.id" />
@@ -30,7 +30,7 @@
           v-model="query.keyword"
           placeholder="搜索评论者 / 评论内容"
           clearable
-          style="width: 240px"
+          style="width: 190px"
           @keyup.enter="handleSearch"
           @clear="handleSearch"
         >
@@ -175,8 +175,10 @@ onMounted(() => {
 <style scoped>
 .toolbar {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 12px;
+  align-items: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 .pagination-wrap {
