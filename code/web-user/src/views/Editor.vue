@@ -2130,8 +2130,6 @@ function openMathEdit(node) {
 
 function mathCancel() {
   mathDialog.value = false
-  // 关闭弹窗后延迟重渲染，恢复弹窗操作可能引起的公式渲染异常
-  setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 400)
 }
 
 function openMathQuick() {
@@ -2180,7 +2178,7 @@ async function insertMathToNode() {
         mathEditMode.value = false
         mathDialog.value = false
         saveDoc()
-        setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 30)
+        // 不调用全量 render()：全量重渲染会使 MathJax SVG 失效（公式空白/模糊），刷新后才恢复
         return
       }
     }
@@ -2194,7 +2192,6 @@ async function insertMathToNode() {
     mathEditMode.value = false
     mathDialog.value = false
     saveDoc()
-    setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 400)
     return
   }
   let html = ''
@@ -2245,8 +2242,7 @@ async function insertMathToNode() {
   }
   mathDialog.value = false
   saveDoc()
-  // 公式写入后自动重渲染画布，避免公式节点塌陷（替代整页刷新）
-  setTimeout(() => { try { if (mind.value) mind.value.render() } catch (e) {} }, 30)
+  // 不调用全量 render()：全量重渲染会使 MathJax SVG 失效（公式空白/模糊），刷新后才恢复。
 }
 
 async function insertEmoji(e) {
