@@ -129,15 +129,25 @@ public class NodeCommentServiceImpl implements NodeCommentService {
 
     @Override
     public NodeComment addShareComment(String token, String password, String nodeId,
-                                       Long parentId, String nick, String content, String ip) {
+                                       Long parentId, String nick, String content, String ip, String clientSid) {
         MindMap m = verifyShare(token, password);
         rateLimit(ip);
         if (!StringUtils.hasText(nodeId)) throw new BusinessException(400, "节点标识缺失");
         validateText(content, nick);
         checkParent(m, parentId);
         NodeComment c = build(m.getId(), nodeId.trim(), parentId, nick.trim(), content.trim(), 0, 0L, "share", ip);
+        c.setClientSid(sanitizeSid(clientSid));
         nodeCommentMapper.insert(c);
         return c;
+    }
+
+    /** 会话 ID 清洗：仅保留安全字符，超长截断；空/非法返回 null */
+    private String sanitizeSid(String sid) {
+        if (!StringUtils.hasText(sid)) return null;
+        String s = sid.trim();
+        if (s.length() > 64) s = s.substring(0, 64);
+        if (!s.matches("[A-Za-z0-9_\\-]+")) return null;
+        return s;
     }
 
     @Override
@@ -300,6 +310,13 @@ public class NodeCommentServiceImpl implements NodeCommentService {
             addTarget(targets, m.getUserId(), c.getUserId());
         }
         return targets;
+    }
+
+    @Override
+    public String replySidOf(NodeComment c) {
+        if (c == null || c.getParentId() == null) return "";
+        NodeComment p = nodeCommentMapper.selectById(c.getParentId());
+        return (p != null && p.getClientSid() != null) ? p.getClientSid() : "";
     }
 
     private void addTarget(List<Long> list, Long uid, Long selfId) {

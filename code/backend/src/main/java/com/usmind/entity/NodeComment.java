@@ -35,5 +35,7 @@ public class NodeComment {
     private String source;
     /** 评论者 IP（审计与超频封禁） */
     private String ip;
+    /** 分享访客会话 ID（匿名访客定向特效用；登录用户为空） */
+    private String clientSid;
     private LocalDateTime createdAt;
 }

@@ -24,6 +24,7 @@
         <div v-show="!bgVideoVal" class="share-bg-image" :style="{ backgroundImage: bgImageVal ? 'url(' + bgImageVal + ')' : 'none', opacity: bgOpacityVal }"></div>
         <video v-if="bgVideoVal" class="share-bg-video" :src="bgVideoVal" autoplay loop muted playsinline :style="{ opacity: bgOpacityVal }"></video>
         <div id="map" ref="mapEl"></div>
+        <div id="cmt-badge-layer" class="cmt-badge-layer"></div>
       </div>
       <div v-if="pageLoading" class="page-loading">
         <div class="pl-spinner"></div>
@@ -76,7 +77,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { loadMathJax, migrateKatexToSvg } from '../utils/mathRenderer'
 import { useRoute } from 'vue-router'
 import 'katex/dist/katex.min.css'
@@ -223,7 +224,9 @@ async function loadShare() {
       isEnableEmptyNodeEdit: false,
       openNodeMove: false,
       // 禁用库内置附件图标（内容区右侧），统一使用注入的节点上方图标
-      attachmentIcon: { style: { size: 0 }, icon: '' }
+      attachmentIcon: { style: { size: 0 }, icon: '' },
+      // 只读页禁止文本编辑：双击公式/文本节点不再弹出 SVG 源码或编辑框（公式节点点击只预览，不进入编辑）
+      beforeTextEdit: () => false
     })
     applyShareBg(data.theme || THEMES[0].name)
     // 旧 KaTeX 公式迁移为 MathJax SVG（只读展示，不保存）
@@ -580,24 +583,198 @@ function injectAttachIcons() {
 }
 
 
-function zoomIn() { mind.value && mind.value.view.enlarge() }
-function zoomOut() { mind.value && mind.value.view.narrow() }
-function zoomFit() { mind.value && mind.value.view.fit() }
+function zoomIn() { if (mind.value) { mind.value.view.enlarge(); repositionCommentBadges() } }
+function zoomOut() { if (mind.value) { mind.value.view.narrow(); repositionCommentBadges() } }
+function zoomFit() { if (mind.value) { mind.value.view.fit(); repositionCommentBadges() } }
 
 // ===== 评论 =====
+// 分享访客会话 ID（匿名定向评论特效：回复我的评论才触发角标/呼吸灯/电流/音效）
+const mySid = (() => {
+  try {
+    let s = localStorage.getItem('usmind_share_sid')
+    if (!s) { s = 'sid_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('usmind_share_sid', s) }
+    return s
+  } catch (e) { return 'sid_' + Math.random().toString(36).slice(2, 10) }
+})()
+const unreadNodes = reactive({})
+const cmtSoundOn = ref(localStorage.getItem('usmind.cmtSound') !== '0')
 const cmtErr = ref('')
 function openCmt(node) {
   const uid = node.getData('uid')
   if (!uid) return
   cmtNodeId.value = uid
-  const t = node.getData('text') || node.getData('attachmentName') || ''
+  let t = node.getData('text') || node.getData('attachmentName') || ''
+  // 富文本/公式节点剥离 HTML 标签，避免面板标题露出 SVG 源码
+  if (/<[a-z][\s\S]*>/i.test(String(t))) {
+    try { t = new DOMParser().parseFromString(String(t), 'text/html').body.textContent || t } catch (e) {}
+  }
   cmtNodeName.value = String(t).slice(0, 24) || '节点'
   cmtOpen.value = true
   replyTo.value = null
   cmtInput.value = ''
+  // 打开面板即视为已读：清除该节点未读标记与特效（刷新后不再显示）
+  if (unreadNodes[uid]) { delete unreadNodes[uid]; applyCommentFlash() }
   refreshCmt()
 }
 function closeCmt() { cmtOpen.value = false; replyTo.value = null; cmtInput.value = '' }
+
+// ===== 评论特效（与编辑页同款：呼吸灯/根路径/流动电子线/右上角未读角标/提示音）=====
+function cmtAnchorOf(uid) {
+  try {
+    const cache = mind.value && mind.value.renderer ? (mind.value.renderer.nodeCache || {}) : {}
+    const vis = (c2) => {
+      if (!c2 || !c2.group) return null
+      const g = c2.group.node || c2.group
+      try {
+        const rc = g.getBoundingClientRect()
+        const win = g.ownerDocument && g.ownerDocument.defaultView ? g.ownerDocument.defaultView : null
+        const cs = win ? win.getComputedStyle(g) : null
+        if (rc.width > 1 && rc.height > 1 && (!cs || (cs.display !== 'none' && cs.visibility !== 'hidden'))) return g
+      } catch (e) {}
+      return null
+    }
+    let t = cache[uid] || null
+    if (t) { const g = vis(t); if (g) return { node: t, el: g } }
+    try {
+      const data = mind.value && mind.value.getData ? mind.value.getData() : null
+      const rootNode = data && data.data ? data.data : null
+      if (rootNode) {
+        if (!rootNode.children && data.children) rootNode.children = data.children
+        const find = (n, path) => {
+          if (!n) return null
+          const nid = (n.data || {}).uid
+          if (nid === uid) return path.concat(nid)
+          for (const c2 of (n.children || [])) { const f = find(c2, path.concat(nid)); if (f) return f }
+          return null
+        }
+        const path = find(rootNode, [])
+        if (path && path.length) {
+          for (let i = path.length - 1; i >= 0; i--) { const c2 = cache[path[i]]; const g = vis(c2); if (g) return { node: c2, el: g } }
+        }
+      }
+    } catch (e) {}
+    let guard = 0
+    while (t && guard < 30) { const g = vis(t); if (g) return { node: t, el: g }; t = t.parent; guard++ }
+  } catch (e) {}
+  return null
+}
+function applyCommentFlash() {
+  if (!mind.value || !mind.value.renderer) return
+  try {
+    document.querySelectorAll('.cmt-flash, .cmt-breath-path, .cmt-breath-line, .cmt-flow-line').forEach(el => {
+      if (el.classList.contains('cmt-flow-line')) { try { el.remove() } catch (e) {} return }
+      el.classList.remove('cmt-flash', 'cmt-breath-path', 'cmt-breath-line')
+    })
+    const layer = document.getElementById('cmt-badge-layer')
+    if (layer) layer.innerHTML = ''
+    const nodeCache = mind.value.renderer.nodeCache || {}
+    const mapRect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    const groups = new Map()
+    Object.keys(unreadNodes).forEach(uid => {
+      const cnt = unreadNodes[uid]
+      if (!cnt) return
+      const anchor = cmtAnchorOf(uid)
+      if (!anchor) return
+      const key = anchor.el
+      const g0 = groups.get(key)
+      if (g0) { g0.cnt += cnt; return }
+      groups.set(key, { node: anchor.node, el: key, cnt })
+    })
+    groups.forEach((g0) => {
+      const n = g0.node, gEl = g0.el, cnt = g0.cnt
+      const rect = gEl.querySelector('rect')
+      if (rect) rect.classList.add('cmt-flash')
+      let p = n.parent, child = n, guard = 0
+      while (p && guard < 30) {
+        const pg = p.group ? (p.group.node || p.group) : null
+        if (pg) { const pr = pg.querySelector('rect'); if (pr) pr.classList.add('cmt-breath-path') }
+        if (p._lines && p._lines.length && p.children && p.children.length) {
+          const idx = p.children.indexOf(child)
+          if (idx >= 0 && idx < p._lines.length) {
+            const l = p._lines[idx]
+            try {
+              const el = l && l.node ? l.node : l
+              if (el && el.classList) el.classList.add('cmt-breath-line')
+              try {
+                if (el && el.tagName === 'path' && el.parentNode) {
+                  const flow = el.cloneNode(false)
+                  flow.removeAttribute('class')
+                  flow.removeAttribute('style')
+                  flow.classList.add('cmt-flow-line')
+                  el.parentNode.appendChild(flow)
+                }
+              } catch (e) {}
+            } catch (e) {}
+          }
+        }
+        child = p; p = p.parent; guard++
+      }
+      if (layer && mapRect) {
+        const r = gEl.getBoundingClientRect()
+        if (r.width > 1 && r.height > 1) {
+          const b = document.createElement('div')
+          b.textContent = cnt > 99 ? '99+' : cnt
+          const st = b.style
+          st.position = 'absolute'
+          st.left = (r.right - mapRect.left) + 'px'
+          st.top = (r.top - mapRect.top) + 'px'
+          st.transform = 'translate(-50%, -50%)'
+          st.minWidth = '18px'; st.height = '18px'; st.lineHeight = '18px'; st.textAlign = 'center'
+          st.fontSize = '11px'; st.fontWeight = '700'; st.color = '#fff'
+          st.background = 'linear-gradient(135deg, #ff6b6b, #e53935)'
+          st.borderRadius = '9px'; st.padding = '0 5px'
+          st.boxShadow = '0 2px 8px rgba(229,57,53,.6)'
+          st.pointerEvents = 'none'
+          layer.appendChild(b)
+        }
+      }
+    })
+  } catch (e) {}
+}
+function syncCommentFlash() {
+  nextTick(() => { try { applyCommentFlash() } catch (e) {} })
+  setTimeout(() => { try { applyCommentFlash(); repositionCommentBadges() } catch (e) {} }, 200)
+  setTimeout(() => { try { applyCommentFlash(); repositionCommentBadges() } catch (e) {} }, 500)
+}
+function repositionCommentBadges() {
+  try {
+    const layer = document.getElementById('cmt-badge-layer')
+    if (!layer || !layer.children.length) return
+    const mapRect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
+    if (!mapRect) return
+    const uids = Object.keys(unreadNodes).filter(uid => unreadNodes[uid])
+    const badges = layer.children
+    for (let i = 0; i < badges.length && i < uids.length; i++) {
+      const uid = uids[i]
+      if (!uid) continue
+      const anchor = cmtAnchorOf(uid)
+      if (!anchor) continue
+      const gEl = anchor.el
+      const r = gEl.getBoundingClientRect()
+      if (r.width <= 1 || r.height <= 1) continue
+      const b = badges[i]
+      b.style.left = (r.right - mapRect.left) + 'px'
+      b.style.top = (r.top - mapRect.top) + 'px'
+    }
+  } catch (e) {}
+}
+function playCmtSound() {
+  if (!cmtSoundOn.value) return
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    const ctx = new Ctx()
+    const o = ctx.createOscillator(), g = ctx.createGain()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(660, ctx.currentTime)
+    o.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.18)
+    g.gain.setValueAtTime(0.12, ctx.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+    o.connect(g); g.connect(ctx.destination)
+    o.start(); o.stop(ctx.currentTime + 0.45)
+    setTimeout(() => { try { ctx.close() } catch (e) {} }, 700)
+  } catch (e) {}
+}
 function setReply(c) {
   replyTo.value = (replyTo.value && replyTo.value.id === c.id) ? null : c
   cmtInput.value = ''
@@ -635,6 +812,13 @@ function disconnectShareCmtWs() {
 
 function handleShareCommentNew(c) {
   if (!c || !c.id) return
+  // 定向特效：只有被回复的人（replySid=我的会话ID 且不是自己发的）收到角标/呼吸灯/电流/音效；其他人仅收信息
+  const replySid = c.replySid || ''
+  if (replySid && replySid === mySid && (c.sid || '') !== mySid) {
+    unreadNodes[c.nodeId] = (unreadNodes[c.nodeId] || 0) + 1
+    syncCommentFlash()
+    playCmtSound()
+  }
   // 仅当评论面板打开且是当前节点时实时追加（按 id 去重保序）
   if (cmtOpen.value && c.nodeId === cmtNodeId.value) {
     const list = cmtList.value
@@ -667,7 +851,8 @@ async function submitCmt(isReply) {
       parentId: isReply && replyTo.value ? replyTo.value.id : null,
       nick: nickName,
       content,
-      password: sharePwd.value || undefined
+      password: sharePwd.value || undefined,
+      clientSid: mySid
     })
     cmtInput.value = ''
     if (isReply) replyTo.value = null
@@ -712,7 +897,7 @@ function onMapMouseMove(e) {
   if (!panState || !mind.value) return
   const dx = e.clientX - panState.sx, dy = e.clientY - panState.sy
   if (!panState.moved && Math.abs(dx) + Math.abs(dy) > 6) panState.moved = true
-  if (panState.moved) { e.preventDefault(); try { setViewPan(panState.st.x + dx, panState.st.y + dy) } catch (e2) {} }
+  if (panState.moved) { e.preventDefault(); try { setViewPan(panState.st.x + dx, panState.st.y + dy); repositionCommentBadges() } catch (e2) {} }
 }
 function onMapMouseUp() {
   panState = null
@@ -744,7 +929,7 @@ function onMapTouchMove(e) {
     const rect = mapEl.value ? mapEl.value.getBoundingClientRect() : null
     const cx = (t1.clientX + t2.clientX) / 2 - (rect ? rect.left : 0)
     const cy = (t1.clientY + t2.clientY) / 2 - (rect ? rect.top : 0)
-    try { mind.value.view.setScale(ns, cx, cy) } catch (e2) {}
+    try { mind.value.view.setScale(ns, cx, cy); repositionCommentBadges() } catch (e2) {}
     return
   }
   if (!touchPan || !mind.value) return
@@ -856,6 +1041,36 @@ onBeforeUnmount(() => {
 .cmt-list::-webkit-scrollbar { width: 5px; }
 .cmt-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
 .cmt-list::-webkit-scrollbar-track { background: transparent; }
+/* 评论特效：未读角标层 + 呼吸灯 + 根路径 + 流动电子线（与编辑页同款） */
+.cmt-badge-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; overflow: hidden; }
+:deep(.cmt-flash) { animation: cmtBreath 1.6s ease-in-out infinite; }
+:deep(.cmt-breath-path) { animation: cmtBreathPath 1.6s ease-in-out infinite; }
+:deep(.cmt-breath-line) { animation: cmtBreathLine 1.6s ease-in-out infinite; }
+@keyframes cmtBreath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
+  50% { filter: drop-shadow(0 0 18px rgba(255,77,79,1)); opacity: .62; }
+}
+@keyframes cmtBreathPath {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255,77,79,0)); opacity: 1; }
+  50% { filter: drop-shadow(0 0 12px rgba(255,77,79,.9)); opacity: .5; }
+}
+@keyframes cmtBreathLine {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: .15; }
+}
+:deep(.cmt-flow-line) {
+  stroke: #ff4d4f !important;
+  stroke-width: 3.2 !important;
+  stroke-linecap: round !important;
+  fill: none !important;
+  stroke-dasharray: 2.5 22 !important;
+  animation: cmtFlow 0.9s linear infinite !important;
+  opacity: .98 !important;
+  pointer-events: none !important;
+}
+@keyframes cmtFlow {
+  to { stroke-dashoffset: -24.5; }
+}
 </style>
 
 <style>

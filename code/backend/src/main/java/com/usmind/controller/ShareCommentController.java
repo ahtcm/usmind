@@ -57,7 +57,7 @@ public class ShareCommentController {
         }
         NodeComment c = nodeCommentService.addShareComment(
                 token, body.get("password"), body.get("nodeId"), parentId,
-                body.get("nick"), body.get("content"), clientIp(request));
+                body.get("nick"), body.get("content"), clientIp(request), body.get("clientSid"));
         broadcast(c);
         return Result.ok(c);
     }
@@ -82,6 +82,8 @@ public class ShareCommentController {
         m.put("isAuthor", c.getIsAuthor());
         m.put("userId", c.getUserId());
         m.put("source", c.getSource() == null ? "share" : c.getSource());
+        m.put("sid", c.getClientSid() == null ? "" : c.getClientSid());
+        m.put("replySid", nodeCommentService.replySidOf(c));
         m.put("targetUserIds", nodeCommentService.targetUserIds(c));
         commentWsHandler.broadcastComment(c.getMindMapId(), m);
     }

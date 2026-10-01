@@ -11,9 +11,9 @@ import java.util.Map;
  */
 public interface NodeCommentService {
 
-    /** 分享页发评论（校验分享密码；parentId 为空=对节点的直接评论） */
+    /** 分享页发评论（校验分享密码；parentId 为空=对节点的直接评论；clientSid=访客会话ID，匿名定向特效用） */
     NodeComment addShareComment(String token, String password, String nodeId,
-                                Long parentId, String nick, String content, String ip);
+                                Long parentId, String nick, String content, String ip, String clientSid);
 
     /** 分享页拉取全部评论（按 id 升序；校验分享密码） */
     List<NodeComment> listShareComments(String token, String password);
@@ -42,4 +42,7 @@ public interface NodeCommentService {
      *  组织内新节点评论 → 导图所有者 + 节点创建者（去重、排除评论者）；
      *  分享访客评论 → 导图所有者。 */
     java.util.List<Long> targetUserIds(NodeComment c);
+
+    /** 回复对象（父评论）的会话 ID：作者在编辑页回复访客、访客之间回复时，被回复访客按此定向收特效 */
+    String replySidOf(NodeComment c);
 }

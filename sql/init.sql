@@ -86,6 +86,7 @@ CREATE TABLE `node_comment` (
   `user_id` bigint NOT NULL DEFAULT '0' COMMENT '评论者用户id，0=分享访客',
   `source` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'share' COMMENT '评论来源：share=分享页，org=组织内',
   `ip` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `client_sid` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '分享访客会话ID（匿名定向特效用）',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_mindmap` (`mind_map_id`),

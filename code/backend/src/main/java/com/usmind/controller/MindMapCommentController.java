@@ -114,6 +114,8 @@ public class MindMapCommentController {
         m.put("isAuthor", c.getIsAuthor());
         m.put("userId", c.getUserId());
         m.put("source", c.getSource() == null ? "share" : c.getSource());
+        m.put("sid", c.getClientSid() == null ? "" : c.getClientSid());
+        m.put("replySid", nodeCommentService.replySidOf(c));
         m.put("targetUserIds", nodeCommentService.targetUserIds(c));
         commentWsHandler.broadcastComment(c.getMindMapId(), m);
     }
