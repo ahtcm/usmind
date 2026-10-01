@@ -1023,7 +1023,7 @@ function bindMindEvents() {
           return
         }
       }
-      if (rich && (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0)) {
+      if (text.indexOf('katex') >= 0 || text.indexOf('mjx-container') >= 0 || text.indexOf('MathJax') >= 0) {
         try { mind.value.renderer.textEdit.hideEditTextBox() } catch (err) {}
         acquireNodeLock(nid0)
         openMathEdit(node)
@@ -2112,6 +2112,12 @@ function openMathEdit(node) {
   mathPreview.value = ''
   mathEditMode.value = true
   mathDialog.value = true
+  // 打开即预览已有公式（不依赖用户再次编辑）
+  if (latex && latex.trim()) {
+    loadMathJax().then(() => {
+      try { mathPreview.value = tex2svgHtml(latex.trim(), true) } catch (e) { mathPreview.value = '' }
+    }).catch(() => { mathPreview.value = '' })
+  }
   setTimeout(() => { try { const el = document.querySelector('.math-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length) } } catch (err) {} }, 50)
 }
 
