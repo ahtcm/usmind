@@ -189,7 +189,7 @@
 
 | 方法 | 路径 | 说明 | 参数 | 返回 data |
 | --- | --- | --- | --- | --- |
-| GET | `/api/admin/comments` | 全部评论列表（分享+组织内） | `page, size, keyword?, source?` | `{list(含用户名/导图名), total}` |
+| GET | `/api/admin/comments` | 全部评论列表（分享+组织内） | `page, size, keyword?（内容/评论者模糊）, source?（share/org）, mindMapId?（脑图）, orgId?（组织，自动覆盖其全部导图）` | `{list(含用户名/导图名), total}` |
 | DELETE | `/api/admin/comments/{id}` | 删除评论 | - | - |
 | POST | `/api/admin/comments/batch-delete` | 批量删除评论 | `[ids]` | 数量 |
 
@@ -317,6 +317,7 @@
 | GET | `/api/admin/redeem-codes` | 兑换码分页 | `page, size, status?（active\|used\|disabled）` | `{total, list}`（used 行含 usedByName / usedAt） |
 | POST | `/api/admin/redeem-codes` | 批量生成（16 位去混淆字符集，选套餐取套餐时长或自定义天数） | `{planId?, days?, count?（1-100）, remark?}` | `{created, codes}` |
 | DELETE | `/api/admin/redeem-codes/{id}` | 删除兑换码 | - | - |
+| GET | `/api/admin/redeem-codes/export` | 批量导出（UTF-8+BOM CSV，Excel 直接打开） | `status?（active\|used\|disabled，筛选后全部导出）` | 下载 CSV（兑换码/套餐/时长/级别/状态/使用者/兑换时间/备注） |
 
 ---
 
@@ -335,7 +336,7 @@
 | 方法 | 路径 | 说明 | 参数 | 返回 data（本批新增字段） |
 | --- | --- | --- | --- | --- |
 | GET | `/api/admin/stats` | 总览统计（仪表盘） | - | `vipCount, redeemVipCount, vipSource`（按 member_source 分布） |
-| GET | `/api/admin/stats/dashboard/business` | 业务统计（区间） | `start?, end?` | `redeemVipCount, vipSource` |
+| GET | `/api/admin/stats/dashboard/business` | 业务统计（区间） | `start?, end?` | `redeemVipCount, vipSource, cumIncome（累计收入）, cumPaidOrders（累计支付订单）, totalMindmaps（平台导图总数）` |
 
 ---
 

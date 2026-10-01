@@ -40,7 +40,7 @@
 | `UserDetailsServiceImpl.java` | Spring Security 用户加载（按用户名查库） |
 | `JwtAuthenticationFilter.java` | JWT 认证过滤器（见上） |
 
-### 1.5 entity（实体，对应 7 张表）
+### 1.5 entity（实体，对应 17 张表）
 | 文件 | 对应表 | 主要字段 |
 | --- | --- | --- |
 | `SysUser.java` | sys_user | id, username, password, nickname, avatar, email, phone, role(ADMIN/USER), status |

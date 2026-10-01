@@ -23,15 +23,15 @@
 - **移动端适配**：完整响应式布局，双指缩放 / 单指平移，标签页与工具栏移动端优化。
 
 - **账号与安全**：注册（图形验证码，后台可关）/ 登录（独立图形验证码开关，前台同步隐藏）；登录后头像下拉菜单（个人信息 / 会员中心 / 退出）；用户中心可改昵称 / 邮箱 / 手机 / 头像；短信验证码注册预留（默认关闭，可后台配置接入服务商）；微信登录预留（默认关闭，后台可配 AppID/Secret）。
-- **会员体系**：套餐购买（微信支付，默认关闭，后台可开）；会员功能（特定主题 👑、导出格式、上传大小与数量、画布数等）后台统一配置，客户端非会员显示皇冠图标且不可用；会员体系可整体关闭（用户无感知）。
+- **会员体系**：套餐购买（微信支付，默认关闭，后台可开）；**套餐价格管理**（套餐增删改、现价 / 原价 / 折扣百分比，改价客户端实时生效）；**一次性兑换码**（批量生成、状态筛选、按筛选批量导出 Excel/CSV）；会员功能（特定主题 👑、导出格式、上传大小与数量、画布数等）后台统一配置，客户端非会员显示皇冠图标且不可用；会员体系可整体关闭（用户无感知）。
 - **评论体系**：分享页与机构内均可对节点评论 / 回复（128 字 / 条，IP 限频）；作者端实时收到评论提醒（呼吸灯电流特效沿连线流淌 + 角标 +1 + 音效，可关闭），点开阅读后不再重复提醒；指定人回复只提醒被回复人。
 ### 管理后台（/admin/）
 - **登录鉴权**：管理员登录（JWT），登录页版权 / 入网声明可在后台配置（本地缓存时长可配置）。
-- **仪表盘**：用户数、导图数、资源数、访问量等统计。
+- **仪表盘**：注册用户 / VIP 会员 / 付费转化率 / 区间收入 / 今日收入 / 区间新增 / 30 天内到期 / 兑换码会员 / 累计收入 / 累计支付订单 / 平台导图 共 12 项指标卡；注册 / 付费 / 收入趋势折线图（按近 7 / 30 / 90 天快捷筛选）；会员来源、付费转化、主题使用分布饼图；订单 / 兑换码 / 最新动态表格。
 - **用户管理**：增删改查、启用禁用、重置密码、批量删除；**至少保留一个管理员**（删到只剩一个时禁止删除）。
 - **导图管理**：全部导图列表、查看详情、取消分享、删除、批量删除。
 - **资源管理**：全部上传文件列表（图片 / 视频 / 音频 / 文件分类）、在线预览、删除、批量删除、按后缀过滤。
-- **OSS 配置**：热插拔存储（本地 / 阿里云 OSS / 腾讯 COS / 七牛 / MinIO），可测试连通、切换启用；未配置 OSS 时自动回落到本地存储。
+- **OSS 配置**：热插拔存储（本地 / 阿里云 OSS / 腾讯 COS / 七牛 / MinIO），可测试连通、切换启用；支持将已有本地文件一键迁移到新存储；未配置 OSS 时自动回落到本地存储。
 - **主题模板管理**：可视化配置主题（节点配色、分支配色、各层字号字体、画布背景图 / 视频 / 背景色 + 透明度），实时预览，启用 / 禁用。
 - **图标管理**：Emoji 图标库管理（分类、启用、增删、批量导入）。
 - **项目配置**：后端配置（数据库 / Redis / 端口 / 上传目录 / JWT / OSS 密钥 / AI 接口等）与 nginx 配置的可视化编辑、导出配置文件，便于迁移到不同环境。
@@ -40,11 +40,11 @@
 
 - **支付与验证码**：微信支付开关（默认关，无商户资质不可用）/ 注册图形验证码开关 / 登录图形验证码开关（前端同步隐藏）/ 短信验证码开关（预留）/ IP 限频与自动拉黑参数（超频自动入黑名单，到期自动解封，后台删除黑名单立即生效）。
 - **会员配置**：会员体系总开关、会员主题（👑）、会员导出格式、上传大小与数量限制、画布数等；订单管理（联查用户名 / 删除 / 批量删）。
-- **评论管理**：全站评论列表（分享 + 机构内，联查用户名 / 导图名，按来源筛选）、删除、批量删除。
+- **评论管理**：全站评论列表（分享 + 机构内，按来源筛选），支持评论内容 / 评论者模糊查询、脑图下拉筛选、组织下拉筛选（自动覆盖该组织全部导图）、批量删除。
 - **IP 黑白名单**：按 IP / 用户 ID 拉黑或加白（正则校验，用户 ID 不存在时提示），删除即解除。
-- **请求日志**：全量接口日志（用户 / 接口下拉 / 级别 / 前后端来源 / 时间筛选），详情含请求头、请求体、响应、异常栈；记录级别与保留天数 / 清理时间可配置。
+- **请求日志**：全量接口日志（用户 / 接口下拉 / 级别 / 前后端来源 / 时间筛选），详情含请求头、请求体、响应、异常栈；记录级别（多选）、保留天数与定时清理时间在系统设置配置；支持一键删除全部日志。
 - **机构管理**：全站机构列表、解散（在线成员被 WS 踢出并提示）。
-- **仪表盘**：用户 / 导图 / 资源 / 访问量 / 订单 / 会员数统计，注册与订单趋势图。
+- **仪表盘**：12 项业务指标卡 + 注册 / 付费 / 收入趋势折线 + 会员来源 / 付费转化 / 主题分布饼图 + 订单 / 兑换码 / 最新动态表格；统计区间支持近 7 / 30 / 90 天快捷筛选。
 ---
 
 ## 二、系统架构
@@ -108,7 +108,7 @@ usmind/
 │   │       ├── java/com/usmind/
 │   │       │   ├── controller/   # REST 接口层（Auth/User/MindMap/Share/File/Theme/Icon/Oss/...）
 │   │       │   ├── service/      # 业务逻辑接口 + impl 实现
-│   │       │   ├── entity/       # MyBatis-Plus 实体（16 张表：用户/导图/资源/主题/图标/配置/机构/成员/协作/评论/已读/会员套餐/订单/IP规则/请求日志/OSS配置）
+│   │       │   ├── entity/       # MyBatis-Plus 实体（17 张表：用户/导图/资源/主题/图标/配置/OSS/会员套餐/订单/兑换码/机构/成员/协作/评论/已读/IP规则/请求日志）
 │   │       │   ├── mapper/       # MyBatis-Plus Mapper
 │   │       │   ├── dto/          # 请求/响应对象
 │   │       │   ├── config/       # 安全/Redis/MyBatis/初始化配置
@@ -170,7 +170,7 @@ usmind/
 | 层 | 技术 |
 | --- | --- |
 | 后端 | Java 17、Spring Boot 3、Spring Security + JWT、MyBatis-Plus、Lombok |
-| 数据库 | MySQL 8.0（`usmind_db`，7 张表）、Redis 5（token / 配置缓存） |
+| 数据库 | MySQL 8.0（`usmind_db`，17 张表）、Redis 5（token / 配置缓存） |
 | 存储 | 本地文件系统 + 策略模式（阿里云 OSS / 腾讯 COS / 七牛 / MinIO 热插拔） |
 | 用户端 | Vue 3（Composition API）、Vite、Pinia、Vue Router、simple-mind-map（脑图内核）、MathJax（公式 SVG）、pdf.js（PDF 预览） |
 | 管理后台 | Vue 3、Vite、Element Plus、Pinia、ECharts（仪表盘） |
@@ -344,13 +344,23 @@ spring:
 
 | 表 | 说明 | 关键字段 |
 | --- | --- | --- |
-| `sys_user` | 用户 / 管理员 | username, password(BCrypt), nickname, role(ADMIN/USER), status |
-| `mind_map` | 导图 | name, data(JSON), layout, theme, viewData, manualStyles, isShared, shareToken, sharePassword, viewCount |
+| `sys_user` | 用户 / 管理员 | username, password(BCrypt), nickname, role(ADMIN/USER), status, memberLevel, memberExpire, memberSource |
+| `mind_map` | 导图 | name, data(JSON), layout, theme, viewData, manualStyles, isShared, shareToken, sharePassword, viewCount, userId |
 | `file_resource` | 上传资源 | originalName, storedName, storageType, url, size, mimeType, userId, mindMapId |
 | `oss_config` | OSS 配置 | type, endpoint, accessKey, secretKey(加密), bucket, domain, isActive, configJson |
 | `sys_config` | 系统配置（KV） | configKey, configValue |
 | `sys_theme` | 主题模板 | name, themeKey, branchColors, configJson, sort, enabled, builtin |
 | `sys_icon` | 图标库 | name, category, sort, enabled, builtin |
+| `ip_rule` | IP / 用户黑白名单 | ruleType(white/black), targetType(ip/user_id), targetValue, remark, expireAt |
+| `member_plan` | 会员套餐 | name, level, price, originalPrice, discountPercent, days, sort, enabled |
+| `pay_order` | 支付订单 | orderNo, userId, planId, amount, status(paid/unpaid/closed), paidAt |
+| `redeem_code` | 会员兑换码 | code, planId, days, level, status(active/used/disabled), usedBy, usedAt, remark, createdBy |
+| `org` | 机构 | name, inviteCode, ownerId, status |
+| `org_member` | 机构成员 | orgId, userId, role, joinedAt |
+| `org_collab` | 机构导图协作 | orgId, mindMapId, inviteMemberIds(JSON) |
+| `node_comment` | 节点评论 | mindMapId, nodeId, userId, nickname, content(≤128字), parentId, source(share/org) |
+| `node_comment_read` | 评论已读 | commentId, userId, readAt |
+| `request_log` | 请求日志 | userId, path, method, level(info/warn/error), source(frontend/backend), requestHeaders, requestBody, responseBody, errorStack, createdAt |
 
 ---
 
