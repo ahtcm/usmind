@@ -249,9 +249,9 @@ function pollStatus(outTradeNo) {
 .redeem-area { margin: 14px 0 4px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; background: rgba(255,255,255,.03); }
 .redeem-title { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
 .redeem-row { display: flex; gap: 8px; }
-.redeem-input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+.redeem-input { flex: 1; min-width: 0; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
 .redeem-input::placeholder { letter-spacing: 0; }
-.redeem-btn { background: linear-gradient(135deg, #f0b429, #f08c2e); border: none; color: #1a1c20; font-weight: 700; border-radius: 8px; padding: 0 18px; font-size: 13px; cursor: pointer; }
+.redeem-btn { flex-shrink: 0; white-space: nowrap; background: linear-gradient(135deg, #f0b429, #f08c2e); border: none; color: #1a1c20; font-weight: 700; border-radius: 8px; padding: 0 14px; font-size: 13px; cursor: pointer; }
 .redeem-btn:disabled { opacity: .5; cursor: not-allowed; }
 .member-off { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 0 28px; }
 .mo-icon { font-size: 40px; opacity: .8; }
