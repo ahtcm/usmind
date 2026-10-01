@@ -1425,7 +1425,7 @@ async function migrateDocMath(doc) {
   const walk = (n) => {
     if (!n || !n.data) return
     const t = n.data.text || ''
-    if (n.data.richText === true && t.indexOf('katex') >= 0) nodes.push(n)
+    if (n.data.richText === true && (t.indexOf('katex') >= 0 || t.indexOf('mjx-container') >= 0)) nodes.push(n)
     if (n.children) n.children.forEach(walk)
   }
   walk(root)
@@ -1439,6 +1439,16 @@ async function migrateDocMath(doc) {
         const migrated = await migrateKatexToSvg(t)
         if (migrated !== t) { n.data.text = migrated; changed = true }
       } catch (e) { console.warn('公式迁移失败', e) }
+    }
+    // 移除 MathJax SVG 内嵌 <title>（LaTeX 源码）：部分浏览器/WebView 会把 title 文本显示在节点上（源码乱码）
+    if (t.indexOf('mjx-container') >= 0 && t.indexOf('<title>') >= 0) {
+      try {
+        const div = document.createElement('div')
+        div.innerHTML = t
+        let removed = false
+        div.querySelectorAll('mjx-container svg title').forEach(x => { x.remove(); removed = true })
+        if (removed && div.innerHTML !== t) { n.data.text = div.innerHTML; changed = true }
+      } catch (e) { console.warn('移除公式title失败', e) }
     }
   }
   if (changed) {

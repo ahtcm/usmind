@@ -24,16 +24,9 @@ export function tex2svgHtml(tex, display = true) {
   const node = mj.tex2svg(tex, { display: !!display })
   // 移除辅助数学标记（assistive MML），避免部分浏览器下与主公式叠加显示成"两层"
   try { node.querySelectorAll('mjx-assistive-mml').forEach(a => a.remove()) } catch (e) {}
-  // 附加 LaTeX 源码：data 属性 + SVG <title>，供双击编辑回填
+  // 附加 LaTeX 源码：data 属性（供双击编辑回填）。
+  // 注意：不再写入 SVG <title>——部分浏览器/内置 WebView 会把 SVG title 的 LaTeX 源码显示在节点上，表现为"公式显示源码/乱码"。
   try { node.setAttribute('data-math-latex', tex) } catch (e) {}
-  const svg = node.querySelector('svg')
-  if (svg && !svg.querySelector('title')) {
-    try {
-      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title')
-      title.textContent = tex
-      svg.insertBefore(title, svg.firstChild)
-    } catch (e) {}
-  }
   const wrapper = document.createElement('div')
   wrapper.appendChild(node)
   return wrapper.innerHTML
