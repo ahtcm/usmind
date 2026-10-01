@@ -22,6 +22,8 @@ public class SysUser {
     private Integer status;
     private Integer memberLevel;
     private java.time.LocalDateTime memberExpire;
+    /** 会员来源：pay(支付)/redeem(兑换码)/admin(后台开通)，null=非会员 */
+    private String memberSource;
     private String source;
     private String openidWechat;
     private String openidQq;

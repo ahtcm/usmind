@@ -16,4 +16,7 @@ public interface MemberService {
     void grant(Long userId, Integer level, int days);
 
     void cancel(Long userId);
+
+    /** 兑换码兑换会员：校验码并开通，成功返回用户会员信息 */
+    Map<String, Object> redeem(Long userId, String code);
 }

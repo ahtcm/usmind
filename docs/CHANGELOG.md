@@ -1,5 +1,14 @@
 # USMIND 变更记录
 
+## 2026-10-01 · 后台评论筛选/批量删除 + 会员价格管理与兑换码体系
+
+- **后台评论管理增强**：评论分页新增脑图下拉（mindMapId）与组织下拉（orgId，自动查该组织全部导图）筛选、评论内容/评论者模糊查询；新增批量删除（`POST /api/admin/comments/batch-delete`），删除后前端刷新列表。
+- **后台侧边栏滚动**：AdminLayout 左侧菜单 `max-height + overflow-y:auto` 且隐藏滚动条（`scrollbar-width:none` / `::-webkit-scrollbar{display:none}`），移动端抽屉内菜单同样处理。
+- **会员价格管理**：member_plan 表新增 `original_price` / `discount_percent` 列（DataInitializer 自动迁移补列）；后台「会员价格管理」卡片支持新增/编辑/删除套餐，改价后客户端 `/api/member/plans` 实时生效（前端显示原价划线 + 折扣标签）。
+- **一次性兑换码**：新增 `redeem_code` 表 + 后台生成（选套餐或自定义天数，1-100 个，16 位去混淆字符集 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`）、状态筛选（可用/已兑换/已停用）、列表删除；用户端会员中心新增兑换输入框（`POST /api/member/redeem`），兑换后会员时长累加、`sys_user.member_source=redeem` 标注来源。
+- **会员来源标注**：sys_user 新增 `member_source` 列（pay 支付 / redeem 兑换码 / 空=后台开通）；后台会员列表新增「会员来源」列（支付蓝 / 兑换码绿 / 后台灰）；仪表盘新增「兑换码会员」统计卡与会员来源分布。
+- **实测**：改价实时生效（月度 8.8 元 / 原价 19.8 / 55% 折扣）；兑换链路通过（expire 累加 30 天、usedByName=系统管理员、redeemVipCount=1）；评论三种筛选与批量删除接口通过；用户端会员中心下拉筛选 / 划线价 / 折扣标签 / 兑换入口渲染正常。
+
 ## 2026-10-01 · 登录图形验证码 + 注册页移除头像 + 后台独立登录接口（`d63ac11` / `b4e7cb5`）
 
 - **登录图形验证码**：登录页用户名/密码后新增图形验证码输入框 + 点击刷新（复用注册验证码组件）；后端 `AuthController.login` 在 `authLoginCaptchaEnabled=1` 时校验 `captchaUuid` + `captchaCode`；`LoginRequest` 增加两字段。

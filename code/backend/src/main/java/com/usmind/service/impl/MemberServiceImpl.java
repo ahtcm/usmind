@@ -22,12 +22,15 @@ public class MemberServiceImpl implements MemberService {
 
     private final SysUserMapper userMapper;
     private final MemberPlanMapper planMapper;
+    private final com.usmind.mapper.RedeemCodeMapper redeemCodeMapper;
     private final SettingsService settingsService;
 
     public MemberServiceImpl(SysUserMapper userMapper, MemberPlanMapper planMapper,
+                             com.usmind.mapper.RedeemCodeMapper redeemCodeMapper,
                              SettingsService settingsService) {
         this.userMapper = userMapper;
         this.planMapper = planMapper;
+        this.redeemCodeMapper = redeemCodeMapper;
         this.settingsService = settingsService;
     }
 
@@ -52,6 +55,7 @@ public class MemberServiceImpl implements MemberService {
         m.put("isVip", vip);
         m.put("level", u == null ? 0 : (u.getMemberLevel() == null ? 0 : u.getMemberLevel()));
         m.put("expire", u == null || u.getMemberExpire() == null ? null : u.getMemberExpire().toString());
+        m.put("source", u == null || u.getMemberSource() == null ? "" : u.getMemberSource());
         m.put("feature", featureConfig());
         return m;
     }
@@ -67,6 +71,8 @@ public class MemberServiceImpl implements MemberService {
             m.put("name", p.getName());
             m.put("level", p.getLevel());
             m.put("price", p.getPrice());
+            m.put("originalPrice", p.getOriginalPrice());
+            m.put("discountPercent", p.getDiscountPercent());
             m.put("days", p.getDays());
             out.add(m);
         }
@@ -101,6 +107,7 @@ public class MemberServiceImpl implements MemberService {
                 ? u.getMemberExpire() : now;
         u.setMemberLevel(level);
         u.setMemberExpire(base.plusDays(days));
+        u.setMemberSource("pay");
         userMapper.updateById(u);
     }
 
@@ -110,6 +117,40 @@ public class MemberServiceImpl implements MemberService {
         if (u == null) return;
         u.setMemberLevel(0);
         u.setMemberExpire(null);
+        u.setMemberSource("");
         userMapper.updateById(u);
+    }
+
+    @Override
+    public Map<String, Object> redeem(Long userId, String code) {
+        if (code == null || code.isBlank()) throw new BusinessException(400, "请输入兑换码");
+        com.usmind.entity.RedeemCode target = redeemCodeMapper.selectOne(
+                new LambdaQueryWrapper<com.usmind.entity.RedeemCode>()
+                        .eq(com.usmind.entity.RedeemCode::getCode, code.trim().toUpperCase())
+                        .eq(com.usmind.entity.RedeemCode::getStatus, "active")
+                        .last("LIMIT 1"));
+        if (target == null) throw new BusinessException(400, "兑换码不存在或已失效");
+        SysUser u = userMapper.selectById(userId);
+        if (u == null) throw new BusinessException(400, "用户不存在");
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime base = u.getMemberExpire() != null && u.getMemberExpire().isAfter(now)
+                ? u.getMemberExpire() : now;
+        int level = target.getLevel() == null ? 1 : target.getLevel();
+        int days = target.getDays() == null ? 30 : target.getDays();
+        u.setMemberLevel(level);
+        u.setMemberExpire(base.plusDays(days));
+        u.setMemberSource("redeem");
+        userMapper.updateById(u);
+        target.setStatus("used");
+        target.setUsedBy(userId);
+        target.setUsedAt(now);
+        redeemCodeMapper.updateById(target);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("isVip", true);
+        out.put("level", level);
+        out.put("expire", u.getMemberExpire().toString());
+        out.put("source", "redeem");
+        out.put("days", days);
+        return out;
     }
 }

@@ -290,6 +290,55 @@
 
 ---
 
+## 二十三、后台评论查询与批量删除（`/api/admin/comments`）
+
+| 方法 | 路径 | 说明 | 参数 | 返回 data |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/comments` | 评论分页查询 | `page, size, keyword?（评论内容/评论者模糊）, mindMapId?（脑图筛选）, orgId?（组织筛选，自动查该组织下全部导图）` | `{total, list}` |
+| POST | `/api/admin/comments/batch-delete` | 批量删除评论（删除后前端刷新列表） | `{ids: []}` | - |
+
+---
+
+## 二十四、会员套餐价格管理（`/api/admin/member-plans`）
+
+| 方法 | 路径 | 说明 | 参数 | 返回 data |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/member-plans` | 套餐列表（含 originalPrice / discountPercent） | - | `[{id, name, level, price, originalPrice, discountPercent, days, sort, enabled}]` |
+| POST | `/api/admin/member-plans` | 新增套餐 | `{name, level, price, originalPrice, discountPercent, days, sort, enabled}` | - |
+| PUT | `/api/admin/member-plans/{id}` | 更新套餐（改价后客户端会员中心实时生效） | 同上（可空） | - |
+| DELETE | `/api/admin/member-plans/{id}` | 删除套餐 | - | - |
+
+---
+
+## 二十五、会员兑换码（`/api/admin/redeem-codes`）
+
+| 方法 | 路径 | 说明 | 参数 | 返回 data |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/redeem-codes` | 兑换码分页 | `page, size, status?（active\|used\|disabled）` | `{total, list}`（used 行含 usedByName / usedAt） |
+| POST | `/api/admin/redeem-codes` | 批量生成（16 位去混淆字符集，选套餐取套餐时长或自定义天数） | `{planId?, days?, count?（1-100）, remark?}` | `{created, codes}` |
+| DELETE | `/api/admin/redeem-codes/{id}` | 删除兑换码 | - | - |
+
+---
+
+## 二十六、用户端兑换码兑换（`/api/member/redeem`）
+
+| 方法 | 路径 | 说明 | 参数 | 返回 data |
+| --- | --- | --- | --- | --- |
+| POST | `/api/member/redeem` | 输入兑换码开通会员（会员时长在原有效期上累加，来源标为 redeem） | `{code}` | `{isVip, level, expire, source, days}` |
+
+> `/api/member/plans` 每条套餐现含 `originalPrice` / `discountPercent`（客户端显示划线价与折扣标签）；`/api/member/info` 增 `source`（pay 支付 / redeem 兑换码 / 空=后台开通）。
+
+---
+
+## 二十七、后台统计（会员来源）（`/api/admin/stats`）
+
+| 方法 | 路径 | 说明 | 参数 | 返回 data（本批新增字段） |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/stats` | 总览统计（仪表盘） | - | `vipCount, redeemVipCount, vipSource`（按 member_source 分布） |
+| GET | `/api/admin/stats/dashboard/business` | 业务统计（区间） | `start?, end?` | `redeemVipCount, vipSource` |
+
+---
+
 ## 附：接口鉴权一览
 
 | 类别 | 是否需登录 |

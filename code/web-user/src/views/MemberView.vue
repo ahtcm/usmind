@@ -26,13 +26,39 @@
         </template>
       </div>
 
+      <div class="plan-filter">
+        <select v-model="filterPlan" class="plan-select">
+          <option value="">全部套餐</option>
+          <option value="month">月度会员</option>
+          <option value="quarter">季度会员</option>
+          <option value="year">年度会员</option>
+        </select>
+        <span class="plan-filter-tip">{{ filterPlan ? filteredPlans.length + ' 个套餐' : plans.length + ' 个套餐' }}</span>
+      </div>
+
       <div class="plan-grid">
-        <div v-for="p in plans" :key="p.id" class="plan-card" :class="{ featured: p.days >= 365 }" @click="selectPlan(p)">
-          <div class="plan-name">{{ p.name }}</div>
-          <div class="plan-price">¥{{ p.price.toFixed(2) }}</div>
+        <div v-for="p in filteredPlans" :key="p.id" class="plan-card" :class="{ featured: p.days >= 365 }" @click="selectPlan(p)">
+          <div class="plan-name">
+            {{ p.name }}
+            <span v-if="p.discountPercent > 0" class="plan-tag">-{{ p.discountPercent }}%</span>
+          </div>
+          <div class="plan-price">
+            ¥{{ Number(p.price || 0).toFixed(2) }}
+            <span v-if="p.originalPrice > 0 && Number(p.originalPrice) > Number(p.price)" class="plan-original">¥{{ Number(p.originalPrice).toFixed(2) }}</span>
+          </div>
           <div class="plan-days">{{ p.days }} 天有效</div>
           <button class="plan-btn" :class="{ active: selected?.id === p.id }">
             {{ selected?.id === p.id ? '已选择' : '选择套餐' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="redeem-area">
+        <div class="redeem-title">有兑换码？输入即可开通会员</div>
+        <div class="redeem-row">
+          <input v-model="redeemCode" class="redeem-input" placeholder="请输入兑换码" maxlength="32" />
+          <button class="redeem-btn" @click="doRedeem" :disabled="redeeming || !redeemCode.trim()">
+            {{ redeeming ? '兑换中...' : '立即兑换' }}
           </button>
         </div>
       </div>
@@ -68,6 +94,9 @@ const router = useRouter()
 const userStore = useUserStore()
 const plans = ref([])
 const selected = ref(null)
+const filterPlan = ref('')
+const redeemCode = ref('')
+const redeeming = ref(false)
 const member = ref(null)
 const paying = ref(false)
 const payCodeUrl = ref('')
@@ -79,6 +108,12 @@ const err = ref('')
 const nickname = computed(() => userStore.user?.nickname || userStore.user?.username || '')
 const isVip = computed(() => !!member.value && member.value.level > 0)
 const expireText = computed(() => (member.value && member.value.expire) ? member.value.expire.slice(0, 10) : '')
+const filteredPlans = computed(() => {
+  if (!filterPlan.value) return plans.value || []
+  const daysMap = { month: 30, quarter: 90, year: 365 }
+  const d = daysMap[filterPlan.value]
+  return (plans.value || []).filter(p => p.days === d)
+})
 
 onMounted(async () => {
   try {
@@ -103,6 +138,23 @@ function selectPlan(p) {
 }
 
 const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+
+async function doRedeem() {
+  if (!redeemCode.value.trim()) return
+  redeeming.value = true
+  err.value = ''
+  try {
+    const d = await memberApi.redeem(redeemCode.value.trim())
+    member.value = { ...(member.value || {}), level: d.level, expire: d.expire, source: d.source, isVip: true }
+    userStore.setUser({ ...userStore.user, memberLevel: d.level, memberExpire: d.expire })
+    toast('兑换成功，会员已开通')
+    redeemCode.value = ''
+  } catch (e) {
+    err.value = e.message || '兑换失败'
+  } finally {
+    redeeming.value = false
+  }
+}
 
 async function doPay() {
   if (!selected.value) return
@@ -183,6 +235,19 @@ function pollStatus(outTradeNo) {
 .ghost-btn { background: rgba(255,255,255,.08); border: none; color: var(--text); border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; }
 .ghost-btn:hover { background: rgba(255,255,255,.14); }
 .member-err { color: #f26d6d; font-size: 13px; text-align: center; margin-top: 12px; }
+.plan-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.plan-select { background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.plan-select option { background: #22262d; color: #e6e8eb; }
+.plan-filter-tip { font-size: 12px; color: var(--text-dim); }
+.plan-tag { display: inline-block; background: #f26d6d; color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
+.plan-original { font-size: 12px; color: var(--text-dim); text-decoration: line-through; font-weight: 400; margin-left: 4px; }
+.redeem-area { margin: 14px 0 4px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; background: rgba(255,255,255,.03); }
+.redeem-title { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.redeem-row { display: flex; gap: 8px; }
+.redeem-input { flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+.redeem-input::placeholder { letter-spacing: 0; }
+.redeem-btn { background: linear-gradient(135deg, #f0b429, #f08c2e); border: none; color: #1a1c20; font-weight: 700; border-radius: 8px; padding: 0 18px; font-size: 13px; cursor: pointer; }
+.redeem-btn:disabled { opacity: .5; cursor: not-allowed; }
 .member-off { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px 0 28px; }
 .mo-icon { font-size: 40px; opacity: .8; }
 .mo-text { font-size: 15px; color: var(--text-dim); }

@@ -14,6 +14,7 @@ import com.usmind.mapper.PayOrderMapper;
 import com.usmind.mapper.MemberPlanMapper;
 import com.usmind.mapper.SysUserMapper;
 import com.usmind.service.StatsService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -32,17 +33,20 @@ public class StatsServiceImpl implements StatsService {
     private final OssConfigMapper ossConfigMapper;
     private final com.usmind.mapper.PayOrderMapper payOrderMapper;
     private final com.usmind.mapper.MemberPlanMapper planMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public StatsServiceImpl(SysUserMapper userMapper, MindMapMapper mindMapMapper,
                             FileResourceMapper fileResourceMapper, OssConfigMapper ossConfigMapper,
                             com.usmind.mapper.PayOrderMapper payOrderMapper,
-                            com.usmind.mapper.MemberPlanMapper planMapper) {
+                            com.usmind.mapper.MemberPlanMapper planMapper,
+                            JdbcTemplate jdbcTemplate) {
         this.userMapper = userMapper;
         this.mindMapMapper = mindMapMapper;
         this.fileResourceMapper = fileResourceMapper;
         this.ossConfigMapper = ossConfigMapper;
         this.payOrderMapper = payOrderMapper;
         this.planMapper = planMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
@@ -81,6 +85,18 @@ public class StatsServiceImpl implements StatsService {
             return x;
         }).toList();
         data.put("recentMindMaps", recentMindMaps);
+
+        // 会员统计（有效期内的会员，按来源标注：pay 支付 / redeem 兑换码 / admin 后台）
+        data.put("vipCount", userMapper.selectCount(new LambdaQueryWrapper<SysUser>()
+                .gt(SysUser::getMemberLevel, 0)
+                .gt(SysUser::getMemberExpire, LocalDateTime.now())));
+        data.put("redeemVipCount", userMapper.selectCount(new LambdaQueryWrapper<SysUser>()
+                .gt(SysUser::getMemberLevel, 0)
+                .gt(SysUser::getMemberExpire, LocalDateTime.now())
+                .eq(SysUser::getMemberSource, "redeem")));
+        java.util.List<java.util.Map<String, Object>> vipSource = jdbcTemplate.queryForList(
+                "SELECT IFNULL(member_source,'') AS src, COUNT(*) AS cnt FROM sys_user WHERE member_level > 0 AND member_expire > NOW() GROUP BY member_source");
+        data.put("vipSource", vipSource);
 
         // 存储信息
         OssConfig active = ossConfigMapper.selectOne(new LambdaQueryWrapper<OssConfig>()
@@ -142,6 +158,14 @@ public class StatsServiceImpl implements StatsService {
         data.put("todayIncome", Math.round(todayIncome * 100) / 100.0);
         data.put("paidOrders", paidCnt);
         data.put("expireSoonVips", expireSoon);
+
+        // 兑换码会员数（会员来源标注：pay 支付 / redeem 兑换码 / admin 后台开通）
+        long redeemVips = userMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysUser>()
+                .gt("member_level", 0).gt("member_expire", now).eq("member_source", "redeem"));
+        java.util.List<java.util.Map<String, Object>> vipSource = jdbcTemplate.queryForList(
+                "SELECT IFNULL(member_source,'') AS src, COUNT(*) AS cnt FROM sys_user WHERE member_level > 0 AND member_expire > NOW() GROUP BY member_source");
+        data.put("redeemVipCount", redeemVips);
+        data.put("vipSource", vipSource);
 
         // ---- 按天趋势 ----
         java.util.List<Map<String, Object>> trend = new java.util.ArrayList<>();

@@ -30,6 +30,16 @@
         <el-table-column label="会员到期" width="170">
           <template #default="{ row }">{{ formatTime(row.memberExpire) }}</template>
         </el-table-column>
+        <el-table-column label="会员来源" width="110">
+          <template #default="{ row }">
+            <template v-if="row.memberLevel > 0">
+              <el-tag v-if="row.memberSource === 'redeem'" type="success" size="small">兑换码</el-tag>
+              <el-tag v-else-if="row.memberSource === 'pay'" type="primary" size="small">支付</el-tag>
+              <el-tag v-else type="info" size="small">后台</el-tag>
+            </template>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="source" label="注册来源" width="100" />
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">

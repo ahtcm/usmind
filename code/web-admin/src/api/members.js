@@ -8,6 +8,31 @@ export function setMember(id, data) {
   return request.put(`/admin/members/${id}/member`, data)
 }
 
+// 会员套餐价格管理
+export function getMemberPlans() {
+  return request.get('/admin/member-plans')
+}
+export function createMemberPlan(data) {
+  return request.post('/admin/member-plans', data)
+}
+export function updateMemberPlan(id, data) {
+  return request.put(`/admin/member-plans/${id}`, data)
+}
+export function deleteMemberPlan(id) {
+  return request.delete(`/admin/member-plans/${id}`)
+}
+
+// 会员兑换码管理
+export function getRedeemCodes(params) {
+  return request.get('/admin/redeem-codes', { params })
+}
+export function createRedeemCodes(data) {
+  return request.post('/admin/redeem-codes', data)
+}
+export function deleteRedeemCode(id) {
+  return request.delete(`/admin/redeem-codes/${id}`)
+}
+
 // IP 黑白名单
 export function getIpRules(params) {
   return request.get('/admin/ip-rules', { params })

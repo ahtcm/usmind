@@ -255,6 +255,20 @@ async function submitPassword() {
 }
 .side-menu {
   border-right: none;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.side-menu::-webkit-scrollbar {
+  display: none;
+}
+.mobile-drawer :deep(.side-menu) {
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.mobile-drawer :deep(.side-menu::-webkit-scrollbar) {
+  display: none;
 }
 .topbar {
   background: #fff;
