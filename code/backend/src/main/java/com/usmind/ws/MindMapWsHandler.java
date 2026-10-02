@@ -135,6 +135,23 @@ public class MindMapWsHandler extends TextWebSocketHandler {
         return set == null ? 0 : set.size();
     }
 
+    /**
+     * 该导图当前在线的订阅者是否只有指定用户自己。
+     * 同一用户开多个标签页/多设备（多个 WS 会话但 userId 相同）不算"其他成员"，
+     * 保存冲突时用于判断是否需要弹冲突框：只有自己在线 → 自动合并不弹窗。
+     * 无人订阅（WS 未连接）时也视为只有自己，避免老页面/无协作场景误弹。
+     */
+    public boolean onlySelfOnline(String mindMapId, long userId) {
+        Set<WebSocketSession> set = sessions.get(mindMapId);
+        if (set == null || set.isEmpty()) return true;
+        for (WebSocketSession s : set) {
+            if (!s.isOpen()) continue;
+            Object uid = s.getAttributes().get(ATTR_UID);
+            if (uid instanceof Long && ((Long) uid) != userId) return false;
+        }
+        return true;
+    }
+
     /** 定期清理过期节点锁并广播释放 */
     @Scheduled(fixedDelay = 30_000)
     public void cleanExpiredLocks() {

@@ -253,10 +253,14 @@ public class MindMapServiceImpl implements MindMapService {
             JsonNode clientRoot = rootOf(req.getData());
             List<Map<String, Object>> conflicts = new java.util.ArrayList<>();
             if (serverRoot != null && clientRoot != null) {
+                // 同用户多会话（多标签/多设备）在线时：不弹冲突框，自动以本地为准合并（对方新增节点仍保留）
                 String resolve = force ? "mine" : req.getResolveConflicts();
+                if (resolve == null && mindMapWsHandler.onlySelfOnline(String.valueOf(id), userId)) {
+                    resolve = "mine";
+                }
                 JsonNode merged = mergeTrees(serverRoot, clientRoot,
                         req.getDeletedUids(), resolve, conflicts);
-                if (!conflicts.isEmpty() && !force) {
+                if (!conflicts.isEmpty() && !force && resolve == null) {
                     throw new com.usmind.common.ConflictException(
                             "导图已被其他成员修改，以下节点存在内容冲突，请选择以谁的为准", conflicts, cur);
                 }
@@ -285,9 +289,13 @@ public class MindMapServiceImpl implements MindMapService {
             String resolve2 = force ? "mine" : req.getResolveConflicts();
             Object finalData2 = req.getData();
             if (serverRoot2 != null && clientRoot2 != null) {
+                // 同用户多会话在线时不弹冲突框，自动以本地为准合并
+                if (resolve2 == null && mindMapWsHandler.onlySelfOnline(String.valueOf(id), userId)) {
+                    resolve2 = "mine";
+                }
                 JsonNode merged2 = mergeTrees(serverRoot2, clientRoot2,
                         req.getDeletedUids(), resolve2, conflicts2);
-                if (!conflicts2.isEmpty() && !force) {
+                if (!conflicts2.isEmpty() && !force && resolve2 == null) {
                     throw new com.usmind.common.ConflictException(
                             "导图已被其他成员修改，以下节点存在内容冲突，请选择以谁的为准", conflicts2, cur2);
                 }

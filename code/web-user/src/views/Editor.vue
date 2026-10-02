@@ -1038,6 +1038,25 @@ function bindMindEvents() {
         return
       }
       acquireNodeLock(nid0)
+      // 双击进入编辑后，部分浏览器（尤其 Edge/内置浏览器）未自动聚焦编辑框、未建立文本选区：
+      // 库 focusInput 把光标 collapse 到容器边界（非文本节点），Backspace/Delete/方向键对边界光标
+      // 无效，必须先输入一个字符激活。这里在库渲染出编辑框后主动 focus 并全选文本，
+      // 选区直接落在文本节点上，删除、输入、方向键、Ctrl+Enter 立即生效。
+      setTimeout(() => {
+        try {
+          const box = document.querySelector('.smm-node-edit-wrap') ||
+            document.querySelector('.smm-text-edit') ||
+            document.querySelector('[contenteditable=true]')
+          if (!box || !document.body.contains(box)) return
+          box.focus()
+          const sel = window.getSelection()
+          if (!sel) return
+          const range = document.createRange()
+          range.selectNodeContents(box)
+          sel.removeAllRanges()
+          sel.addRange(range)
+        } catch (e) {}
+      }, 60)
     } catch (err) { console.warn(err) }
   })
   mind.value.on('draw_click', () => hideCtxMenu())
