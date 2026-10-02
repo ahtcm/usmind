@@ -208,6 +208,17 @@ async function loadShare() {
     shareBgZoom = (docData.tabs && docData.tabs[0] && docData.tabs[0].bgZoom) || docData.bgZoom || 1.35
     let root = docData.root || (docData.tabs && docData.tabs[0] && docData.tabs[0].data && docData.tabs[0].data.root) || docData
     applyAttachDefaultColor(root)
+    // 双图修复：富文本图片节点（text 含 <img）同时存在 data.image（粘贴产生的 base64 大图）时删除 image，
+    // 避免渲染层同时渲染大图(SVG)与小图(foreignObject)
+    const walkFixDup = (n) => {
+      if (!n || !n.data) return
+      if (n.data.richText && typeof n.data.text === 'string' && n.data.text.indexOf('<img') !== -1 && typeof n.data.image === 'string') {
+        delete n.data.image
+        delete n.data.imageSize
+      }
+      if (n.children) n.children.forEach(walkFixDup)
+    }
+    walkFixDup(root)
     let vd = data.viewData
     if (typeof vd === 'string') { try { vd = JSON.parse(vd) } catch (e) { vd = null } }
     await nextTick()

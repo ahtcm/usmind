@@ -2338,6 +2338,12 @@ async function insertFileToNode(node, file) {
         '<div style="position:relative;width:'+w+'px;height:'+h+'px;overflow:hidden;border-radius:12px;line-height:0">'+
         '<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;display:block;margin:0">'+
         '</div>' })
+      // 清除可能由 simple-mind-map 粘贴机制(Ctrl+V 时 SET_NODE_IMAGE)写入的 data.image，
+      // 避免渲染层同时渲染大图(SVG)与小图(foreignObject)出现一大一小两张图
+      try {
+        const nd = node.nodeData && node.nodeData.data
+        if (nd) { if (nd.image) delete nd.image; if (nd.imageSize) delete nd.imageSize }
+      } catch (e) {}
       // 节点本身即图片：去掉节点外框，图片作为节点主体
       mind.value.execCommand('SET_NODE_STYLES', node, { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 })
     } else if (type.startsWith('audio/')) {
@@ -3499,6 +3505,14 @@ function replaceUrlsInExportData(node, files) {
 function ensureImageSize(root) {
   const tasks = []
   function walk(n) {
+    if (n && n.data) {
+      // 双图修复：富文本图片节点（text 含 <img，上传插入的卡片图）同时存在 data.image（simple-mind-map 粘贴图片写入的 base64 大图）时，
+      // 删除 image 字段，避免渲染层 createImgNode(大图) + createRichTextNode(小图) 同时渲染出现一大一小两张图
+      if (n.data.richText && typeof n.data.text === 'string' && n.data.text.indexOf('<img') !== -1 && typeof n.data.image === 'string') {
+        delete n.data.image
+        delete n.data.imageSize
+      }
+    }
     if (n && n.data && typeof n.data.image === 'string' && !n.data.imageSize) {
       tasks.push(new Promise((resolve) => {
         const img = new Image()
