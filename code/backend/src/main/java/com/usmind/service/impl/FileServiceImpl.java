@@ -94,6 +94,28 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    /** 后台允许类型校验（allowed 为空/“*”表示全部允许） */
+    private boolean allowedType(String allowed, String extLower) {
+        if (allowed == null || allowed.isBlank()) return true;
+        return allowed.trim().equals("*") || Arrays.stream(allowed.split(","))
+                .map(String::trim)
+                .anyMatch(t -> t.equalsIgnoreCase(extLower));
+    }
+
+    /** 按真实文件头识别图片真实格式，无法识别返回 null */
+    private String detectImageExt(byte[] head) {
+        if (head == null || head.length < 12) return null;
+        int b0 = head[0] & 0xFF, b1 = head[1] & 0xFF, b2 = head[2] & 0xFF, b3 = head[3] & 0xFF;
+        if (b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47) return "png";
+        if (b0 == 0xFF && b1 == 0xD8) return "jpg";
+        if (b0 == 0x47 && b1 == 0x49 && b2 == 0x46 && b3 == 0x38) return "gif";
+        if (b0 == 0x42 && b1 == 0x4D) return "bmp";
+        if (b0 == 0x52 && b1 == 0x49 && b2 == 0x46 && b3 == 0x46
+                && head[8] == 0x57 && head[9] == 0x45 && head[10] == 0x42 && head[11] == 0x50) return "webp";
+        if (b0 == 0x00 && b1 == 0x00 && b2 == 0x01 && b3 == 0x00) return "ico";
+        return null;
+    }
+
     @Override
     public Map<String, Object> upload(long userId, MultipartFile file, Long mindMapId) throws IOException {
         if (file == null || file.isEmpty()) {
@@ -122,20 +144,28 @@ public class FileServiceImpl implements FileService {
         String ext = dotIdx >= 0 ? original.substring(dotIdx) : "";
         String extLower = dotIdx >= 0 ? original.substring(dotIdx + 1).toLowerCase(Locale.ROOT) : "";
         if (allowed != null && !allowed.isBlank() && !extLower.isEmpty()) {
-            boolean ok = allowed.trim().equals("*") || Arrays.stream(allowed.split(","))
-                    .map(String::trim)
-                    .anyMatch(t -> t.equalsIgnoreCase(extLower));
-            if (!ok) throw new BusinessException(400, "不允许的文件类型: " + extLower);
+            if (!allowedType(allowed, extLower)) throw new BusinessException(400, "不允许的文件类型: " + extLower);
         }
         // 内置危险类型黑名单：无论后台如何配置（含 *），一律拒绝，防止 SVG/HTML/JS 存储型 XSS
         if (!extLower.isEmpty() && DANGEROUS_EXT.contains(extLower)) {
             throw new BusinessException(400, "不允许上传危险文件类型: " + extLower);
         }
-        // 图片魔数校验：声明/扩展名为图片时，校验真实文件头，防止伪装文件（如把脚本改名 .png）
+        // 图片魔数校验：声明/扩展名为图片时，校验真实文件头，防止伪装文件（如把脚本改名 .png）。
+        // Windows 剪贴板粘贴的图片常见"表面类型 png、实际字节 jpeg"（微信/网页复制），
+        // 魔数不符时先按真实格式纠正扩展名，无法识别才拒绝。
         if (isImage(extLower, file.getContentType())) {
             byte[] head = file.getBytes();
             if (!magicMatches(head, extLower)) {
-                throw new BusinessException(400, "文件内容与图片格式不符: " + extLower);
+                String realExt = detectImageExt(head);
+                if (realExt == null) {
+                    throw new BusinessException(400, "文件内容与图片格式不符: " + extLower);
+                }
+                extLower = realExt;
+                ext = "." + realExt;
+                // 纠正扩展名后重新校验后台允许类型
+                if (allowed != null && !allowed.isBlank()) {
+                    if (!allowedType(allowed, extLower)) throw new BusinessException(400, "不允许的文件类型: " + extLower);
+                }
             }
         }
 
