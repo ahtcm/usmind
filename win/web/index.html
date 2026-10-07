@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USMIND 思维导图</title>
+<link rel="stylesheet" href="css/app.css?v=20261008b1">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶部浮动工具栏（一条毛玻璃 pill） -->
+  <nav id="topBar">
+    <div class="tb-info">
+      <svg viewBox="0 0 32 32" width="16" height="16" aria-hidden="true">
+        <circle cx="8" cy="24" r="5" fill="#6C8CFF"/>
+        <circle cx="16" cy="12" r="5" fill="#8B5CF6"/>
+        <circle cx="26" cy="24" r="5" fill="#34D399"/>
+        <path d="M13 24 H21 M17 17 V19 M11 22 Q16 17 21 22" stroke="#A5B4FC" stroke-width="1.6" fill="none"/>
+      </svg>
+      <span id="docTitle" class="doc-title">未命名导图</span>
+      <span id="saveState" class="save-state"></span>
+    </div>
+    <div class="tb-btns">
+      <button class="icon-btn" id="btnNew" title="新建导图 (Ctrl+N)">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" id="btnOpen" title="打开导图 (Ctrl+O)">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M4 8V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v2M4 8h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSave" title="保存 (Ctrl+S)">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M5 3h11l3 3v15H5V3zM8 3v6h8V3M8 21v-8h8v8" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="dropdown" id="exportMenu">
+        <button class="icon-btn" id="btnExport" title="导出">
+          <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown-menu" id="exportMenuItems">
+          <a data-type="png">PNG 图片</a>
+          <a data-type="jpeg">JPEG 图片</a>
+          <a data-type="svg">SVG 矢量图</a>
+          <a data-type="md">Markdown 大纲</a>
+          <a data-type="json">JSON 数据</a>
+          <a data-type="xmind">XMind 文件</a>
+        </div>
+      </div>
+      <button class="icon-btn" id="btnInsertImage" title="插入图片">
+        <svg viewBox="0 0 24 24" width="17" height="17"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M3 17l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <input type="file" id="imgFileInput" accept="image/*" style="display:none;">
+      <input type="file" id="attachFileInput" style="display:none;">
+      <button class="icon-btn" id="btnAttach" title="添加附件（视频/音频/文件）">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="btnExpandAll" title="全部展开">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M7 4h10M7 12h10M7 20h10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4 4l2-2M4 4l2 2M20 4l-2-2M20 4l-2 2" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+      </button>
+      <button class="icon-btn" id="btnCollapseAll" title="全部收起">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M9 4h6M9 12h6M9 20h6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4 4l2-2M4 4l2 2M20 4l-2-2M20 4l-2 2" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+      </button>
+      <button class="icon-btn" id="btnTheme" title="主题样式">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5-1-2-1-3s1-2 2-2h2a4 4 0 0 0 4-4c0-4-4-7-9-7z" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor"/><circle cx="10" cy="7" r="1.1" fill="currentColor"/><circle cx="15" cy="7.5" r="1.1" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn" id="btnHistory" title="历史版本">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="tb-right">
+      <button class="icon-btn" id="btnSettings" title="设置">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="btnToggleBar" title="收起工具栏">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 15l7-7 7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </nav>
+  <!-- 收起后的展开按钮 -->
+  <button id="btnExpandBar" class="icon-btn" title="展开工具栏" style="display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%); z-index:40;">
+    <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+
+  <!-- 画布 -->
+  <main id="mindMapContainer"></main>
+
+  <!-- 左下：标签页 -->
+  <div id="tabBar">
+    <button class="scroll-arrow" id="tabScrollLeft" title="向左">‹</button>
+    <div id="tabStrip"></div>
+    <button class="scroll-arrow" id="tabScrollRight" title="向右">›</button>
+    <button class="icon-btn" id="btnTabAdd" title="新建标签页" style="width:24px;height:24px;">
+      <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- 右下：缩放/布局 -->
+  <div id="bottomCtl">
+    <span id="nodeCount" class="muted-text">1 节点</span>
+    <div id="layoutDrop" class="custom-drop">
+      <button id="layoutBtn" title="布局">逻辑结构图(右) ▾</button>
+      <div id="layoutMenu" class="drop-menu" style="display:none;"></div>
+    </div>
+    <div class="zoom-ctl">
+      <button class="icon-btn" id="btnZoomOut" title="缩小">−</button>
+      <span id="zoomLevel">100%</span>
+      <button class="icon-btn" id="btnZoomIn" title="放大">+</button>
+      <button class="icon-btn" id="btnFit" title="适应屏幕">⛶</button>
+    </div>
+  </div>
+
+  <!-- 遮罩 -->
+  <div id="overlay"></div>
+
+  <!-- 主题面板 -->
+  <div class="panel" id="themePanel">
+    <div class="panel-head">
+      <span>主题样式</span>
+      <button class="panel-close" data-close="themePanel">✕</button>
+    </div>
+    <div class="panel-body" id="themeGrid"></div>
+  </div>
+
+  <!-- 历史面板 -->
+  <div class="panel" id="historyPanel">
+    <div class="panel-head">
+      <span>历史版本</span>
+      <div class="head-actions">
+        <button class="mini-btn danger" id="btnClearHistory">清空历史</button>
+        <button class="panel-close" data-close="historyPanel">✕</button>
+      </div>
+    </div>
+    <div class="panel-body" id="historyList"></div>
+  </div>
+
+  <!-- 设置面板 -->
+  <div class="panel" id="settingsPanel">
+    <div class="panel-head">
+      <span>设置</span>
+      <button class="panel-close" data-close="settingsPanel">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="setting-row">
+        <label>默认主题</label>
+        <div id="themeDrop" class="custom-drop" style="width:100%;">
+          <button id="themeBtn" style="width:100%;justify-content:flex-start;">晨曦 ▾</button>
+          <div id="themeMenu" class="drop-menu" style="position:relative;bottom:auto;right:auto;max-height:260px;overflow-y:auto;margin-top:6px;"></div>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>历史版本保存位置</label>
+        <div class="row-inline">
+          <input type="text" id="setHistoryDir" readonly placeholder="默认：程序目录 \history">
+          <button class="mini-btn" id="btnPickHistoryDir">选择…</button>
+        </div>
+        <div class="row-desc" id="historyDirDesc"></div>
+      </div>
+      <div class="setting-row">
+        <label>文件关联</label>
+        <div class="row-inline">
+          <span id="assocState" class="muted-text">双击 .usmind 文件打开</span>
+          <button class="mini-btn" id="btnRegAssoc">重新注册</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>关于</label>
+        <div class="row-desc" id="aboutText">USMIND 思维导图 · 本地版 1.0.0 · 纯本地存储，无需联网</div>
+      </div>
+      <div class="setting-row">
+        <button class="btn btn-primary" id="btnSaveSettings" style="width:100%;justify-content:center;">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片全屏查看 -->
+  <div id="imgViewer" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.85); align-items:center; justify-content:center; cursor:zoom-out;">
+    <img id="imgViewerImg" style="max-width:90%; max-height:90%; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5);">
+    <button id="imgViewerClose" style="position:absolute; top:20px; right:20px; width:36px; height:36px; border-radius:50%; border:none; background:rgba(255,255,255,.2); color:#fff; font-size:18px; cursor:pointer;">✕</button>
+  </div>
+
+  <!-- 附件播放器 -->
+  <div id="mediaViewer" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.85); align-items:center; justify-content:center; flex-direction:column; gap:16px;">
+    <video id="mediaVideo" controls style="max-width:90%; max-height:80%; border-radius:12px; display:none;"></video>
+    <audio id="mediaAudio" controls style="width:60%; display:none;"></audio>
+    <div id="mediaFileName" style="color:#fff; font-size:14px;"></div>
+    <button id="mediaClose" style="position:absolute; top:20px; right:20px; width:36px; height:36px; border-radius:50%; border:none; background:rgba(255,255,255,.2); color:#fff; font-size:18px; cursor:pointer;">✕</button>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- 自定义输入弹窗 -->
+  <div id="dlgOverlay" style="display:none;">
+    <div id="dlgBox">
+      <div id="dlgTitle">重命名</div>
+      <input type="text" id="dlgInput" autocomplete="off">
+      <div class="dlg-actions">
+        <button id="dlgCancel" class="mini-btn">取消</button>
+        <button id="dlgOk" class="mini-btn" style="background:#6c8cff;color:#fff;border-color:#6c8cff;">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 节点右键菜单 -->
+  <div id="ctxMenu" style="display:none;">
+    <div class="ctx-item" data-act="child">⊕ 插入子节点</div>
+    <div class="ctx-item" data-act="sibling">＋ 插入兄弟节点</div>
+    <div class="ctx-item danger" data-act="delete">✕ 删除节点</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-act="copy">⧉ 复制节点</div>
+    <div class="ctx-item" data-act="cut">✂ 剪切节点</div>
+    <div class="ctx-item" data-act="paste">📋 粘贴节点</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-act="undo">↩ 撤销</div>
+    <div class="ctx-item" data-act="redo">↪ 重做</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-act="icon">🔢 图标</div>
+    <div class="ctx-item" data-act="math">∑ 插入公式</div>
+    <div class="ctx-item" data-act="link">🔗 链接</div>
+    <div class="ctx-item" data-act="note">📝 备注</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-act="style">🎨 节点样式</div>
+  </div>
+
+  <!-- 节点样式条 -->
+  <div id="styleBar" style="display:none;">
+    <button class="sb-btn" data-style="bold" title="加粗 (Ctrl+B)"><b>B</b></button>
+    <button class="sb-btn" data-style="italic" title="斜体 (Ctrl+I)"><i>I</i></button>
+    <button class="sb-btn" data-style="underline" title="下划线 (Ctrl+U)"><u>U</u></button>
+    <button class="sb-btn" data-style="strikeThrough" title="删除线"><s>S</s></button>
+    <span class="sb-sep"></span>
+    <button class="sb-btn" id="sbFontMinus" title="减小字号">A−</button>
+    <span id="sbFontSize">14</span>
+    <button class="sb-btn" id="sbFontPlus" title="增大字号">A＋</button>
+    <span class="sb-sep"></span>
+    <label class="sb-color" title="字体颜色">A<input type="color" id="sbColor" value="#000000"></label>
+    <label class="sb-color" title="背景颜色">🖌<input type="color" id="sbBgColor" value="#ffffff"></label>
+    <span class="sb-sep"></span>
+    <button class="sb-btn" id="sbClose" title="关闭样式条">✕</button>
+  </div>
+
+  <!-- 图标选择弹窗 -->
+  <div id="iconDialog" style="display:none;">
+    <div class="dlg-box2">
+      <div class="dlg-title2">选择图标</div>
+      <div class="icon-section-label">数字</div>
+      <div class="icon-grid" id="iconGridNum"></div>
+      <div class="icon-section-label">表情</div>
+      <div class="icon-grid" id="iconGridEmoji"></div>
+      <div class="dlg-actions">
+        <button class="mini-btn danger" id="iconClear">移除图标</button>
+        <button class="mini-btn" id="iconCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 公式弹窗 -->
+  <div id="mathDialog" style="display:none;">
+    <div class="dlg-box2 wide">
+      <div class="dlg-title2">插入数学公式</div>
+      <div class="math-row">
+        <label>标题</label>
+        <input type="text" id="mathTitle" value="公式" autocomplete="off" placeholder="公式前显示的文字，默认：公式">
+      </div>
+      <div class="math-row">
+        <label>LaTeX</label>
+        <input type="text" id="mathInput" autocomplete="off" placeholder="例如：\frac{a}{b} 或 E=mc^2">
+      </div>
+      <div class="math-row">
+        <label>预览</label>
+        <div class="math-preview" id="mathPreview"></div>
+      </div>
+      <div class="dlg-actions">
+        <button class="mini-btn" id="mathCancel">取消</button>
+        <button class="mini-btn" style="background:#6c8cff;color:#fff;border-color:#6c8cff;" id="mathOk">插入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 链接弹窗 -->
+  <div id="linkDialog" style="display:none;">
+    <div class="dlg-box2">
+      <div class="dlg-title2">节点链接</div>
+      <input type="text" id="linkInput" autocomplete="off" placeholder="https:// 或 http:// 或相对地址">
+      <div class="dlg-actions">
+        <button class="mini-btn danger" id="linkClear">清除链接</button>
+        <button class="mini-btn" id="linkCancel">取消</button>
+        <button class="mini-btn" style="background:#6c8cff;color:#fff;border-color:#6c8cff;" id="linkOk">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 备注弹窗 -->
+  <div id="noteDialog" style="display:none;">
+    <div class="dlg-box2 wide">
+      <div class="dlg-title2">节点备注</div>
+      <textarea id="noteInput" rows="5" placeholder="输入备注内容…"></textarea>
+      <div class="dlg-actions">
+        <button class="mini-btn danger" id="noteClear">清除备注</button>
+        <button class="mini-btn" id="noteCancel">取消</button>
+        <button class="mini-btn" style="background:#6c8cff;color:#fff;border-color:#6c8cff;" id="noteOk">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="vendor/katex/katex.min.js"></script>
+<script type="module" src="js/app.js?v=20261008e1"></script>
+</body>
+</html>

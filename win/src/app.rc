@@ -1,0 +1,35 @@
+// usmind 本地版 - Windows 资源定义
+IDI_APP ICON "logo.ico"
+
+// 版本信息
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   0x3fL
+#ifdef _DEBUG
+FILEFLAGS       0x1L
+#else
+FILEFLAGS       0x0L
+#endif
+FILEOS          0x40004L
+FILETYPE        0x1L
+FILESUBTYPE     0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "USMIND"
+            VALUE "FileDescription", "USMIND 思维导图（本地版）"
+            VALUE "FileVersion", "1.0.0"
+            VALUE "InternalName", "usmind"
+            VALUE "OriginalFilename", "usmind.exe"
+            VALUE "ProductName", "USMIND 思维导图"
+            VALUE "ProductVersion", "1.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
