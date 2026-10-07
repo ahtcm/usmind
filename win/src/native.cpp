@@ -32,6 +32,31 @@ static std::string base64Encode(const std::string& in) {
     return out;
 }
 
+// base64 解码（容忍空白，忽略非法字符）
+static std::string base64Decode(const std::string& in) {
+    static int tbl[256] = { 0 };
+    static bool init = false;
+    if (!init) {
+        init = true;
+        const char* src = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        for (int i = 0; src[i]; i++) tbl[(unsigned char)src[i]] = i + 1; // 1..64
+    }
+    std::string out;
+    int val = 0, bits = 0;
+    for (unsigned char c : in) {
+        if (c == '=' || c == '\r' || c == '\n' || c == ' ' || c == '\t') continue;
+        int d = tbl[c];
+        if (d <= 0) continue;
+        val = (val << 6) | (d - 1);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back((char)((val >> bits) & 0xFF));
+        }
+    }
+    return out;
+}
+
 static std::wstring g_appDir;
 
 std::wstring appDir() {
@@ -375,6 +400,23 @@ bool pickAnyFile(std::wstring& outName, std::string& outB64) {
     }
     pDlg->Release();
     return got;
+}
+
+// 用系统默认程序打开 base64 附件：解码 → 临时目录 → ShellExecute
+bool openAttachment(const std::string& b64, const std::wstring& name) {
+    if (b64.empty()) return false;
+    std::string bytes = base64Decode(b64);
+    if (bytes.empty()) return false;
+    wchar_t tmp[MAX_PATH] = { 0 };
+    if (!GetTempPathW(MAX_PATH, tmp)) return false;
+    std::wstring dir = std::wstring(tmp) + L"usmind_att\\";
+    CreateDirectoryW(dir.c_str(), NULL);
+    std::wstring safe = fileNameOf(name); // 防目录穿越：只取文件名
+    if (safe.empty()) safe = L"attachment.bin";
+    std::wstring path = dir + safe;
+    if (!writeFile(path, bytes)) return false;
+    HINSTANCE r = ShellExecuteW(NULL, L"open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    return (INT_PTR)r > 32;
 }
 
 bool pickSaveFile(const std::wstring& suggested, std::wstring& outPath) {

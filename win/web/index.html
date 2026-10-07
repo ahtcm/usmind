@@ -215,6 +215,7 @@
     <div class="ctx-sep"></div>
     <div class="ctx-item" data-act="icon">🔢 图标</div>
     <div class="ctx-item" data-act="math">∑ 插入公式</div>
+    <div class="ctx-item" data-act="attach">📎 附件</div>
     <div class="ctx-item" data-act="link">🔗 链接</div>
     <div class="ctx-item" data-act="note">📝 备注</div>
     <div class="ctx-sep"></div>
@@ -301,8 +302,43 @@
       </div>
     </div>
   </div>
+
+  <!-- 附件管理弹窗 -->
+  <div id="attachDialog" style="display:none;">
+    <div class="dlg-box2">
+      <div class="dlg-title2">附件</div>
+      <div class="attach-info">
+        <span class="attach-icon">📎</span>
+        <span class="attach-name" id="attachFileName">—</span>
+      </div>
+      <div class="attach-tip">非图片/音视频文件将用系统默认程序打开</div>
+      <div class="dlg-actions">
+        <button class="mini-btn" id="attachOpen" style="background:#6c8cff;color:#fff;border-color:#6c8cff;">打开</button>
+        <button class="mini-btn" id="attachReplace">替换</button>
+        <button class="mini-btn danger" id="attachRemove">移除附件</button>
+        <button class="mini-btn" id="attachCancel">取消</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script src="vendor/katex/katex.min.js"></script>
-<script type="module" src="js/app.js?v=20261008e1"></script>
+<link rel="stylesheet" href="vendor/codemirror/lib/codemirror.css">
+<script src="vendor/codemirror/lib/codemirror.js"></script>
+<script src="vendor/codemirror/mode/javascript/javascript.js"></script>
+<script src="vendor/codemirror/mode/clike/clike.js"></script>
+<script src="vendor/codemirror/mode/xml/xml.js"></script>
+<script src="vendor/codemirror/mode/css/css.js"></script>
+<script src="vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+<script src="vendor/codemirror/mode/markdown/markdown.js"></script>
+<script src="vendor/codemirror/mode/python/python.js"></script>
+<script src="vendor/codemirror/mode/sql/sql.js"></script>
+<script src="vendor/codemirror/mode/shell/shell.js"></script>
+<script src="vendor/codemirror/mode/go/go.js"></script>
+<script src="vendor/codemirror/mode/rust/rust.js"></script>
+<script src="vendor/codemirror/mode/php/php.js"></script>
+<script src="vendor/codemirror/mode/yaml/yaml.js"></script>
+<script src="vendor/codemirror/mode/ruby/ruby.js"></script>
+<script src="vendor/codemirror/mode/swift/swift.js"></script>
+<script type="module" src="js/app.js?v=20261008g"></script>
 </body>
 </html>

@@ -25,7 +25,8 @@ static const wchar_t* const kMethods[] = {
     L"registerAssoc",   // 14
     L"notifyDocumentState", // 15 （前端上报文件名变化，用于标题栏）
     L"pickFolder",      // 16 （目录选择，历史目录设置用）
-    L"pickAnyFile"      // 17 （选任意文件返回base64）
+    L"pickAnyFile",     // 17 （选任意文件返回base64）
+    L"openAttachment"   // 18 （base64附件用系统默认程序打开）
 };
 static const int kMethodCount = sizeof(kMethods) / sizeof(kMethods[0]);
 
@@ -364,6 +365,15 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
                 j += "\"}";
             } else j = "{\"ok\":false}";
             *result = MakeJsonResult(j);
+        }
+        break;
+    }
+    case 18: { // openAttachment(b64, name) → {ok, path}
+        std::wstring b64 = ParamStr(p, 0);
+        std::wstring name = ParamStr(p, 1);
+        bool ok = openAttachment(wideToUtf8_2(b64), name);
+        if (result) {
+            *result = MakeJsonResult(ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"无法打开附件\"}");
         }
         break;
     }

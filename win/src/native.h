@@ -54,6 +54,8 @@ bool setHistoryDir(const std::wstring& dir);
 // ---- 原生对话框 ----
 bool pickOpenFile(std::wstring& outPath, std::string& outData); // 打开 .usmind
 bool pickAnyFile(std::wstring& outName, std::string& outB64); // 选任意文件返回base64
+// 用系统默认程序打开 base64 附件（解码→临时文件→ShellExecute）
+bool openAttachment(const std::string& b64, const std::wstring& name);
 bool pickSaveFile(const std::wstring& suggested, std::wstring& outPath);
 // 通用另存为（导出用）：初始目录+文件名，任意扩展名
 bool pickSaveFileAny(const std::wstring& defDir, const std::wstring& defName, std::wstring& outPath);

@@ -433,3 +433,43 @@ body {
 }
 .math-preview .katex-display { margin: 4px 0; }
 .math-preview .katex { font-size: 1.05em; }
+
+/* 附件管理弹窗 */
+.attach-info {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px; background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 10px;
+  word-break: break-all;
+}
+.attach-icon { font-size: 20px; flex-shrink: 0; }
+.attach-name { font-size: 13px; color: var(--text); }
+.attach-tip { font-size: 12px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+
+/* ---------- 附件内置预览（CodeMirror 深色，与在线版一致） ---------- */
+#att-preview { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; }
+#att-preview .attp-mask { position: absolute; inset: 0; background: rgba(0,0,0,.72); }
+#att-preview .attp-box { position: relative; width: min(860px, 92vw); max-height: 88vh; background: #1e1e1e; border-radius: 12px; box-shadow: 0 18px 60px rgba(0,0,0,.55); display: flex; flex-direction: column; overflow: hidden; }
+#att-preview .attp-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #252526; border-bottom: 1px solid #333; }
+#att-preview .attp-title { color: #e6e6e6; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px; }
+#att-preview .attp-close { width: 30px; height: 30px; border: none; background: transparent; color: #aaa; font-size: 20px; cursor: pointer; border-radius: 6px; line-height: 1; flex-shrink: 0; }
+#att-preview .attp-close:hover { background: rgba(255,255,255,.12); color: #fff; }
+#att-preview .attp-body { padding: 14px; overflow: auto; }
+#att-preview .attp-dl { color: #909399; font-size: 14px; padding: 40px 0 16px; text-align: center; }
+#att-preview .attp-dl-btn { display: inline-block; padding: 8px 24px; background: #0e7c86; color: #fff; border-radius: 6px; text-decoration: none; font-size: 14px; }
+#att-preview .attp-body .CodeMirror { background: #1e1e1e; color: #e6e6e6; font-family: Consolas,'Courier New',monospace; font-size: 13px; line-height: 1.6; height: 100%; }
+#att-preview .attp-body .CodeMirror-gutters { background: #252526; border-right: 1px solid #333; }
+#att-preview .attp-body .CodeMirror-linenumber { color: #6e6e6e; }
+#att-preview .attp-body .CodeMirror-cursor { border-left: 1px solid #fff; }
+#att-preview .attp-body .CodeMirror-selected { background: #264f78; }
+#att-preview .attp-body span.cm-keyword { color: #569cd6; }
+#att-preview .attp-body span.cm-string, #att-preview .attp-body span.cm-string-2 { color: #ce9178; }
+#att-preview .attp-body span.cm-comment { color: #6a9955; }
+#att-preview .attp-body span.cm-number { color: #b5cea8; }
+#att-preview .attp-body span.cm-atom { color: #d7ba7d; }
+#att-preview .attp-body span.cm-variable, #att-preview .attp-body span.cm-variable-2, #att-preview .attp-body span.cm-property { color: #9cdcfe; }
+#att-preview .attp-body span.cm-def, #att-preview .attp-body span.cm-builtin, #att-preview .attp-body span.cm-qualifier { color: #dcdcaa; }
+#att-preview .attp-body span.cm-operator { color: #d4d4d4; }
+#att-preview .attp-body span.cm-tag { color: #569cd6; }
+#att-preview .attp-body span.cm-attribute { color: #9cdcfe; }
+#att-preview .attp-body span.cm-meta { color: #d4d4d4; }
+#att-preview .attp-body span.cm-error { color: #f44747; }

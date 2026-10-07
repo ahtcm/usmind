@@ -487,7 +487,7 @@ function initMindMap() {
     rainbowLinesConfig: { open: true, colorsList: branchColorsOf(doc.theme) },
     iconList: [
       { type: 'number', list: Array.from({length: 10}, (_, i) => ({ name: String(i + 1), icon: numSvg(i + 1) })) },
-      { type: 'emoji', list: FALLBACK_EMOJI.map(e => ({ name: e, icon: emojiSvg(e) })) },
+      { type: 'emoji', list: FALLBACK_EMOJI.map(e => ({ name: e, icon: emojiSvg(e) })).concat([{ name: '📎', icon: emojiSvg('📎') }]) },
     ],
   });
 
@@ -791,16 +791,438 @@ function ctxAct(act) {
       break;
     case 'copy': try { mind.copy(); } catch (e) {} break;
     case 'cut': try { mind.cut(); } catch (e) {} break;
-    case 'paste': try { mind.handlePaste(); } catch (e) {} break;
+    case 'paste':
+      try { if (ctxNode) mind.renderer.currentNode = ctxNode; } catch (e2) {}
+      try { mind.handlePaste(); } catch (e) {}
+      break;
     case 'undo': try { mind.undo(); } catch (e) { try { mind.command && mind.command.undo && mind.command.undo(); } catch (e2) {} } break;
     case 'redo': try { mind.redo(); } catch (e) { try { mind.command && mind.command.redo && mind.command.redo(); } catch (e2) {} } break;
     case 'icon': openIconDialog(node); break;
     case 'math': openMathDialog(node, false); break;
+    case 'attach': openAttachManage(node || currentSelectedNode()); break;
     case 'link': openLinkDialog(node); break;
     case 'note': openNoteDialog(node); break;
     case 'style': openStyleBar(node || currentSelectedNode()); break;
   }
   setTimeout(() => { try { mind.render(); } catch (e) {} }, 30);
+}
+
+// ---- 附件 ----
+let attachNode = null; // 附件管理弹窗目标节点
+function nodeAttachData(node) {
+  try {
+    const nd = nodeDataOf(node);
+    const dd = (nd && nd.data) || nd || {};
+    if (dd.attachUrl || dd.attachmentUrl) return { url: dd.attachUrl || dd.attachmentUrl, name: dd.attachName || dd.attachmentName || '附件' };
+    return null;
+  } catch (e) { return null; }
+}
+function setNodeAttachment(node, url, name) {
+  try {
+    const nd = nodeDataOf(node);
+    const dd = (nd && nd.data) || nd;
+    dd.attachmentUrl = url;
+    dd.attachmentName = name;
+    // 节点显示 📎 图标：经 execCommand 走库的变更流程（直接改字段不会触发内容重建）
+    try {
+      let real = null;
+      if (nd && nd._node) real = nd._node;                 // 渲染树挂载的节点实例
+      if (!real && mind && mind.renderer && mind.renderer.renderTree) {
+        const uid = nd && nd.data && nd.data.uid;
+        const findInTree = (t) => {
+          if (!t) return null;
+          if (t.data && t.data.uid === uid) return t._node || null;
+          if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
+          return null;
+        };
+        real = findInTree(mind.renderer.renderTree) || null;
+      }
+      if (real && real.getData) {
+        const icons = real.getData('icon') || [];
+        if (icons.indexOf('emoji_📎') < 0) icons.push('emoji_📎');
+        mind.execCommand('SET_NODE_ICON', real, icons);
+        // execCommand 可能重建数据引用：把附件字段同步写入最新数据
+        try {
+          const ndd = nodeDataOf(real);
+          const ddd = (ndd && ndd.data) || ndd;
+          if (ddd) { ddd.attachmentUrl = url; ddd.attachmentName = name; }
+        } catch (e2) {}
+      } else {
+        dd.icon = ['emoji_📎'];
+      }
+    } catch (e) { dd.icon = ['emoji_📎']; }
+  } catch (e) {}
+  mind.render();
+  markDirty();
+  toast('附件已添加：' + name);
+}
+function removeNodeAttachment(node) {
+  try {
+    const nd = nodeDataOf(node);
+    const dd = (nd && nd.data) || nd;
+    delete dd.attachUrl;
+    delete dd.attachName;
+    delete dd.attachmentUrl;
+    delete dd.attachmentName;
+    // 只移除 📎 图标（保留用户其它图标；经 execCommand 走库的变更流程）
+    try {
+      const uid = nd && nd.data && nd.data.uid;
+      let real = null;
+      if (nd && nd._node) real = nd._node;                 // 渲染树挂载的节点实例
+      if (!real && mind && mind.renderer && mind.renderer.renderTree) {
+        const findInTree = (t) => {
+          if (!t) return null;
+          if (t.data && t.data.uid === uid) return t._node || null;
+          if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
+          return null;
+        };
+        real = findInTree(mind.renderer.renderTree) || null;
+      }
+      if (real && real.getData) {
+        const icons = real.getData('icon') || [];
+        const rest = icons.filter(i => i !== 'emoji_📎');
+        mind.execCommand('SET_NODE_ICON', real, rest);
+        // execCommand 可能重建数据引用：同步删除最新数据的附件字段
+        try {
+          const ndd = nodeDataOf(real);
+          const ddd = (ndd && ndd.data) || ndd;
+          if (ddd) { delete ddd.attachUrl; delete ddd.attachName; delete ddd.attachmentUrl; delete ddd.attachmentName; }
+        } catch (e2) {}
+      } else {
+        const icons = dd.icon || [];
+        const rest = icons.filter(i => i !== 'emoji_📎');
+        if (rest.length) dd.icon = rest; else delete dd.icon;
+      }
+    } catch (e) {
+      const icons = dd.icon || [];
+      const rest = icons.filter(i => i !== 'emoji_📎');
+      if (rest.length) dd.icon = rest; else delete dd.icon;
+    }
+  } catch (e) {}
+  mind.render();
+  markDirty();
+  toast('附件已移除');
+}
+// 代码/文本附件预览（CodeMirror 内置，与在线版一致）
+const CODE_MODE_DEFAULT = { js:'text/javascript', mjs:'text/javascript', cjs:'text/javascript', ts:'text/javascript', jsx:'text/javascript', tsx:'text/javascript', json:'application/json', map:'application/json', html:'text/html', htm:'text/html', vue:'text/html', xml:'application/xml', svg:'application/xml', css:'text/css', scss:'text/x-scss', less:'text/x-less', md:'text/x-markdown', markdown:'text/x-markdown', py:'text/x-python', python:'text/x-python', java:'text/x-java', kt:'text/x-kotlin', c:'text/x-csrc', h:'text/x-csrc', cpp:'text/x-c++src', cc:'text/x-c++src', cxx:'text/x-c++src', hpp:'text/x-c++src', hh:'text/x-c++src', cs:'text/x-csharp', go:'text/x-go', rs:'text/x-rust', php:'text/x-php', sh:'text/x-sh', bash:'text/x-sh', zsh:'text/x-sh', sql:'text/x-sql', rb:'text/x-ruby', yml:'text/x-yaml', yaml:'text/x-yaml', swift:'text/x-swift' };
+const TEXT_EXT_DEFAULT = ['txt','log','ini','conf','cfg','csv','env','properties','tsv','gitignore','dockerfile','sass','plist'];
+function isTextExt(ext) { if (!ext) return false; return !!CODE_MODE_DEFAULT[ext] || TEXT_EXT_DEFAULT.includes(ext); }
+function utf8Encode(str) { try { return btoa(unescape(encodeURIComponent(str))); } catch (e) { try { return btoa(str); } catch (e2) { return ''; } } }
+function utf8Decode(b64) { try { return decodeURIComponent(escape(atob(b64))); } catch (e) { try { return atob(b64); } catch (e2) { return ''; } } }
+
+// 扩展名 → MIME（离线版无 file.type 时用）
+function mimeFromName(name) {
+  const ext = (name || '').split('.').pop().toLowerCase();
+  const map = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', bmp:'image/bmp', webp:'image/webp', svg:'image/svg+xml', ico:'image/x-icon',
+    mp3:'audio/mpeg', wav:'audio/wav', m4a:'audio/mp4', flac:'audio/flac', ogg:'audio/ogg', aac:'audio/aac',
+    mp4:'video/mp4', webm:'video/webm', mov:'video/quicktime', mkv:'video/x-matroska', avi:'video/x-msvideo',
+    txt:'text/plain', md:'text/markdown', json:'application/json', js:'text/javascript', py:'text/x-python', c:'text/x-csrc', cpp:'text/x-c++src', h:'text/x-csrc', hpp:'text/x-c++src', java:'text/x-java', html:'text/html', css:'text/css', xml:'application/xml', sql:'text/x-sql', sh:'text/x-sh', pdf:'application/pdf', docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', zip:'application/zip', rar:'application/x-rar-compressed', '7z':'application/x-7z-compressed' };
+  return map[ext] || 'application/octet-stream';
+}
+// 图片尺寸探测
+function getImageSize(src) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res({ width: im.naturalWidth, height: im.naturalHeight });
+    im.onerror = () => res({ width: 210, height: 157 });
+    im.src = src;
+  });
+}
+// 渲染节点 + 同步数据树（getData 递归按 uid 改），保证保存/重渲染后不丢失
+function setNodeDataPersist(node, data, skipRender) {
+  try {
+    if (!skipRender) {
+      mind.renderer.setNodeDataRender(node, data);
+    } else {
+      // 跳过 setNodeDataRender（它会重建节点、丢失新节点的布局位置）：手动写渲染树/实例数据
+      try { if (node && node.data) { for (const k in data) node.data[k] = data[k]; } } catch (e1) {}
+      try {
+        const nd = nodeDataOf(node);
+        const dd = (nd && nd.data) || nd;
+        if (dd) { for (const k in data) dd[k] = data[k]; }
+      } catch (e2) {}
+    }
+    const dd = nodeDataOf(node);
+    const uid = ((dd && dd.data) || dd || {}).uid;
+    if (uid) {
+      const d = mind.getData();
+      const walk = (n) => {
+        if (!n) return;
+        if (n.data && n.data.uid === uid) { const nd = n.data; for (const k in data) { nd[k] = data[k]; } return; }
+        (n.children || []).forEach(walk);
+      };
+      walk(d.root || d);
+    }
+  } catch (e) {}
+}
+// 仅写附件字段（不设 📎 图标；媒体节点内容即附件）。
+// 用自定义字段 attachUrl/attachName（库不识别，不会触发节点内容重建、不丢布局位置）
+function setNodeMediaAttachment(node, url, name) {
+  setNodeDataPersist(node, { attachUrl: url, attachName: name }, true);
+}
+// 从渲染树按 uid 找节点实例
+function findNodeInstance(uid) {
+  try {
+    const findInTree = (t) => {
+      if (!t) return null;
+      if (t.data && t.data.uid === uid) return t._node || null;
+      if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
+      return null;
+    };
+    return findInTree(mind.renderer.renderTree);
+  } catch (e) { return null; }
+}
+// 与在线版一致：在当前选中节点下新建子节点，图片/音视频内嵌渲染，文件显示文件名（红字虚线框）
+function insertFileToNode(file) {
+  if (!file || !mind) return;
+  try {
+    // 插入前父（当前选中节点；无选中 → 根）
+    let parent = null, parentUid = null;
+    try { const l = mind.renderer.activeNodeList; if (l && l[0]) parent = l[0]; } catch (e) {}
+    if (parent) { try { const dd = nodeDataOf(parent); parentUid = ((dd && dd.data) || dd || {}).uid || null; } catch (e2) {} }
+    if (!parentUid) { try { const d = mind.getData(); parentUid = (d.root && d.root.uid) || null; } catch (e3) {} }
+    // 关键：用"渲染树节点"作为 INSERT 目标（库对渲染树节点插入会正确异步布局到父旁；
+    // 传节点实例/无参插入会把新节点留在画布原点或布局错位）
+    let inserted = false;
+    let insertTarget = null;
+    if (parentUid) {
+      try {
+        const findInTree = (t) => {
+          if (!t) return null;
+          if (t.data && t.data.uid === parentUid) return t;
+          if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
+          return null;
+        };
+        insertTarget = findInTree(mind.renderer.renderTree);
+      } catch (e0) {}
+    }
+    if (insertTarget) {
+      try { mind.execCommand('INSERT_CHILD_NODE', insertTarget); inserted = true; } catch (e0b) {}
+    }
+    if (!inserted) {
+      try { if (parent) mind.renderer.currentNode = parent; } catch (e0c) {}
+      try { mind.execCommand('INSERT_CHILD_NODE'); } catch (e0d) {}
+    }
+    // 注意：不能在这里立即 hideEditTextBox——库的 INSERT 布局是异步的，立即取消编辑会打断布局，
+    // 导致新节点留在画布原点（偏移）。等 120ms 布局完成后，renderFileNode 内统一处理。
+    // 库在 execCommand 后异步刷新渲染树+异步布局，多等一会（布局完成后新节点才在父旁）
+    setTimeout(() => {
+      try {
+        let child = null;
+        if (parentUid) {
+          try {
+            const findInTree = (t) => {
+              if (!t) return null;
+              if (t.data && t.data.uid === parentUid) return t;
+              if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
+              return null;
+            };
+            const pt = findInTree(mind.renderer.renderTree);
+            if (pt && pt.children && pt.children.length) {
+              const last = pt.children[pt.children.length - 1];
+              child = last._node || null;
+            }
+          } catch (e4) {}
+        }
+        if (!child) { try { const l = mind.renderer.activeNodeList; if (l && l[0]) child = l[0]; } catch (e5) {} }
+        if (!child) return;
+        renderFileNode(child, file);
+      } catch (e6) {}
+    }, 600);
+  } catch (e) {}
+}
+// 直接写节点样式数据字段（不 execCommand，避免库重建新节点导致布局位置丢失到画布原点）
+function applyNodeStylesDirect(node, styles) {
+  try {
+    const nd = nodeDataOf(node);
+    const dd = (nd && nd.data) || nd;
+    if (!dd || !styles) return;
+    if (styles.shape) dd.shape = styles.shape;
+    if (styles.borderRadius != null) dd.borderRadius = styles.borderRadius;
+    if (styles.borderWidth != null) dd.borderWidth = styles.borderWidth;
+    if (styles.borderColor) dd.borderColor = styles.borderColor;
+    if (styles.borderDasharray) dd.borderDasharray = styles.borderDasharray;
+    if (styles.fillColor) dd.fillColor = styles.fillColor;
+    if (styles.paddingX != null) dd.paddingX = styles.paddingX;
+    if (styles.paddingY != null) dd.paddingY = styles.paddingY;
+    if (styles.textColor) dd.textColor = styles.textColor;
+  } catch (e) {}
+}
+// 在已创建的子节点上按类型渲染媒体/文件
+function renderFileNode(child, file) {
+  try {
+    const name = file.name || '附件';
+    const type = file.type || mimeFromName(name);
+    const src = file.dataUrl || '';
+    if (!src) return;
+    // 统一流程：先退出 INSERT 后库自动进入的文本编辑态（避免其把内容重置回"新主题"），再写媒体内容
+    const apply = (data, styles) => {
+      try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
+      // skipRender：跳过 setNodeDataRender，避免库重建新节点导致布局位置丢失（画布原点）
+      setNodeDataPersist(child, data, true);
+      try { if (styles) applyNodeStylesDirect(child, styles); } catch (e2) {}
+      setNodeMediaAttachment(child, src, name);
+      mind.render();
+      markDirty();
+      toast('已插入: ' + name);
+    };
+    if (type.indexOf('image/') === 0) {
+      getImageSize(src).then(size => {
+        try {
+          const MAX_W = 360, MAX_H = 240;
+          const scale = Math.min(1, MAX_W / (size.width || 1), MAX_H / (size.height || 1));
+          const w = Math.max(100, Math.round((size.width || 210) * scale));
+          const h = Math.max(75, Math.round((size.height || 157) * scale));
+          apply({ richText: true, text:
+            '<div style="position:relative;width:'+w+'px;height:'+h+'px;overflow:hidden;border-radius:12px;line-height:0">'+
+            '<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;display:block;margin:0"></div>' },
+            { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
+        } catch (e3) {}
+      });
+    } else if (type.indexOf('audio/') === 0) {
+      apply({ richText: true, text:
+        '<div style="position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000">'+
+        '<audio controls style="width:100%;height:100%;display:block" src="'+src+'"></audio></div>' }, null);
+    } else if (type.indexOf('video/') === 0) {
+      apply({ richText: true, text:
+        '<div style="position:relative;width:300px;height:170px;overflow:hidden;border-radius:12px;background:#000;line-height:0">'+
+        '<video controls style="width:100%;height:100%;object-fit:cover;display:block;background:#000" src="'+src+'"></video></div>' },
+        { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
+    } else {
+      // 普通文件：文件名（红字虚线框，双击打开/预览）
+      setNodeMediaAttachment(child, src, name);
+      apply({ text: name, richText: false },
+        { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6, textColor:'#e53935' });
+    }
+  } catch (e) {}
+}
+
+// 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
+function openTextPreview(node, att) {
+  try {
+    if (typeof CodeMirror === 'undefined') { toast('预览组件缺失', 'error'); return; }
+    const name = att.name || '附件';
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const mode = CODE_MODE_DEFAULT[ext] || null;
+    const b64 = (att.url || '').split(',')[1] || '';
+    let text = '';
+    try { text = utf8Decode(b64); } catch (e) { text = ''; }
+    let wrap = document.getElementById('att-preview');
+    if (wrap) wrap.remove();
+    wrap = document.createElement('div');
+    wrap.id = 'att-preview';
+    wrap.innerHTML = '<div class="attp-mask"></div><div class="attp-box"><div class="attp-head"><span class="attp-title"></span><button class="attp-close">×</button></div><div class="attp-body"></div></div>';
+    document.body.appendChild(wrap);
+    wrap.querySelector('.attp-title').textContent = name;
+    const close = () => { if (wrap && wrap.parentNode) wrap.remove(); };
+    wrap.querySelector('.attp-close').addEventListener('click', close);
+    wrap.querySelector('.attp-mask').addEventListener('click', close);
+    const body = wrap.querySelector('.attp-body');
+    const cmWrap = document.createElement('div');
+    cmWrap.style.cssText = 'border:1px solid #333;border-radius:10px;overflow:hidden;background:#1e1e1e';
+    body.appendChild(cmWrap);
+    const cm = CodeMirror(cmWrap, {
+      value: text,
+      mode: mode || null,
+      lineNumbers: true,
+      lineWrapping: false,
+      readOnly: 'nocursor',
+      indentUnit: 2,
+      tabSize: 2,
+      scrollbarStyle: 'null'
+    });
+    cm.setSize('100%', '50vh');
+    const bar = document.createElement('div');
+    bar.style.cssText = 'text-align:right;margin-top:10px;display:flex;justify-content:flex-end;gap:8px';
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '编辑';
+    editBtn.className = 'attp-dl-btn';
+    editBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px';
+    const cancelEdit = document.createElement('button');
+    cancelEdit.textContent = '取消编辑';
+    cancelEdit.style.cssText = 'padding:6px 18px;background:#555;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none';
+    const saveBtn = document.createElement('button');
+    saveBtn.textContent = '保存';
+    saveBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none';
+    bar.appendChild(cancelEdit); bar.appendChild(saveBtn); bar.appendChild(editBtn);
+    body.appendChild(bar);
+    editBtn.addEventListener('click', () => {
+      cm.setOption('readOnly', false);
+      editBtn.style.display = 'none';
+      cancelEdit.style.display = ''; saveBtn.style.display = '';
+      cm.focus();
+    });
+    cancelEdit.addEventListener('click', () => {
+      cm.setOption('readOnly', 'nocursor');
+      editBtn.style.display = '';
+      cancelEdit.style.display = 'none'; saveBtn.style.display = 'none';
+    });
+    saveBtn.addEventListener('click', () => {
+      saveBtn.disabled = true; saveBtn.textContent = '保存中...';
+      try {
+        const newB64 = utf8Encode(cm.getValue());
+        setNodeAttachment(node, 'data:text/plain;charset=utf-8;base64,' + newB64, name);
+        close();
+        toast('已保存');
+        markDirty();
+      } catch (e) { toast('保存失败: ' + e.message, 'error'); }
+      saveBtn.disabled = false; saveBtn.textContent = '保存';
+    });
+  } catch (e) {}
+}
+
+// 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
+function openNodeAttachment(node) {
+  try {
+    const att = nodeAttachData(node);
+    if (!att) return;
+    const ext = (att.name.split('.').pop() || '').toLowerCase();
+    const IMG = ['jpg','jpeg','png','gif','bmp','webp','svg'];
+    const VID = ['mp4','webm','ogg','mov'];
+    const AUD = ['mp3','wav','m4a','flac'];
+    if (IMG.includes(ext)) {
+      $('imgViewerImg').src = att.url;
+      $('imgViewer').style.display = 'flex';
+      return;
+    }
+    if (VID.includes(ext) || AUD.includes(ext)) {
+      $('mediaFileName').textContent = att.name;
+      const v = $('mediaVideo'), a = $('mediaAudio');
+      if (VID.includes(ext)) { v.src = att.url; v.style.display = 'block'; a.style.display = 'none'; }
+      else { a.src = att.url; a.style.display = 'block'; v.style.display = 'none'; }
+      $('mediaViewer').style.display = 'flex';
+      return;
+    }
+    // 文本/代码 → 内置 CodeMirror 预览编辑
+    if (isTextExt(ext)) { openTextPreview(node, att); return; }
+    // 其他文件：C++ 解码写临时文件并系统打开；浏览器环境降级为下载
+    const b64 = att.url.split(',')[1] || '';
+    if (hasNative) {
+      callNative('openAttachment', b64, att.name).then(r => {
+        if (!r || !r.ok) {
+          const a2 = document.createElement('a');
+          a2.href = att.url; a2.download = att.name; a2.click();
+        }
+      });
+    } else {
+      const a2 = document.createElement('a');
+      a2.href = att.url; a2.download = att.name; a2.click();
+    }
+  } catch (e) {}
+}
+async function openAttachManage(node) {
+  if (!node) return;
+  attachNode = node;
+  const att = nodeAttachData(node);
+  if (!att) {
+    // 无附件 → 直接选择文件插入
+    const r = await callNative('pickAnyFile');
+    if (!r || !r.ok) return;
+    setNodeAttachment(node, 'data:application/octet-stream;base64,' + r.b64, r.name);
+    return;
+  }
+  $('attachFileName').textContent = att.name;
+  $('attachDialog').style.display = 'flex';
 }
 
 // ---- 样式条 ----
@@ -1039,6 +1461,18 @@ function initNodeEdit() {
       } catch (e2) {}
     });
   } catch (e) {}
+  // 点击节点右上角附件图标 → 打开附件
+  try { mind.on('node_attachmentClick', (node) => { openNodeAttachment(node); }); } catch (e) {}
+  // iconList 图标（📎）点击 → 打开附件
+  try { mind.on('node_icon_click', (node, icon) => {
+    if (icon === 'emoji_📎') openNodeAttachment(node);
+  }); } catch (e) {}
+  // 点击节点图标（📎）→ 打开附件
+  try {
+    mind.on('node_icon_click', (node, iconVal) => {
+      if (String(iconVal || '').indexOf('📎') >= 0) openNodeAttachment(node);
+    });
+  } catch (e) {}
   // 右键菜单点击
   $('ctxMenu').addEventListener('click', (e) => {
     const it = e.target.closest('.ctx-item');
@@ -1099,6 +1533,7 @@ function initNodeEdit() {
       if ($('iconDialog').style.display !== 'none') { $('iconDialog').style.display = 'none'; iconTarget = null; return; }
       if ($('linkDialog').style.display !== 'none') { closeLinkDialog(); return; }
       if ($('noteDialog').style.display !== 'none') { closeNoteDialog(); return; }
+      if ($('attachDialog').style.display !== 'none') { $('attachDialog').style.display = 'none'; attachNode = null; return; }
     }
   });
 }
@@ -1121,34 +1556,62 @@ function bindUi() {
     try { mind.execCommand('UNEXPAND_ALL'); setTimeout(() => mind.view.fit(), 100); } catch (e) {}
   });
 
-  // 添加附件
+  // 添加附件（与在线版一致：在当前选中节点下新建子节点，图片/音视频节点内嵌预览）
   $('btnAttach').addEventListener('click', async () => {
-    document.title = 'DBG:点击附件';
     try {
-      const r = await callNative('pickAnyFile');
-      document.title = 'DBG:返回=' + JSON.stringify(r).slice(0, 100);
-      if (!r || !r.ok) return;
-      const dataUrl = 'data:application/octet-stream;base64,' + r.b64;
-      let parentNode = null;
-      try {
-        const cn = mind.renderer.currentNode;
-        if (cn && cn.nodeData) parentNode = cn.nodeData;
-      } catch (err) {}
-      if (!parentNode) {
-        const d = mind.getData();
-        parentNode = d.root || d;
+      if (hasNative) {
+        const r = await callNative('pickAnyFile');
+        if (!r || !r.ok) return;
+        const type = mimeFromName(r.name);
+        insertFileToNode({ name: r.name, type: type, dataUrl: 'data:' + type + ';base64,' + r.b64 });
+      } else {
+        attachFileInput.value = '';
+        attachFileInput.click();
       }
-      parentNode.attachmentUrl = dataUrl;
-      parentNode.attachmentName = r.name;
-      mind.render();
-      markDirty();
-      document.title = 'DBG:完成';
-    } catch (e) {
-      document.title = 'DBG:异常=' + e.message;
-    }
+    } catch (e) {}
+  });
+  attachFileInput.addEventListener('change', () => {
+    try {
+      const f = attachFileInput.files && attachFileInput.files[0];
+      if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => insertFileToNode({ name: f.name, type: f.type || mimeFromName(f.name), dataUrl: String(rd.result) });
+      rd.readAsDataURL(f);
+    } catch (e) {}
+  });
+  // 附件管理弹窗
+  $('attachOpen').addEventListener('click', () => {
+    if (attachNode) openNodeAttachment(attachNode);
+    $('attachDialog').style.display = 'none';
+    attachNode = null;
+  });
+  $('attachReplace').addEventListener('click', async () => {
+    const n = attachNode;
+    $('attachDialog').style.display = 'none';
+    attachNode = null;
+    if (!n) return;
+    const r = await callNative('pickAnyFile');
+    if (!r || !r.ok) return;
+    setNodeAttachment(n, 'data:application/octet-stream;base64,' + r.b64, r.name);
+  });
+  $('attachRemove').addEventListener('click', () => {
+    if (attachNode) removeNodeAttachment(attachNode);
+    $('attachDialog').style.display = 'none';
+    attachNode = null;
+  });
+  $('attachCancel').addEventListener('click', () => {
+    $('attachDialog').style.display = 'none';
+    attachNode = null;
   });
 
-  // Ctrl+V 粘贴图片/文件
+  // Ctrl+V 粘贴图片/文件（统一走 insertFileToNode：在当前选中节点下新建子节点并渲染）
+  // 库节点粘贴（Ctrl+C 复制节点后 Ctrl+V）前，强制当前节点为选中节点，避免库兜底粘贴到根
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+      const act = (mind.renderer && mind.renderer.activeNodeList && mind.renderer.activeNodeList[0]) || null;
+      if (act) { try { mind.renderer.currentNode = act; } catch (e2) {} }
+    }
+  }, true);
   window.addEventListener('paste', (e) => {
     if (!e.clipboardData) return;
     const items = e.clipboardData.items;
@@ -1156,14 +1619,6 @@ function bindUi() {
     // 如果正在编辑节点输入框，不拦截
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
-    function getParent() {
-      try {
-        const cn = mind.renderer.currentNode;
-        if (cn && cn.nodeData) return cn.nodeData;
-      } catch (err) {}
-      const d = mind.getData();
-      return d.root || d;
-    }
     for (const it of items) {
       if (it.type && it.type.startsWith('image/')) {
         e.preventDefault();
@@ -1171,15 +1626,7 @@ function bindUi() {
         if (!blob) continue;
         const reader = new FileReader();
         reader.onload = (ev) => {
-          const p = getParent();
-          if (!p) return;
-          p.children = p.children || [];
-          p.children.push({
-            data: { text: '', image: ev.target.result, imageSize: { width: 200, height: 200 } },
-            children: []
-          });
-          mind.render();
-          markDirty();
+          insertFileToNode({ name: blob.name || '图片.png', type: it.type, dataUrl: String(ev.target.result) });
         };
         reader.readAsDataURL(blob);
         return;
@@ -1190,12 +1637,7 @@ function bindUi() {
         if (!blob) continue;
         const reader = new FileReader();
         reader.onload = (ev) => {
-          const p = getParent();
-          if (!p) return;
-          p.attachmentUrl = ev.target.result;
-          p.attachmentName = blob.name || '粘贴附件';
-          mind.render();
-          markDirty();
+          insertFileToNode({ name: blob.name || '附件', type: blob.type || mimeFromName(blob.name || ''), dataUrl: String(ev.target.result) });
         };
         reader.readAsDataURL(blob);
         return;
@@ -1203,7 +1645,7 @@ function bindUi() {
     }
   }, true);
 
-  // 双击播放附件
+  // 双击播放附件 / 打开附件
   setTimeout(() => {
     if (mind && mind.on) {
       mind.on('node_dblclick', (node) => {
@@ -1215,24 +1657,7 @@ function bindUi() {
             $('imgViewer').style.display = 'flex';
             return;
           }
-          const attUrl = d.attachmentUrl || (d.data && d.data.attachmentUrl);
-          const attName = d.attachmentName || (d.data && d.data.attachmentName) || '';
-          if (attUrl) {
-            const mv = $('mediaViewer');
-            const v = $('mediaVideo'), a = $('mediaAudio');
-            $('mediaFileName').textContent = attName;
-            const ext = attName.split('.').pop().toLowerCase();
-            if (['mp4','webm','ogg','mov'].includes(ext)) {
-              v.src = attUrl; v.style.display = 'block'; a.style.display = 'none';
-            } else if (['mp3','wav','m4a','flac'].includes(ext)) {
-              a.src = attUrl; a.style.display = 'block'; v.style.display = 'none';
-            } else {
-              const a2 = document.createElement('a');
-              a2.href = attUrl; a2.download = attName;
-              a2.click(); return;
-            }
-            mv.style.display = 'flex';
-          }
+          if (nodeAttachData(node)) { openNodeAttachment(node); return; }
         } catch (e) {}
       });
     }
@@ -1381,3 +1806,8 @@ async function boot() {
 }
 
 boot();
+
+// 浏览器（无原生桥）环境暴露测试钩子；exe 内不暴露
+if (!hasNative && typeof window !== 'undefined') {
+  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, get mind() { return mind; } };
+}
