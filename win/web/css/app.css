@@ -208,7 +208,7 @@ body {
 .panel {
   position: fixed; top: 56px; right: 16px; bottom: 24px;
   width: 440px;
-  background: rgba(255,255,255,.6); backdrop-filter: blur(28px) saturate(1.6);
+  background: rgba(255,255,255,.45); backdrop-filter: blur(36px) saturate(1.8);
   border: 1px solid rgba(255,255,255,.75);
   border-radius: 20px;
   box-shadow: 0 16px 48px rgba(0,0,0,.16);
