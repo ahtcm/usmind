@@ -777,7 +777,7 @@ async function exportSelfContained() {
     // 归一化：https://media.local/attachments/xxx 与 attachments/xxx 视为同一媒体（避免重复打包）
     const keyOf = (u) => {
       try {
-        if (typeof u === 'string' && u.indexOf('https://media.local/') === 0) return 'attachments/' + decodeURIComponent(u.slice(22));
+        if (typeof u === 'string' && u.indexOf('https://media.local/') === 0) return 'attachments/' + decodeURIComponent(u.slice(20));
         return u;
       } catch (e) { return u; }
     };
