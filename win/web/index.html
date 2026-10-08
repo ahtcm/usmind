@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261008c9">
+<link rel="stylesheet" href="css/app.css?v=20261008c10">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -224,6 +224,15 @@
             <div class="te-field"><label>画布背景</label><input type="color" id="teCanvasBg" value="#fafbff"></div>
             <div class="te-field"><label>连线颜色</label><input type="color" id="teLineColor"></div>
             <div class="te-field"><label>连线宽度</label><input type="number" id="teLineWidth" min="1" max="12" value="4"></div>
+            <div class="te-field"><label>附件文字色</label><input type="color" id="teAttachColor"></div>
+            <div class="te-field"><label>背景图片</label>
+              <div class="te-file"><input type="text" id="teBgImage" readonly placeholder="未选择"><button class="mini-btn" id="teBgImageBtn">选择</button><input type="file" id="teBgImageFile" accept="image/*" style="display:none;"></div>
+            </div>
+            <div class="te-field"><label>背景视频</label>
+              <div class="te-file"><input type="text" id="teBgVideo" readonly placeholder="未选择"><button class="mini-btn" id="teBgVideoBtn">选择</button><input type="file" id="teBgVideoFile" accept="video/*" style="display:none;"></div>
+            </div>
+            <div class="te-field"><label>图片透明度</label><input type="number" id="teBgOpacity" min="0" max="100" value="80"></div>
+            <div class="te-field"><label>背景缩放</label><input type="number" id="teBgZoom" min="0.1" max="5" step="0.1" value="1.4"></div>
           </div>
         </div>
         <div class="setting-row">
@@ -232,8 +241,12 @@
             <div class="te-field"><label>填充色</label><input type="color" id="teRootFill"></div>
             <div class="te-field"><label>文字颜色</label><input type="color" id="teRootColor"></div>
             <div class="te-field"><label>边框颜色</label><input type="color" id="teRootBorder"></div>
+            <div class="te-field"><label>边框宽度</label><input type="number" id="teRootBorderWidth" min="0" max="10" value="0"></div>
             <div class="te-field"><label>圆角</label><input type="number" id="teRootRadius" min="0" max="40" value="20"></div>
             <div class="te-field"><label>字号</label><input type="number" id="teRootFontSize" min="12" max="60" value="36"></div>
+            <div class="te-field"><label>字体</label>
+              <select id="teRootFont" class="select-input"><option value="SimHei, Microsoft YaHei, sans-serif">黑体</option><option value="Microsoft YaHei, PingFang SC, sans-serif">微软雅黑</option><option value="SimSun, serif">宋体</option><option value="KaiTi, STKaiti, serif">楷体</option><option value="FangSong, STFangsong, serif">仿宋</option></select>
+            </div>
           </div>
         </div>
       </div>

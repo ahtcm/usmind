@@ -839,6 +839,43 @@ const _ba = $('btnAddTheme'); if (_ba) _ba.addEventListener('click', () => openT
 const _ts = $('teSave'); if (_ts) _ts.addEventListener('click', saveThemeFromDialog);
 const _tc = $('teCancel'); if (_tc) _tc.addEventListener('click', () => $('themeEditDialog').classList.remove('open'));
 const _ta = $('teAddColor'); if (_ta) _ta.addEventListener('click', () => { const arr = currentTeColors(); arr.push('#4a6cf7'); renderTeColors(arr); updateTePreview(); });
+// 背景图片选择（压缩为 dataURL 存储）
+const _bi = $('teBgImageBtn');
+if (_bi) _bi.addEventListener('click', () => $('teBgImageFile').click());
+const _bif = $('teBgImageFile');
+if (_bif) _bif.addEventListener('change', () => {
+  const f = _bif.files && _bif.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      const mx = 1600;
+      if (w > mx || h > mx) { const r = Math.min(mx / w, mx / h); w = Math.round(w * r); h = Math.round(h * r); }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const data = cv.toDataURL('image/jpeg', 0.85);
+      $('teBgImage').dataset.data = data;
+      $('teBgImage').value = '已选择：' + f.name;
+      toast('背景图已选择');
+    };
+    img.onerror = () => toast('图片读取失败', 'error');
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+});
+// 背景视频选择（存配置，本地版暂不支持视频背景预览）
+const _bv = $('teBgVideoBtn');
+if (_bv) _bv.addEventListener('click', () => $('teBgVideoFile').click());
+const _bvf = $('teBgVideoFile');
+if (_bvf) _bvf.addEventListener('change', () => {
+  const f = _bvf.files && _bvf.files[0];
+  if (!f) return;
+  $('teBgVideo').dataset.data = f.name;
+  $('teBgVideo').value = '已选择：' + f.name;
+  toast('背景视频配置已保存（本地版暂不支持预览）');
+});
 // 面板滚动：拦截滚轮冒泡，防止被导图缩放逻辑抢走
 document.querySelectorAll('.panel-body').forEach(pb => {
   pb.addEventListener('wheel', e => { e.stopPropagation(); }, { passive: false });
@@ -914,12 +951,19 @@ function loadCustomThemes() {
     if (colors.length) { config.branchColors = colors; config.lineColor = t.lineColor || colors[0]; }
     if (t.canvasBg) config.backgroundColor = t.canvasBg;
     if (t.lineWidth != null) config.lineWidth = t.lineWidth;
+    if (t.bgImage) config.backgroundImage = t.bgImage;
+    if (t.bgVideo) config.backgroundVideo = t.bgVideo;
+    if (t.bgOpacity != null) config.backgroundOpacity = t.bgOpacity;
+    if (t.bgZoom != null) config.backgroundZoom = t.bgZoom;
+    if (t.attachText) config.attachTextColor = t.attachText;
     if (config.root) {
       config.root.fillColor = t.rootFill || colors[0] || config.root.fillColor;
       if (t.rootColor) config.root.color = t.rootColor;
       if (t.rootBorder) config.root.borderColor = t.rootBorder;
       if (t.rootRadius != null) config.root.borderRadius = t.rootRadius;
       if (t.rootFontSize != null) config.root.fontSize = t.rootFontSize;
+      if (t.rootBorderWidth != null) config.root.borderWidth = t.rootBorderWidth;
+      if (t.rootFont) config.root.fontFamily = t.rootFont;
     }
     const entry = { name: t.name, key: t.key || '', branchColors: colors.length ? colors : (base.branchColors || []), config };
     THEMES.push(entry);
@@ -982,6 +1026,15 @@ function openThemeEdit(name) {
   $('teRootBorder').value = editing ? (editing.rootBorder || '#ffffff') : (cfg ? (cfg.root.borderColor || '#ffffff') : '#ffffff');
   $('teRootRadius').value = editing ? (editing.rootRadius != null ? editing.rootRadius : 20) : (cfg ? (cfg.root.borderRadius || 20) : 20);
   $('teRootFontSize').value = editing ? (editing.rootFontSize != null ? editing.rootFontSize : 36) : (cfg ? (cfg.root.fontSize || 36) : 36);
+  $('teRootBorderWidth').value = editing ? (editing.rootBorderWidth != null ? editing.rootBorderWidth : 0) : (cfg ? (cfg.root.borderWidth || 0) : 0);
+  $('teRootFont').value = editing ? (editing.rootFont || 'SimHei, Microsoft YaHei, sans-serif') : (cfg ? (cfg.root.fontFamily || 'SimHei, Microsoft YaHei, sans-serif') : 'SimHei, Microsoft YaHei, sans-serif');
+  $('teAttachColor').value = editing ? (editing.attachText || '#e53935') : (cfg ? (cfg.attachTextColor || '#e53935') : '#e53935');
+  $('teBgImage').dataset.data = editing ? (editing.bgImage || '') : (cfg && cfg.backgroundImage && cfg.backgroundImage !== 'none' ? cfg.backgroundImage : '');
+  $('teBgImage').value = $('teBgImage').dataset.data ? '已选择' : '';
+  $('teBgVideo').dataset.data = editing ? (editing.bgVideo || '') : (cfg && cfg.backgroundVideo && cfg.backgroundVideo !== 'none' ? cfg.backgroundVideo : '');
+  $('teBgVideo').value = $('teBgVideo').dataset.data ? '已选择' : '';
+  $('teBgOpacity').value = editing ? (editing.bgOpacity != null ? Math.round(editing.bgOpacity * 100) : 80) : (cfg && cfg.backgroundOpacity != null ? Math.round(cfg.backgroundOpacity * 100) : 80);
+  $('teBgZoom').value = editing ? (editing.bgZoom != null ? editing.bgZoom : 1.4) : (cfg ? (cfg.backgroundZoom || 1.4) : 1.4);
   updateTePreview();
   $('themeEditDialog').classList.add('open');
   $('themeEditDialog').dataset.editing = name || '';
@@ -992,12 +1045,20 @@ function renderTeColors(colors) {
   (colors.length ? colors : ['#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4']).forEach((c, i) => {
     const tc = document.createElement('div');
     tc.className = 'tc';
+    const sw = document.createElement('div'); sw.className = 'tc-swatch';
     const inp = document.createElement('input');
     inp.type = 'color'; inp.value = c;
-    inp.addEventListener('input', () => { const arr = currentTeColors(); if (arr[i]) arr[i] = inp.value; updateTePreview(); });
+    inp.addEventListener('input', () => {
+      const arr = currentTeColors(); if (arr[i]) arr[i] = inp.value;
+      sw.style.background = inp.value;
+      tc.querySelector('.tc-hex').textContent = inp.value.toUpperCase();
+      updateTePreview();
+    });
+    sw.appendChild(inp);
+    const hex = document.createElement('div'); hex.className = 'tc-hex'; hex.textContent = c.toUpperCase();
     const x = document.createElement('span'); x.className = 'tc-x'; x.textContent = '×';
     x.onclick = () => { const arr = currentTeColors(); arr.splice(i, 1); renderTeColors(arr); updateTePreview(); };
-    tc.appendChild(inp); tc.appendChild(x);
+    tc.appendChild(sw); tc.appendChild(hex); tc.appendChild(x);
     box.appendChild(tc);
   });
 }
@@ -1038,7 +1099,14 @@ function saveThemeFromDialog() {
     rootColor: $('teRootColor').value,
     rootBorder: $('teRootBorder').value,
     rootRadius: parseInt($('teRootRadius').value) || 20,
-    rootFontSize: parseInt($('teRootFontSize').value) || 36
+    rootFontSize: parseInt($('teRootFontSize').value) || 36,
+    rootBorderWidth: parseInt($('teRootBorderWidth').value) || 0,
+    rootFont: $('teRootFont').value,
+    attachText: $('teAttachColor').value,
+    bgImage: $('teBgImage').dataset.data || '',
+    bgVideo: $('teBgVideo').dataset.data || '',
+    bgOpacity: parseInt($('teBgOpacity').value) / 100,
+    bgZoom: parseFloat($('teBgZoom').value) || 1.4
   };
   const customs = getCustomThemes();
   if (editingName) {
