@@ -206,12 +206,12 @@ body {
 #overlay.show { opacity: 1; pointer-events: auto; }
 
 .panel {
-  position: fixed; top: 60px; right: 16px; bottom: 70px;
-  width: 340px;
-  background: rgba(255,255,255,.65); backdrop-filter: blur(24px) saturate(1.5);
-  border: 1px solid rgba(255,255,255,.7);
-  border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0,0,0,.12);
+  position: fixed; top: 56px; right: 16px; bottom: 24px;
+  width: 440px;
+  background: rgba(255,255,255,.6); backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 20px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.16);
   transform: translateX(calc(100% + 30px)); transition: transform .25s cubic-bezier(.2,.8,.2,1);
   z-index: 55; display: flex; flex-direction: column;
   overflow: hidden;
@@ -336,7 +336,7 @@ body {
 }
 #layoutBtn:hover, #themeBtn:hover { background: rgba(255,255,255,.9); }
 .drop-menu {
-  position: absolute; bottom: 40px; right: 0; min-width: 160px;
+  display: none; position: absolute; bottom: 40px; right: 0; min-width: 160px;
   background: rgba(255,255,255,.75); backdrop-filter: blur(28px) saturate(1.5);
   border: 1px solid rgba(255,255,255,.8); border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0,0,0,.15); padding: 6px; z-index: 60;

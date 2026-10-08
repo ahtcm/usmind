@@ -821,10 +821,14 @@ async function fillSettings() {
     });
     themeMenu.appendChild(it);
   });
-  $('themeBtn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    themeMenu.style.display = themeMenu.style.display === 'none' ? 'block' : 'none';
-  });
+  if (!$('themeBtn')._bound) {
+    $('themeBtn')._bound = true;
+    $('themeBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      themeMenu.style.display = themeMenu.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+  themeMenu.style.display = 'none';
   // 历史目录
   const app = await callNative('getAppInfo');
   $('setHistoryDir').value = s.historyDir || '（默认：程序目录 \\history）';
