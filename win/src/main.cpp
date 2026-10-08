@@ -147,6 +147,12 @@ public:
         if (g_webview4) {
             g_webview4->SetVirtualHostNameToFolderMapping(
                 L"app.local", webDir.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
+            // 虚拟主机映射：https://media.local → data 目录（附件外置存储，浏览器流式加载本地媒体）
+            std::wstring dataDir = appDir() + L"\\data";
+            CreateDirectoryW(dataDir.c_str(), NULL);
+            CreateDirectoryW((dataDir + L"\\attachments").c_str(), NULL);
+            g_webview4->SetVirtualHostNameToFolderMapping(
+                L"media.local", dataDir.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
             // 导出下载拦截（弹"另存为"对话框，本地导出路径可控）
             EventRegistrationToken dlTok;
             g_webview4->add_DownloadStarting(new DownloadStartingHandler(), &dlTok);

@@ -15,7 +15,7 @@
 
 namespace usmind {
 
-static std::string base64Encode(const std::string& in) {
+std::string base64Encode(const std::string& in) {
     static const char tbl[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string out;
     int val = 0, valb = -6;
@@ -402,9 +402,23 @@ bool pickAnyFile(std::wstring& outName, std::string& outB64) {
     return got;
 }
 
+// ---- 附件外置存储前置声明（openAttachment 使用）----
+static bool safeRelPath(const std::wstring& rel);
+std::wstring attachmentDir();
+
 // 用系统默认程序打开 base64 附件：解码 → 临时目录 → ShellExecute
+// 兼容外置模式：b64 参数若为 "attachments/xxx" 相对路径，则直接打开 exe/data/attachments 下文件
 bool openAttachment(const std::string& b64, const std::wstring& name) {
     if (b64.empty()) return false;
+    std::wstring rel = utf8ToWide(b64);
+    if (rel.compare(0, 12, L"attachments/") == 0 && safeRelPath(rel)) {
+        std::wstring full = attachmentDir() + L"\\" + rel.substr(12);
+        if (fileExists(full)) {
+            HINSTANCE r = ShellExecuteW(NULL, L"open", full.c_str(), NULL, NULL, SW_SHOWNORMAL);
+            return (INT_PTR)r > 32;
+        }
+        return false;
+    }
     std::string bytes = base64Decode(b64);
     if (bytes.empty()) return false;
     wchar_t tmp[MAX_PATH] = { 0 };
@@ -417,6 +431,57 @@ bool openAttachment(const std::string& b64, const std::wstring& name) {
     if (!writeFile(path, bytes)) return false;
     HINSTANCE r = ShellExecuteW(NULL, L"open", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
     return (INT_PTR)r > 32;
+}
+
+// ---- 附件外置存储（exe/data/attachments，media.local 虚拟主机映射到 exe/data） ----
+std::wstring attachmentDir() {
+    std::wstring base = appDir() + L"\\data";
+    CreateDirectoryW(base.c_str(), NULL);
+    std::wstring d = base + L"\\attachments";
+    CreateDirectoryW(d.c_str(), NULL);
+    return d;
+}
+
+// 校验相对路径：必须 "attachments/" 前缀、正斜杠、无 .. 与冒号穿越
+static bool safeRelPath(const std::wstring& rel) {
+    if (rel.size() < 13) return false;
+    if (rel.compare(0, 12, L"attachments/") != 0) return false;
+    if (rel.find(L"..") != std::wstring::npos) return false;
+    if (rel.find(L":") != std::wstring::npos) return false;
+    if (rel.find(L"\\") != std::wstring::npos) return false;
+    return true;
+}
+
+// 写入外置附件（relPath="attachments/xxx.mp4"，b64 内容）
+bool writeAttachment(const std::wstring& relPath, const std::string& b64) {
+    if (!safeRelPath(relPath)) return false;
+    std::string bytes = base64Decode(b64);
+    if (bytes.empty()) return false;
+    std::wstring full = attachmentDir() + L"\\" + relPath.substr(12);
+    return writeFile(full, bytes);
+}
+
+// 外置附件是否存在
+bool attachmentExists(const std::wstring& relPath) {
+    if (!safeRelPath(relPath)) return false;
+    std::wstring full = attachmentDir() + L"\\" + relPath.substr(12);
+    return fileExists(full);
+}
+
+// 读任意文件为 base64（二进制安全，用于自包含 zip 打开）
+bool readFileB64(const std::wstring& path, std::string& outB64) {
+    bool ok = false;
+    std::string raw = readTextFile(path, ok);
+    if (!ok) return false;
+    outB64 = base64Encode(raw);
+    return true;
+}
+
+// base64 → 写二进制文件（用于自包含 zip 保存）
+bool writeFileB64(const std::wstring& path, const std::string& b64) {
+    std::string bytes = base64Decode(b64);
+    if (bytes.empty()) return false;
+    return writeFile(path, bytes);
 }
 
 bool pickSaveFile(const std::wstring& suggested, std::wstring& outPath) {

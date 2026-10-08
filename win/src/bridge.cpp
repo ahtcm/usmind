@@ -4,6 +4,8 @@
 
 #include <objbase.h>
 #include <oleauto.h>
+#include <windows.h>
+#include <cstdio>
 #include <vector>
 #include <sstream>
 
@@ -25,8 +27,11 @@ static const wchar_t* const kMethods[] = {
     L"registerAssoc",   // 14
     L"notifyDocumentState", // 15 （前端上报文件名变化，用于标题栏）
     L"pickFolder",      // 16 （目录选择，历史目录设置用）
-    L"pickAnyFile",     // 17 （选任意文件返回base64）
-    L"openAttachment"   // 18 （base64附件用系统默认程序打开）
+    L"pickAnyFile",     // 17 （选任意文件：写入外置附件返回相对路径）
+    L"openAttachment",  // 18 （附件用系统默认程序打开：base64 或 外置相对路径）
+    L"writeAttachment", // 19 （写入外置附件 relPath+b64）
+    L"openPathBinary",  // 20 （读任意文件→base64，自包含 zip 打开用）
+    L"saveBinary"       // 21 （base64→写二进制文件，自包含 zip 保存用）
 };
 static const int kMethodCount = sizeof(kMethods) / sizeof(kMethods[0]);
 
@@ -213,32 +218,50 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 5: { // openWithDialog → {ok,path,name,data}
+    case 5: { // openWithDialog → {ok,path,name,data}（zip 自包含包 → {ok,isZip,path,name,b64}）
         std::wstring path;
         std::string data;
         bool ok = pickOpenFile(path, data);
         if (result) {
             if (ok) {
-                std::string j = "{\"ok\":true,\"path\":\"" + JsEscape(path) + "\","
-                                "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
-                                "\"data\":" + (data.empty() ? std::string("null") : std::string("\"") + JsEscape(utf8ToWide2(data)) + "\"") + "}";
-                *result = MakeJsonResult(j);
+                bool isZip = data.size() >= 4 && (unsigned char)data[0] == 0x50 && (unsigned char)data[1] == 0x4B
+                             && (unsigned char)data[2] == 0x03 && (unsigned char)data[3] == 0x04;
+                if (isZip) {
+                    std::string j = "{\"ok\":true,\"isZip\":true,\"path\":\"" + JsEscape(path) + "\","
+                                    "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
+                                    "\"b64\":\"" + base64Encode(data) + "\"}";
+                    *result = MakeJsonResult(j);
+                } else {
+                    std::string j = "{\"ok\":true,\"path\":\"" + JsEscape(path) + "\","
+                                    "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
+                                    "\"data\":" + (data.empty() ? std::string("null") : std::string("\"") + JsEscape(utf8ToWide2(data)) + "\"") + "}";
+                    *result = MakeJsonResult(j);
+                }
             } else {
                 *result = MakeJsonResult("{\"ok\":false}");
             }
         }
         break;
     }
-    case 6: { // openPath(path) → {ok,path,name,data}
+    case 6: { // openPath(path) → {ok,path,name,data}（zip 自包含包 → {ok,isZip,path,name,b64}）
         std::wstring path = ParamStr(p, 0);
         std::string data;
         bool ok = !path.empty() && readFile(path, data);
         if (result) {
             if (ok) {
-                std::string j = "{\"ok\":true,\"path\":\"" + JsEscape(path) + "\","
-                                "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
-                                "\"data\":" + std::string("\"") + JsEscape(utf8ToWide2(data)) + "\"}";
-                *result = MakeJsonResult(j);
+                bool isZip = data.size() >= 4 && (unsigned char)data[0] == 0x50 && (unsigned char)data[1] == 0x4B
+                             && (unsigned char)data[2] == 0x03 && (unsigned char)data[3] == 0x04;
+                if (isZip) {
+                    std::string j = "{\"ok\":true,\"isZip\":true,\"path\":\"" + JsEscape(path) + "\","
+                                    "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
+                                    "\"b64\":\"" + base64Encode(data) + "\"}";
+                    *result = MakeJsonResult(j);
+                } else {
+                    std::string j = "{\"ok\":true,\"path\":\"" + JsEscape(path) + "\","
+                                    "\"name\":\"" + JsEscape(fileNameOf(path)) + "\","
+                                    "\"data\":" + std::string("\"") + JsEscape(utf8ToWide2(data)) + "\"}";
+                    *result = MakeJsonResult(j);
+                }
             } else {
                 *result = MakeJsonResult("{\"ok\":false,\"error\":\"无法读取文件\"}");
             }
@@ -353,16 +376,22 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 17: { // pickAnyFile → {ok, name, b64}
+    case 17: { // pickAnyFile → {ok, name, relPath?, b64?}（外置模式：直接写 attachments 返回相对路径）
         std::wstring name;
         std::string b64;
         bool ok = pickAnyFile(name, b64);
         if (result) {
             std::string j;
             if (ok) {
-                j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"b64\":\"";
-                j += b64;
-                j += "\"}";
+                // 生成唯一相对路径 att_<毫秒>_<原名>，写入外置附件目录
+                wchar_t ts[40] = { 0 };
+                swprintf(ts, 40, L"%lld", (long long)GetTickCount64());
+                std::wstring rel = L"attachments/att_" + std::wstring(ts) + L"_" + fileNameOf(name);
+                if (writeAttachment(rel, b64)) {
+                    j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"relPath\":\"" + JsEscape(rel) + "\"}";
+                } else {
+                    j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"b64\":\"" + b64 + "\"}";
+                }
             } else j = "{\"ok\":false}";
             *result = MakeJsonResult(j);
         }
@@ -374,6 +403,55 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         bool ok = openAttachment(wideToUtf8_2(b64), name);
         if (result) {
             *result = MakeJsonResult(ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"无法打开附件\"}");
+        }
+        break;
+    }
+    case 19: { // writeAttachment(relPath, b64) → {ok}
+        std::wstring rel = ParamStr(p, 0);
+        std::wstring b64 = ParamStr(p, 1);
+        bool ok = writeAttachment(rel, wideToUtf8_2(b64));
+        if (result) {
+            *result = MakeJsonResult(ok ? "{\"ok\":true}" : "{\"ok\":false,\"error\":\"写入附件失败\"}");
+        }
+        break;
+    }
+    case 20: { // openPathBinary(path) → {ok, b64}（自包含 zip 打开）
+        std::wstring path = ParamStr(p, 0);
+        std::string b64;
+        bool ok = !path.empty() && readFileB64(path, b64);
+        if (result) {
+            if (ok) {
+                std::string j = "{\"ok\":true,\"b64\":\"" + b64 + "\"}";
+                *result = MakeJsonResult(j);
+            } else {
+                *result = MakeJsonResult("{\"ok\":false,\"error\":\"无法读取文件\"}");
+            }
+        }
+        break;
+    }
+    case 21: { // saveBinary(b64, path, name) → {ok, path?}（自包含 zip 保存）
+        std::wstring b64 = ParamStr(p, 0);
+        std::wstring path = ParamStr(p, 1);
+        std::wstring name = ParamStr(p, 2);
+        bool ok = false;
+        if (!path.empty()) {
+            snapshotHistory(path, name.empty() ? fileNameOf(path) : name);
+            ok = writeFileB64(path, wideToUtf8_2(b64));
+        } else {
+            std::wstring sp;
+            if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", sp)) {
+                snapshotHistory(sp, name);
+                ok = writeFileB64(sp, wideToUtf8_2(b64));
+                if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
+            } else {
+                if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                break;
+            }
+        }
+        if (result) {
+            std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
+                               : "{\"ok\":false,\"error\":\"保存失败\"}";
+            *result = MakeJsonResult(j);
         }
         break;
     }

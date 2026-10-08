@@ -40,6 +40,8 @@ bool readFile(const std::wstring& path, std::string& out); // UTF-8
 bool writeFile(const std::wstring& path, const std::string& data);
 bool fileExists(const std::wstring& path);
 std::wstring fileNameOf(const std::wstring& path);
+// 二进制 → base64（自包含 zip 走桥用）
+std::string base64Encode(const std::string& in);
 
 // ---- 历史 ----
 std::wstring historyDir();
@@ -54,8 +56,17 @@ bool setHistoryDir(const std::wstring& dir);
 // ---- 原生对话框 ----
 bool pickOpenFile(std::wstring& outPath, std::string& outData); // 打开 .usmind
 bool pickAnyFile(std::wstring& outName, std::string& outB64); // 选任意文件返回base64
-// 用系统默认程序打开 base64 附件（解码→临时文件→ShellExecute）
+// 用系统默认程序打开 base64 附件（解码→临时文件→ShellExecute）；相对路径直接打开外置附件
 bool openAttachment(const std::string& b64, const std::wstring& name);
+// ---- 附件外置存储（exe/data/attachments）----
+// 写入外置附件（relPath="attachments/xxx"，b64 内容）
+bool writeAttachment(const std::wstring& relPath, const std::string& b64);
+// 外置附件是否存在
+bool attachmentExists(const std::wstring& relPath);
+// 读任意文件为 base64（二进制安全，自包含 zip 打开用）
+bool readFileB64(const std::wstring& path, std::string& outB64);
+// base64 → 写二进制文件（自包含 zip 保存用）
+bool writeFileB64(const std::wstring& path, const std::string& b64);
 bool pickSaveFile(const std::wstring& suggested, std::wstring& outPath);
 // 通用另存为（导出用）：初始目录+文件名，任意扩展名
 bool pickSaveFileAny(const std::wstring& defDir, const std::wstring& defName, std::wstring& outPath);

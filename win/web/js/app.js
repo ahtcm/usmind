@@ -417,8 +417,9 @@ async function applyDoc(parsed, path, name) {
 async function openPath(path) {
   if (!path) return;
   const r = await callNative('openPath', path);
-  if (r && r.ok && r.data) {
+  if (r && r.ok && (r.data || r.b64)) {
     try {
+      if (r.isZip) { await importSelfContained(r.b64, r.path || path, r.name); return; }
       const parsed = parseDoc(r.data);
       openInTab(r.path || path, r.name, parsed);
       booting = false;
@@ -435,8 +436,9 @@ async function openPath(path) {
 
 async function openWithDialog() {
   const r = await callNative('openWithDialog');
-  if (r && r.ok && r.data) {
+  if (r && r.ok && (r.data || r.b64)) {
     try {
+      if (r.isZip) { await importSelfContained(r.b64, r.path, r.name); return; }
       const parsed = parseDoc(r.data);
       openInTab(r.path, r.name, parsed);
       toast('已打开：' + r.name);
@@ -751,9 +753,153 @@ async function doExport(type) {
     else if (type === 'md') await mind.doExport.export('md', true, name);
     else if (type === 'json') await mind.doExport.export('json', true, name);
     else if (type === 'xmind') await mind.doExport.export('xmind', true, name);
+    else if (type === 'zip') await exportSelfContained();
     toast('导出已启动，请选择保存位置');
   } catch (e) {
     toast('导出失败：' + e.message, 'error');
+  }
+}
+
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+
+// 导出"自包含"包：结构与所有媒体打进单文件 .usmind（zip），拷走即开
+async function exportSelfContained() {
+  try {
+    if (typeof JSZip === 'undefined') return { ok: false, error: '缺少打包组件' };
+    const root = JSON.parse(JSON.stringify(mind.getData()));
+    // 归一化：https://media.local/attachments/xxx 与 attachments/xxx 视为同一媒体（避免重复打包）
+    const keyOf = (u) => {
+      try {
+        if (typeof u === 'string' && u.indexOf('https://media.local/') === 0) return 'attachments/' + decodeURIComponent(u.slice(22));
+        return u;
+      } catch (e) { return u; }
+    };
+    const mediaMap = new Map(); // 归一 key → { id, raw }
+    let idx = 0;
+    const norm = (u) => {
+      const k = keyOf(u);
+      if (!mediaMap.has(k)) { idx++; mediaMap.set(k, { id: 'media/att' + idx, raw: u }); }
+      return mediaMap.get(k).id;
+    };
+    const walk = (n) => {
+      if (!n) return;
+      const dd = n.data;
+      if (dd) {
+        const u = dd.attachUrl || dd.attachmentUrl;
+        if (u) {
+          dd.attachUrl = norm(u);
+          delete dd.attachmentUrl;
+        }
+        if (typeof dd.text === 'string' && dd.text.indexOf('src="') !== -1) {
+          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|blob:|data:)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
+        }
+        if (dd.image && (dd.image.indexOf('https://media.local/') === 0 || dd.image.indexOf('data:') === 0)) {
+          dd.image = norm(dd.image);
+        }
+      }
+      (n.children || []).forEach(walk);
+    };
+    walk(root);
+    const manifest = {
+      format: 'usmind', version: 2, selfContained: true,
+      name: doc.name, theme: doc.theme, layout: doc.layout,
+      savedAt: new Date().toISOString(), data: { root },
+    };
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    for (const [, v] of mediaMap) {
+      try {
+        let buf;
+        if (v.raw.indexOf('data:') === 0) buf = await dataUrlToBlob(v.raw).arrayBuffer();
+        else { const r = await fetch(resolveMediaUrl(v.raw)); if (!r.ok) continue; buf = await r.arrayBuffer(); }
+        zip.file(v.id, buf);
+      } catch (eM) { /* 单个媒体失败跳过，引用保留但缺失 */ }
+    }
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+    const name0 = (doc.name || '导图').replace(/\.usmind$/i, '');
+    if (hasNative) {
+      const b64 = arrayBufferToBase64(await blob.arrayBuffer());
+      const r = await callNative('saveBinary', b64, '', name0 + '.usmind');
+      if (r && r.ok) { toast('已导出自包含包'); return { ok: true, mediaCount: mediaMap.size, bytes: b64.length }; }
+      toast('导出已取消', 'info');
+      return { ok: false, cancel: true };
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name0 + '.usmind';
+      a.click();
+      toast('已导出自包含包');
+      return { ok: true, mediaCount: mediaMap.size, bytes: blob.size };
+    }
+  } catch (e) {
+    toast('导出失败：' + e.message, 'error');
+    return { ok: false, error: e.message };
+  }
+}
+
+// 导入"自包含"包：解 zip → 媒体落盘 exe/data/attachments → 引用改外置相对路径 → 打开（外置模式渲染）
+async function importSelfContained(b64, path, name) {
+  try {
+    if (typeof JSZip === 'undefined') return { ok: false, error: '缺少打包组件' };
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const zip = await JSZip.loadAsync(bytes);
+    const mf = zip.file('manifest.json');
+    if (!mf) { toast('不是有效的自包含包', 'error'); return; }
+    const manifest = JSON.parse(await mf.async('string'));
+    const ts = Date.now();
+    const replaceMap = {};
+    const mediaKeys = Object.keys(zip.files).filter(k => k.indexOf('media/') === 0 && !zip.files[k].dir);
+    for (const k of mediaKeys) {
+      try {
+        const ab = await zip.files[k].async('arraybuffer');
+        const rel = 'attachments/att_' + ts + '_' + k.replace('media/', '').replace(/[\\/:*?"<>|]/g, '_');
+        const wr = await callNative('writeAttachment', rel, arrayBufferToBase64(ab));
+        if (wr && wr.ok) replaceMap[k] = rel;
+      } catch (eM) {}
+    }
+    const walk = (n) => {
+      if (!n) return;
+      const dd = n.data;
+      if (dd) {
+        if (typeof dd.text === 'string' && dd.text.indexOf('src="media/') !== -1) {
+          dd.text = dd.text.replace(/src="(media\/[^"]+)"/g, (m, ref) => {
+            const rel = replaceMap[ref];
+            return rel ? 'src="' + rel + '"' : m;
+          });
+        }
+        const u = dd.attachUrl || dd.attachmentUrl;
+        if (u && u.indexOf('media/') === 0) {
+          const rel = replaceMap[u];
+          if (rel) { dd.attachUrl = rel; delete dd.attachmentUrl; }
+        }
+        if (dd.image && dd.image.indexOf('media/') === 0) {
+          const rel = replaceMap[dd.image];
+          if (rel) dd.image = resolveMediaUrl(rel);
+        }
+      }
+      (n.children || []).forEach(walk);
+    };
+    walk(manifest.data.root);
+    const parsed = {
+      root: manifest.data.root,
+      theme: manifest.theme || DEFAULT_THEME,
+      layout: manifest.layout || 'logicalStructure',
+      name: manifest.name || name || '未命名导图',
+    };
+    openInTab(path, name, parsed);
+    toast('已导入自包含包');
+    return { ok: true, media: Object.keys(replaceMap).length };
+  } catch (e) {
+    toast('导入失败：' + e.message, 'error');
+    return { ok: false, error: e.message };
   }
 }
 
@@ -997,6 +1143,21 @@ function findNodeInstance(uid) {
 function insertFileToNode(file) {
   if (!file || !mind) return;
   try {
+    // 未选中节点时：库 INSERT 依赖选中/渲染树，直接走数据树根插入（可靠且不偏移）
+    let hasActive = false;
+    try { const l = mind.renderer.activeNodeList; hasActive = !!(l && l.length); } catch (eA) {}
+    if (!hasActive) {
+      try {
+        const d = mind.getData();
+        if (!d.root) d.root = { data: { text: '中心主题' }, children: [] };
+        if (!d.root.children) d.root.children = [];
+        const nd = { data: { text: '' }, children: [] };
+        d.root.children.push(nd);
+        try { mind.render(); } catch (eR) {}
+        setTimeout(() => { renderFileNode(nd, file); }, 600);
+        return;
+      } catch (eQ) {}
+    }
     // 插入前父（当前选中节点；无选中 → 根）
     let parent = null, parentUid = null;
     try { const l = mind.renderer.activeNodeList; if (l && l[0]) parent = l[0]; } catch (e) {}
@@ -1019,6 +1180,28 @@ function insertFileToNode(file) {
     }
     if (insertTarget) {
       try { mind.execCommand('INSERT_CHILD_NODE', insertTarget); inserted = true; } catch (e0b) {}
+    }
+    if (!inserted && parentUid) {
+      // 兜底：库 INSERT 失败（如未选中节点时）→ 直接往数据树父节点追加子节点，渲染后写媒体
+      try {
+        const d = mind.getData();
+        const walkP = (n) => {
+          if (!n) return null;
+          if (n.data && n.data.uid === parentUid) return n;
+          for (const c of (n.children || [])) { const r = walkP(c); if (r) return r; }
+          return null;
+        };
+        const ptD = walkP(d);
+        if (ptD) {
+          if (!ptD.children) ptD.children = [];
+          const nd = { data: { text: '' }, children: [] };
+          ptD.children.push(nd);
+          inserted = true;
+          try { mind.render(); } catch (eR) {}
+          setTimeout(() => { renderFileNode(nd, file); }, 600);
+          return; // 已完成（数据树直接插入），跳过后续库插入流程
+        }
+      } catch (eF) {}
     }
     if (!inserted) {
       try { if (parent) mind.renderer.currentNode = parent; } catch (e0c) {}
@@ -1046,6 +1229,20 @@ function insertFileToNode(file) {
           } catch (e4) {}
         }
         if (!child) { try { const l = mind.renderer.activeNodeList; if (l && l[0]) child = l[0]; } catch (e5) {} }
+        if (!child) {
+          // 兜底：未选中/渲染树未挂载时，从数据树取父节点的最后一个子节点（保证插入根场景不丢附件）
+          try {
+            const d = mind.getData();
+            const walk2 = (n) => {
+              if (!n) return null;
+              if (n.data && n.data.uid === parentUid) return n;
+              for (const c of (n.children || [])) { const r2 = walk2(c); if (r2) return r2; }
+              return null;
+            };
+            const pt2 = walk2(d);
+            if (pt2 && pt2.children && pt2.children.length) child = pt2.children[pt2.children.length - 1];
+          } catch (e7) {}
+        }
         if (!child) return;
         renderFileNode(child, file);
       } catch (e6) {}
@@ -1078,7 +1275,7 @@ function renderFileNode(child, file) {
   try {
     const name = file.name || '附件';
     const type = file.type || mimeFromName(name);
-    const src = file.dataUrl || '';
+    const src = file.dataUrl || file.relPath || '';
     if (!src) return;
     // 统一流程：先退出 INSERT 后库自动进入的文本编辑态（避免其把内容重置回"新主题"），再写媒体内容
     const apply = (data, styles) => {
@@ -1092,7 +1289,7 @@ function renderFileNode(child, file) {
       toast('已插入: ' + name);
     };
     if (type.indexOf('image/') === 0) {
-      const objUrl = mediaObjectUrl(src);
+      const objUrl = resolveMediaUrl(src);
       getImageSize(objUrl).then(size => {
         try {
           const MAX_W = 360, MAX_H = 240;
@@ -1108,11 +1305,11 @@ function renderFileNode(child, file) {
     } else if (type.indexOf('audio/') === 0) {
       apply({ richText: true, text:
         '<div style="position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000">'+
-        '<audio controls style="width:100%;height:100%;display:block" src="'+mediaObjectUrl(src)+'"></audio></div>' }, null);
+        '<audio controls style="width:100%;height:100%;display:block" src="'+resolveMediaUrl(src)+'"></audio></div>' }, null);
     } else if (type.indexOf('video/') === 0) {
       apply({ richText: true, text:
         '<div style="position:relative;width:300px;height:170px;overflow:hidden;border-radius:12px;background:#000;line-height:0">'+
-        '<video controls style="width:100%;height:100%;object-fit:cover;display:block;background:#000" src="'+mediaObjectUrl(src)+'"></video></div>' },
+        '<video controls style="width:100%;height:100%;object-fit:cover;display:block;background:#000" src="'+resolveMediaUrl(src)+'"></video></div>' },
         { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
     } else {
       // 普通文件：文件名（红字虚线框，双击打开/预览）
@@ -1124,15 +1321,14 @@ function renderFileNode(child, file) {
 }
 
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
-function openTextPreview(node, att) {
+async function openTextPreview(node, att) {
   try {
     if (typeof CodeMirror === 'undefined') { toast('预览组件缺失', 'error'); return; }
     const name = att.name || '附件';
     const ext = (name.split('.').pop() || '').toLowerCase();
     const mode = CODE_MODE_DEFAULT[ext] || null;
-    const b64 = (att.url || '').split(',')[1] || '';
     let text = '';
-    try { text = utf8Decode(b64); } catch (e) { text = ''; }
+    try { text = await loadAttachmentText(att); } catch (e) { text = ''; }
     let wrap = document.getElementById('att-preview');
     if (wrap) wrap.remove();
     wrap = document.createElement('div');
@@ -1224,6 +1420,66 @@ function revokeMediaUrl(dataUrl) {
   }
 }
 
+// 附件 URL 解析（双模式）：外置相对路径 attachments/xxx → media.local 虚拟主机 URL（浏览器流式加载）；
+// dataUrl 内嵌 → blob objectURL；其他（blob:/http:）原样
+function resolveMediaUrl(u) {
+  if (!u || typeof u !== 'string') return u || '';
+  if (u.indexOf('attachments/') === 0) {
+    try { return 'https://media.local/' + u.split('/').map(encodeURIComponent).join('/'); }
+    catch (e) { return u; }
+  }
+  if (u.indexOf('data:') === 0) return mediaObjectUrl(u);
+  return u;
+}
+// 附件文本读取（markdown/文本预览）：data: → 解码；外置相对路径 → fetch(media.local)
+async function loadAttachmentText(att) {
+  const u = (att && att.url) || '';
+  if (u.indexOf('data:') === 0) {
+    const b64 = u.split(',')[1] || '';
+    try { return decodeURIComponent(escape(atob(b64))); } catch (e) { try { return atob(b64); } catch (e2) { return ''; } }
+  }
+  try { const r = await fetch(resolveMediaUrl(u)); return await r.text(); } catch (e) { return ''; }
+}
+// 附件二进制读取（docx/xlsx/pdf 预览）：返回 ArrayBuffer
+async function loadAttachmentBuffer(att) {
+  const u = (att && att.url) || '';
+  if (u.indexOf('data:') === 0) {
+    try { return dataUrlToBlob(u).arrayBuffer(); } catch (e) { throw e; }
+  }
+  const r = await fetch(resolveMediaUrl(u));
+  if (!r.ok) throw new Error('附件读取失败');
+  return r.arrayBuffer();
+}
+
+// 外置模式：把 File 写入 exe/data/attachments，返回相对路径 attachments/xxx（失败返回 null）
+async function storeFileExternal(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    }
+    const b64 = btoa(bin);
+    const safeName = String(file.name || 'file').replace(/[\\/:*?"<>|]/g, '_');
+    const rel = 'attachments/att_' + Date.now() + '_' + safeName;
+    const r = await callNative('writeAttachment', rel, b64);
+    if (r && r.ok) return rel;
+    return null;
+  } catch (e) { return null; }
+}
+// 统一插入：hasNative 走外置（快），否则内嵌 dataUrl
+async function insertExternalOrInline(file, name, type) {
+  if (hasNative) {
+    const rel = await storeFileExternal(file);
+    if (rel) { insertFileToNode({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), relPath: rel }); return; }
+  }
+  const rd = new FileReader();
+  rd.onload = () => insertFileToNode({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), dataUrl: String(rd.result) });
+  rd.readAsDataURL(file);
+}
+
 // 树级媒体 src 优化：dataUrl ↔ blob objectURL（渲染用 blob 流畅，保存前还原 dataUrl 保证文件自包含）
 function walkTree(node, fn) {
   if (!node) return;
@@ -1233,10 +1489,14 @@ function walkTree(node, fn) {
 function patchTreeMediaSrc(root) {
   walkTree(root, n => {
     const t = n && n.data && n.data.text;
-    if (typeof t === 'string' && t.indexOf('data:') !== -1) {
-      n.data.text = t.replace(/src="(data:[^"]+)"/g, (m, d) => {
-        try { return 'src="' + mediaObjectUrl(d) + '"'; } catch (e) { return m; }
-      });
+    if (typeof t === 'string' && (t.indexOf('data:') !== -1 || t.indexOf('attachments/') !== -1)) {
+      n.data.text = t
+        .replace(/src="(data:[^"]+)"/g, (m, d) => {
+          try { return 'src="' + mediaObjectUrl(d) + '"'; } catch (e) { return m; }
+        })
+        .replace(/src="(attachments\/[^"]+)"/g, (m, r) => {
+          try { return 'src="' + resolveMediaUrl(r) + '"'; } catch (e) { return m; }
+        });
     }
   });
 }
@@ -1253,48 +1513,49 @@ function restoreTreeMediaSrc(root) {
 }
 
 // docx/xlsx/pdf 内置预览（离线：mammoth / SheetJS / Chromium 原生 PDF）
-function openDocPreview(att) {
+async function openDocPreview(att) {
   try {
     const ext = (att.name.split('.').pop() || '').toLowerCase();
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在加载…</div>';
     nameEl.textContent = att.name;
     $('docPreview').style.display = 'flex';
-    const blob = dataUrlToBlob(att.url);
+    const buf = await loadAttachmentBuffer(att);
     if (ext === 'pdf') {
-      const url = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }));
       body.innerHTML = '<iframe class="doc-pdf-frame" src="' + url + '"></iframe>';
       return;
     }
-    const read = blob.arrayBuffer ? blob.arrayBuffer() : Promise.reject(new Error('浏览器不支持 arrayBuffer'));
-    read.then(buf => {
-      if (ext === 'docx' || ext === 'doc') {
-        if (!window.mammoth) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 mammoth 库</div>'; return; }
-        mammoth.convertToHtml({ arrayBuffer: buf }).then(res => {
-          body.innerHTML = '<div class="doc-docx">' + (res.value || '<em>（空文档）</em>') + '</div>';
-        }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">docx 解析失败：' + (e && e.message || e) + '</div>'; });
-      } else {
-        if (!window.XLSX) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 SheetJS 库</div>'; return; }
-        const wb = XLSX.read(buf, { type: 'array' });
-        const html = wb.SheetNames.map(sn => {
-          return '<h4 style="margin:8px 0;color:#333;">' + sn + '</h4>' + XLSX.utils.sheet_to_html(wb.Sheets[sn]);
-        }).join('<hr style="border:none;border-top:1px solid #eee;">');
-        body.innerHTML = '<div class="doc-xlsx">' + html + '</div>';
-      }
-    }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">读取失败：' + (e && e.message || e) + '</div>'; });
-  } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
+    if (ext === 'docx' || ext === 'doc') {
+      if (!window.mammoth) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 mammoth 库</div>'; return; }
+      mammoth.convertToHtml({ arrayBuffer: buf }).then(res => {
+        body.innerHTML = '<div class="doc-docx">' + (res.value || '<em>（空文档）</em>') + '</div>';
+      }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">docx 解析失败：' + (e && e.message || e) + '</div>'; });
+      return;
+    }
+    if (!window.XLSX) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 SheetJS 库</div>'; return; }
+    const wb = XLSX.read(buf, { type: 'array' });
+    const html = wb.SheetNames.map(sn => {
+      return '<h4 style="margin:8px 0;color:#333;">' + sn + '</h4>' + XLSX.utils.sheet_to_html(wb.Sheets[sn]);
+    }).join('<hr style="border:none;border-top:1px solid #eee;">');
+    body.innerHTML = '<div class="doc-xlsx">' + html + '</div>';
+  } catch (e) {
+    try {
+      const body = $('docPreviewBody');
+      body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">读取失败：' + (e && e.message || e) + '</div>';
+    } catch (e2) { try { $('docPreview').style.display = 'none'; } catch (e3) {} }
+  }
 }
 
 // markdown 附件：渲染预览（marked + KaTeX 公式），可切换 CodeMirror 编辑
-function openMarkdownPreview(node, att) {
+async function openMarkdownPreview(node, att) {
   try {
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     nameEl.textContent = att.name;
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在渲染…</div>';
     $('docPreview').style.display = 'flex';
-    const b64 = att.url.split(',')[1] || '';
     let text = '';
-    try { text = decodeURIComponent(escape(atob(b64))); } catch (e) { try { text = atob(b64); } catch (e2) {} }
+    try { text = await loadAttachmentText(att); } catch (e) { text = ''; }
     const raw = text || '';
     let html = '';
     if (window.marked) {
@@ -1335,15 +1596,15 @@ function openNodeAttachment(node) {
     const VID = ['mp4','webm','ogg','mov'];
     const AUD = ['mp3','wav','m4a','flac'];
     if (IMG.includes(ext)) {
-      $('imgViewerImg').src = mediaObjectUrl(att.url);
+      $('imgViewerImg').src = resolveMediaUrl(att.url);
       $('imgViewer').style.display = 'flex';
       return;
     }
     if (VID.includes(ext) || AUD.includes(ext)) {
       $('mediaFileName').textContent = att.name;
       const v = $('mediaVideo'), a = $('mediaAudio');
-      if (VID.includes(ext)) { v.src = mediaObjectUrl(att.url); v.style.display = 'block'; a.style.display = 'none'; }
-      else { a.src = mediaObjectUrl(att.url); a.style.display = 'block'; v.style.display = 'none'; }
+      if (VID.includes(ext)) { v.src = resolveMediaUrl(att.url); v.style.display = 'block'; a.style.display = 'none'; }
+      else { a.src = resolveMediaUrl(att.url); a.style.display = 'block'; v.style.display = 'none'; }
       $('mediaViewer').style.display = 'flex';
       return;
     }
@@ -1353,18 +1614,19 @@ function openNodeAttachment(node) {
     if (isTextExt(ext)) { openTextPreview(node, att); return; }
     // docx/xlsx/pdf → 内置预览（mammoth/SheetJS/Chromium PDF）
     if (ext === 'pdf' || ext === 'docx' || ext === 'doc' || ext === 'xlsx' || ext === 'xls') { openDocPreview(att); return; }
-    // 其他文件：C++ 解码写临时文件并系统打开；浏览器环境降级为下载
-    const b64 = att.url.split(',')[1] || '';
+    // 其他文件：C++ 打开（外置相对路径直接打开；内嵌 base64 写临时文件）；浏览器环境降级为下载
     if (hasNative) {
+      const relLike = String(att.url || '').indexOf('attachments/') === 0;
+      const b64 = relLike ? String(att.url) : ((att.url || '').split(',')[1] || '');
       callNative('openAttachment', b64, att.name).then(r => {
         if (!r || !r.ok) {
           const a2 = document.createElement('a');
-          a2.href = att.url; a2.download = att.name; a2.click();
+          a2.href = resolveMediaUrl(att.url); a2.download = att.name; a2.click();
         }
       });
     } else {
       const a2 = document.createElement('a');
-      a2.href = att.url; a2.download = att.name; a2.click();
+      a2.href = resolveMediaUrl(att.url); a2.download = att.name; a2.click();
     }
   } catch (e) {}
 }
@@ -1721,7 +1983,11 @@ function bindUi() {
         const r = await callNative('pickAnyFile');
         if (!r || !r.ok) return;
         const type = mimeFromName(r.name);
-        insertFileToNode({ name: r.name, type: type, dataUrl: 'data:' + type + ';base64,' + r.b64 });
+        if (r.relPath) {
+          insertFileToNode({ name: r.name, type: type, relPath: r.relPath });
+        } else {
+          insertFileToNode({ name: r.name, type: type, dataUrl: 'data:' + type + ';base64,' + r.b64 });
+        }
       } else {
         attachFileInput.value = '';
         attachFileInput.click();
@@ -1732,9 +1998,7 @@ function bindUi() {
     try {
       const f = attachFileInput.files && attachFileInput.files[0];
       if (!f) return;
-      const rd = new FileReader();
-      rd.onload = () => insertFileToNode({ name: f.name, type: f.type || mimeFromName(f.name), dataUrl: String(rd.result) });
-      rd.readAsDataURL(f);
+      insertExternalOrInline(f, f.name, f.type || mimeFromName(f.name));
     } catch (e) {}
   });
   // 附件管理弹窗
@@ -1750,7 +2014,11 @@ function bindUi() {
     if (!n) return;
     const r = await callNative('pickAnyFile');
     if (!r || !r.ok) return;
-    setNodeAttachment(n, 'data:application/octet-stream;base64,' + r.b64, r.name);
+    if (r.relPath) {
+      setNodeAttachment(n, r.relPath, r.name);
+    } else {
+      setNodeAttachment(n, 'data:application/octet-stream;base64,' + r.b64, r.name);
+    }
   });
   $('attachRemove').addEventListener('click', () => {
     if (attachNode) removeNodeAttachment(attachNode);
@@ -1782,22 +2050,14 @@ function bindUi() {
         e.preventDefault();
         const blob = it.getAsFile();
         if (!blob) continue;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          insertFileToNode({ name: blob.name || '图片.png', type: it.type, dataUrl: String(ev.target.result) });
-        };
-        reader.readAsDataURL(blob);
+        insertExternalOrInline(blob, blob.name || '图片.png', it.type);
         return;
       }
       if (it.kind === 'file') {
         e.preventDefault();
         const blob = it.getAsFile();
         if (!blob) continue;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          insertFileToNode({ name: blob.name || '附件', type: blob.type || mimeFromName(blob.name || ''), dataUrl: String(ev.target.result) });
-        };
-        reader.readAsDataURL(blob);
+        insertExternalOrInline(blob, blob.name || '附件', blob.type || mimeFromName(blob.name || ''));
         return;
       }
     }
@@ -1833,39 +2093,53 @@ function bindUi() {
     $('docPreviewBody').innerHTML = '';
     $('docPreview').style.display = 'none';
   });
-  $('imgFileInput').addEventListener('change', (e) => {
+  $('imgFileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      const img = new Image();
-      img.onload = () => {
-        const w = Math.min(img.width, 280);
-        const h = img.height * (w / img.width);
-        // 直接往当前选中节点的 children 里加
-        let parentNode = null;
-        try {
-          const cn = mind.renderer.currentNode;
-          if (cn && cn.nodeData) parentNode = cn.nodeData;
-        } catch (err) {}
-        if (!parentNode) {
-          const d = mind.getData();
-          parentNode = d.root;
-        }
-        if (!parentNode.children) parentNode.children = [];
-        parentNode.children.push({
-          data: { text: '', image: dataUrl, imageSize: { width: w, height: h } },
-          children: []
-        });
-        mind.render();
-        markDirty();
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+    let imgUrl = '';
+    if (hasNative) {
+      const rel = await storeFileExternal(file);
+      if (rel) imgUrl = resolveMediaUrl(rel);
+    }
+    if (!imgUrl) {
+      const reader = new FileReader();
+      reader.onload = (ev) => { insertImageNode(String(ev.target.result)); };
+      reader.readAsDataURL(file);
+    } else {
+      insertImageNode(imgUrl);
+    }
     e.target.value = '';
   });
+
+  // 图片节点插入（image 字段：URL 或 dataUrl）
+  function insertImageNode(imgUrl) {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const w = Math.min(img.width, 280);
+          const h = img.height * (w / img.width);
+          let parentNode = null;
+          try {
+            const cn = mind.renderer.currentNode;
+            if (cn && cn.nodeData) parentNode = cn.nodeData;
+          } catch (err) {}
+          if (!parentNode) {
+            const d = mind.getData();
+            parentNode = d.root;
+          }
+          if (!parentNode.children) parentNode.children = [];
+          parentNode.children.push({
+            data: { text: '', image: imgUrl, imageSize: { width: w, height: h } },
+            children: []
+          });
+          mind.render();
+          markDirty();
+        } catch (e2) {}
+      };
+      img.src = imgUrl;
+    } catch (e) {}
+  }
 
   // 双击图片节点全屏查看（mind 可能还没创建，延迟绑定）
   setTimeout(() => {
@@ -1971,5 +2245,5 @@ boot();
 
 // 浏览器（无原生桥）环境暴露测试钩子；exe 内不暴露
 if (!hasNative && typeof window !== 'undefined') {
-  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, mediaObjectUrl: mediaObjectUrl, patchTreeMediaSrc: patchTreeMediaSrc, restoreTreeMediaSrc: restoreTreeMediaSrc, serializeDoc: serializeDoc, get mind() { return mind; } };
+  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, mediaObjectUrl: mediaObjectUrl, resolveMediaUrl: resolveMediaUrl, storeFileExternal: storeFileExternal, exportSelfContained: exportSelfContained, importSelfContained: importSelfContained, patchTreeMediaSrc: patchTreeMediaSrc, restoreTreeMediaSrc: restoreTreeMediaSrc, serializeDoc: serializeDoc, get mind() { return mind; } };
 }
