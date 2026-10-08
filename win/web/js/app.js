@@ -193,8 +193,9 @@ function switchToTab(i) {
   doc.theme = t.theme || userDefaultTheme;
   doc.layout = t.layout || 'logicalStructure';
   // 统一直接根节点格式（旧快照可能是 {root:...}，库 setData 不接受）
+  // 直接用快照引用（快照已是深拷贝副本），省去大导图重复克隆造成的切换卡顿
   const dd = t.data && t.data.root ? t.data.root : t.data;
-  try { mind.setData(cloneMindData(dd, new Map())); } catch (e) { showErr('切换失败 setData: ' + e.message); }
+  try { mind.setData(dd); } catch (e) { showErr('切换失败 setData: ' + e.message); }
   try { mind.setLayout(doc.layout); } catch (e) {}
   try { mind.setTheme(doc.theme); } catch (e) {}
   try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
