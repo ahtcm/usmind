@@ -177,6 +177,11 @@ function switchToTab(i) {
   try { mind.setTheme(doc.theme); } catch (e) {}
   try { mind.render(); } catch (e) {}
   setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+  // 切换丝滑：画布淡入
+  try {
+    const mc = document.getElementById('mindMapContainer');
+    if (mc) { mc.classList.remove('mindmap-fade'); void mc.offsetWidth; mc.classList.add('mindmap-fade'); }
+  } catch (e) {}
   dirty = false;
   updateTitle();
   updateStatus();
