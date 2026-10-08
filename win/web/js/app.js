@@ -663,42 +663,20 @@ function applyTheme(name) {
   doc.theme = name;
   try { mind.setTheme(name); } catch (e) {}
   try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(name) }); } catch (e) {}
-  paintBranchNodeColors(name);
   dirty = true;
   updateTitle();
   toast('已切换主题：' + t.name);
 }
 
-// 自定义主题：分支节点背景跟随配色（中心/二级/其它节点用第1/2/3色）
+// 分支节点背景：引擎按主题层级配色（root=第1色，second=第2色，node=第3色），已在 loadCustomThemes 写入主题 config
 function paintBranchNodeColors(name) {
-  const root = mind.renderTree;
-  if (!root) return;
-  const customs = getCustomThemes();
-  const custom = customs.find(x => x.name === name);
-  const colors = (custom && custom.colors && custom.colors.filter(Boolean)) || [];
-  (function walk(n) {
-    if (n && n.data) { delete n.data.fillColor; delete n.data.color; }
-    (n.children || []).forEach(walk);
-  })(root);
-  if (!colors.length) return;
-  // 分支节点按彩虹配色循环：第2层=colors[分支索引]，第3层起=colors[分支索引+深度偏移]
-  (function walk(n, bi, depth) {
-    if (depth >= 1 && n.data) {
-      const c = colors[(bi + depth - 1) % colors.length];
-      n.data.fillColor = c;
-      n.data.color = '#ffffff';
-    }
-    const kids = n.children || [];
-    if (depth === 0) kids.forEach((ch, i) => walk(ch, i, 1));
-    else kids.forEach(ch => walk(ch, bi, depth + 1));
-  })(root, 0, 0);
-  try { mind.render && mind.render(); } catch (e) {}
+  // 引擎不支持逐分支节点配色，保留空实现避免误写节点数据
 }
 
 function buildThemeGrid() {
   const grid = $('themeGrid');
   grid.innerHTML = '';
-  grid.className = 'theme-grid';
+  grid.className = 'panel-body theme-grid';
   THEMES.forEach(t => {
     const card = document.createElement('div');
     card.className = 'theme-card' + (t.name === doc.theme ? ' active' : '');
@@ -949,6 +927,8 @@ function loadCustomThemes() {
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
     if (colors.length) { config.branchColors = colors; config.lineColor = t.lineColor || colors[0]; }
+    if (config.second && colors.length) { config.second.fillColor = colors[1] || colors[0]; config.second.color = '#ffffff'; }
+    if (config.node && colors.length) { config.node.fillColor = colors[2] || colors[0]; config.node.color = '#ffffff'; }
     if (t.canvasBg) config.backgroundColor = t.canvasBg;
     if (t.lineWidth != null) config.lineWidth = t.lineWidth;
     if (t.bgImage) config.backgroundImage = t.bgImage;

@@ -228,7 +228,7 @@ body {
   font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 8px;
 }
 .panel-close:hover { background: rgba(0,0,0,.06); color: #2a2e3d; }
-.panel-body { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 14px 18px; color: #3a3f4e; }
+.panel-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 18px; color: #3a3f4e; }
 .panel-body::-webkit-scrollbar { width: 6px; }
 .panel-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 3px; }
 
