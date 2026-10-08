@@ -1593,8 +1593,7 @@ function setNodeAttachment(node, url, name) {
   try {
     const nd = nodeDataOf(node);
     const dd = (nd && nd.data) || nd;
-    dd.attachmentUrl = url;
-    dd.attachmentName = name;
+    if (dd) { dd.attachmentUrl = url; dd.attachmentName = name; }
     // 节点显示 📎 图标：经 execCommand 走库的变更流程（直接改字段不会触发内容重建）
     try {
       let real = null;
@@ -1603,7 +1602,7 @@ function setNodeAttachment(node, url, name) {
         const uid = nd && nd.data && nd.data.uid;
         const findInTree = (t) => {
           if (!t) return null;
-          if (t.data && t.data.uid === uid) return t._node || null;
+          if (t.data && t.data.uid === uid) return t;
           if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
           return null;
         };
@@ -1612,19 +1611,21 @@ function setNodeAttachment(node, url, name) {
       if (real && real.getData) {
         const icons = real.getData('icon') || [];
         if (icons.indexOf('emoji_📎') < 0) icons.push('emoji_📎');
-        mind.execCommand('SET_NODE_ICON', real, icons);
-        // execCommand 可能重建数据引用：把附件字段同步写入最新数据
+        // 直写 icon 数据（不走 execCommand：其部分重渲染+节点缓存复用会让附件节点文字停在
+        // 布局前的旧坐标，造成"文字左偏/框文分离"）；下面统一全量重建渲染。
         try {
           const ndd = nodeDataOf(real);
           const ddd = (ndd && ndd.data) || ndd;
-          if (ddd) { ddd.attachmentUrl = url; ddd.attachmentName = name; }
+          if (ddd) { ddd.icon = icons; ddd.attachmentUrl = url; ddd.attachmentName = name; }
         } catch (e2) {}
       } else {
-        dd.icon = ['emoji_📎'];
+        if (dd) dd.icon = ['emoji_📎'];
       }
-    } catch (e) { dd.icon = ['emoji_📎']; }
+    } catch (e) { try { if (dd) dd.icon = ['emoji_📎']; } catch (e3) {} }
   } catch (e) {}
-  mind.render();
+  // 清渲染缓存强制全量重建：确保附件节点（直写数据+图标）的文字按最新布局坐标绘制，不残留旧位置
+  try { if (mind && mind.renderer) { mind.renderer.nodeCache = {}; mind.renderer.lastNodeCache = {}; } } catch (eC) {}
+  try { mind.render(); } catch (e) {}
   markDirty();
   toast('附件已添加：' + name);
 }
@@ -1638,7 +1639,7 @@ function removeNodeAttachment(node) {
     delete dd.attachName;
     delete dd.attachmentUrl;
     delete dd.attachmentName;
-    // 只移除 📎 图标（保留用户其它图标；经 execCommand 走库的变更流程）
+    // 只移除 📎 图标（保留用户其它图标）：直写数据避免库部分重渲染+缓存复用残留文字位置
     try {
       const uid = nd && nd.data && nd.data.uid;
       let real = null;
@@ -1655,12 +1656,10 @@ function removeNodeAttachment(node) {
       if (real && real.getData) {
         const icons = real.getData('icon') || [];
         const rest = icons.filter(i => i !== 'emoji_📎');
-        mind.execCommand('SET_NODE_ICON', real, rest);
-        // execCommand 可能重建数据引用：同步删除最新数据的附件字段
         try {
           const ndd = nodeDataOf(real);
           const ddd = (ndd && ndd.data) || ndd;
-          if (ddd) { delete ddd.attachUrl; delete ddd.attachName; delete ddd.attachmentUrl; delete ddd.attachmentName; }
+          if (ddd) { if (rest.length) ddd.icon = rest; else delete ddd.icon; }
         } catch (e2) {}
       } else {
         const icons = dd.icon || [];
@@ -1673,7 +1672,9 @@ function removeNodeAttachment(node) {
       if (rest.length) dd.icon = rest; else delete dd.icon;
     }
   } catch (e) {}
-  mind.render();
+  // 清渲染缓存强制全量重建（同 setNodeAttachment）
+  try { if (mind && mind.renderer) { mind.renderer.nodeCache = {}; mind.renderer.lastNodeCache = {}; } } catch (eC) {}
+  try { mind.render(); } catch (e) {}
   markDirty();
   toast('附件已移除');
 }
@@ -1778,7 +1779,7 @@ function insertFileToNode(file) {
       try {
         const findInTree = (t) => {
           if (!t) return null;
-          if (t.data && t.data.uid === parentUid) return t;
+          if (t.data && t.data.uid === parentUid) return t._node || null;   // 库命令需要 Node 实例
           if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
           return null;
         };
