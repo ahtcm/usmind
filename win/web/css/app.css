@@ -27,7 +27,6 @@ body {
   font-size: 14px;
   user-select: none;
   -webkit-font-smoothing: antialiased;
-  perspective: 1400px;
 }
 
 #app { position: relative; height: 100vh; overflow: hidden; }
@@ -120,11 +119,21 @@ body {
   box-shadow: 0 3px 12px rgba(108,140,255,.25);
 }
 .tab-item:hover { color: #2a2e3d; background: #f5f7ff; box-shadow: 0 3px 12px rgba(20,30,60,.14); transform: translateY(-1px); }
-@keyframes tabPageTurn {
-  from { transform: rotateY(-58deg) translateX(30px); opacity: .35; }
-  to   { transform: rotateY(0) translateX(0); opacity: 1; }
+#renderLoading {
+  position: absolute; inset: 0; z-index: 60;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(20,22,31,.32);
 }
-.mindmap-page { animation: tabPageTurn .36s cubic-bezier(.25,.8,.3,1); transform-origin: left center; transform-style: preserve-3d; }
+#renderLoading.show { display: flex; }
+.rl-spinner {
+  width: 32px; height: 32px;
+  border: 3px solid rgba(255,255,255,.25); border-top-color: #fff;
+  border-radius: 50%;
+  animation: rlSpin .7s linear infinite;
+  flex-shrink: 0;
+}
+.rl-text { color: #fff; font-size: 13px; margin-left: 10px; letter-spacing: 1px; }
+@keyframes rlSpin { to { transform: rotate(360deg); } }
 .tab-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; margin-left: 6px;

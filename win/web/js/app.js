@@ -15,6 +15,14 @@ function showErr(msg) {
   }
   document.getElementById('bootErr').textContent = msg;
 }
+function showRenderLoading() {
+  const el = document.getElementById('renderLoading');
+  if (el) el.classList.add('show');
+}
+function hideRenderLoading() {
+  const el = document.getElementById('renderLoading');
+  if (el) el.classList.remove('show');
+}
 window.addEventListener('error', (e) => showErr('脚本错误: ' + (e.message || String(e.error || '')) + '\n' + (e.filename || '')));
 window.addEventListener('unhandledrejection', (e) => showErr('未处理异常: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))));
 
@@ -66,6 +74,7 @@ let booting = true;
 // 多标签：每个标签保存一份文档快照（data/theme/layout/name/path）
 let tabs = [];       // [{name, path, data, theme, layout}]
 let activeTab = -1;
+let switchingTab = false;   // 切换渲染中，防止连点重复切换
 
 // 深拷贝导图数据：跳过 parent/_parent 等循环引用字段，seen 集合兜底防任意循环（如栈溢出导致快照失败、切换无效）
 function cloneMindData(node, seen) {
@@ -183,8 +192,7 @@ function closeTab(i) {
   renderTabStrip();
 }
 function switchToTab(i) {
-  if (i === activeTab) return;
-  const oldActiveTab = activeTab;
+  if (i === activeTab || switchingTab) return;
   snapshotActiveTab();
   activeTab = i;
   const t = tabs[i];
@@ -196,25 +204,23 @@ function switchToTab(i) {
   // 统一直接根节点格式（旧快照可能是 {root:...}，库 setData 不接受）
   // 直接用快照引用（快照已是深拷贝副本），省去大导图重复克隆造成的切换卡顿
   const dd = t.data && t.data.root ? t.data.root : t.data;
-  try { mind.setData(dd); } catch (e) { showErr('切换失败 setData: ' + e.message); }
-  try { mind.setLayout(doc.layout); } catch (e) {}
-  try { mind.setTheme(doc.theme); } catch (e) {}
-  try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
-  setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
-  // 切换翻书动画：画布像书页一样从左翻开（rotateY + 轻微位移）
-  try {
-    const mc = document.getElementById('mindMapContainer');
-    if (mc) {
-      mc.classList.remove('mindmap-page');
-      void mc.offsetWidth;
-      mc.classList.add('mindmap-page');
-    }
-  } catch (e) {}
-  dirty = false;
-  updateTitle();
-  updateStatus();
-  renderTabStrip();
-  syncLayoutSelect();
+  // 先显示渲染 loading，再异步渲染（避免同步渲染阻塞导致 loading 来不及显示）
+  showRenderLoading();
+  switchingTab = true;
+  setTimeout(() => {
+    try { mind.setData(dd); } catch (e) { showErr('切换失败 setData: ' + e.message); }
+    try { mind.setLayout(doc.layout); } catch (e) {}
+    try { mind.setTheme(doc.theme); } catch (e) {}
+    try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
+    hideRenderLoading();
+    switchingTab = false;
+    setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+    dirty = false;
+    updateTitle();
+    updateStatus();
+    renderTabStrip();
+    syncLayoutSelect();
+  }, 40);
 }
 function newTab() {
   snapshotActiveTab();
