@@ -548,7 +548,17 @@ async function openPath(path) {
     try {
       if (r.isZip) { await importSelfContained(r.b64, r.path || path, r.name); return; }
       const parsed = parseDoc(r.data);
-      if (parsed.multiTabs) { restoreAllTabs(parsed.multiTabs); booting = false; toast('已恢复 ' + parsed.multiTabs.length + ' 个标签'); return; }
+      if (parsed.multiTabs) {
+        restoreAllTabs(parsed.multiTabs);
+        tabs[activeTab].path = r.path || path;
+        doc.path = tabs[activeTab].path;
+        doc.name = r.name || parsed.name || doc.name;
+        booting = false;
+        updateTitle();
+        toast('已恢复 ' + parsed.multiTabs.length + ' 个标签');
+        callNative('saveSettings', JSON.stringify({ lastFile: doc.path }));
+        return;
+      }
       openInTab(r.path || path, r.name, parsed);
       booting = false;
       toast('已打开：' + (r.name || doc.name));
@@ -589,7 +599,17 @@ async function openWithDialog() {
     try {
       if (r.isZip) { await importSelfContained(r.b64, r.path, r.name); return; }
       const parsed = parseDoc(r.data);
-      if (parsed.multiTabs) { restoreAllTabs(parsed.multiTabs); booting = false; toast('已恢复 ' + parsed.multiTabs.length + ' 个标签'); return; }
+      if (parsed.multiTabs) {
+        restoreAllTabs(parsed.multiTabs);
+        tabs[activeTab].path = r.path;
+        doc.path = r.path;
+        doc.name = r.name || parsed.name || doc.name;
+        booting = false;
+        updateTitle();
+        toast('已恢复 ' + parsed.multiTabs.length + ' 个标签');
+        callNative('saveSettings', JSON.stringify({ lastFile: r.path }));
+        return;
+      }
       openInTab(r.path, r.name, parsed);
       toast('已打开：' + r.name);
     } catch (e) {

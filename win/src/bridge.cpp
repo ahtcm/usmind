@@ -251,6 +251,7 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         bool ok = !path.empty() && readFile(path, data);
         if (result) {
             if (ok) {
+                currentPath = path; currentName = fileNameOf(path); // 打开即记住工作文件
                 bool isZip = data.size() >= 4 && (unsigned char)data[0] == 0x50 && (unsigned char)data[1] == 0x4B
                              && (unsigned char)data[2] == 0x03 && (unsigned char)data[3] == 0x04;
                 if (isZip) {
