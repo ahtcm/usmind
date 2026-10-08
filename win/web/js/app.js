@@ -100,12 +100,20 @@ function renderTabStrip() {
   const strip = document.getElementById('tabStrip');
   strip.innerHTML = '';
   tabs.forEach((t, i) => {
+    // 活跃标签实时取画布根节点文字（t.data 可能是旧快照，避免节点改名后标签不跟随）
+    let labelText = rootText(t);
+    if (i === activeTab && mind) {
+      try {
+        const rd = mind.getData();
+        if (rd && rd.root && rd.root.data && rd.root.data.text) labelText = stripHtml(rd.root.data.text) || labelText;
+      } catch (e) {}
+    }
     const el = document.createElement('div');
     el.className = 'tab-item' + (i === activeTab ? ' active' : '');
-    el.title = rootText(t);
+    el.title = labelText;
 
     const label = document.createElement('span');
-    label.textContent = rootText(t) + (t.dirty ? ' ●' : '');
+    label.textContent = labelText + (t.dirty ? ' ●' : '');
     el.appendChild(label);
 
     const close = document.createElement('span');
@@ -521,8 +529,8 @@ function initMindMap() {
     markDirty();
     renderTabStrip();
   });
-  // 轮询刷新标签名（内联编辑时 data_change 可能不触发）
-  setInterval(() => { try { renderTabStrip(); } catch (e) {} }, 200);
+  // 轮询刷新标签名（内联编辑时 data_change 可能不触发；100ms 保证"快速跟随"）
+  setInterval(() => { try { renderTabStrip(); } catch (e) {} }, 100);
   // 监听节点编辑结束
   try { mind.on('node_text_change', () => renderTabStrip()); } catch (e) {}
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
