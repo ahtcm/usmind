@@ -1901,26 +1901,15 @@ function noteConfirm() {
 }
 
 function initNodeEdit() {
-  // 右键菜单
+  // 右键菜单（平时隐藏样式条，仅点"节点样式"才显示）
   try {
     mind.on('node_contextmenu', (a, b) => {
       const node = (a && (a.nodeData || a.getData)) ? a : (b || null);
       const ev = (a && a.clientX !== undefined) ? a : ((b && b.clientX !== undefined) ? b : null);
       try { if (ev && ev.stopPropagation) ev.stopPropagation(); } catch (e2) {}
       ctxNode = node;
+      $('styleBar').style.display = 'none'; styleNode = null;
       showCtxMenu(ev ? ev.clientX : 0, ev ? ev.clientY : 0);
-    });
-  } catch (e) {}
-  // 左键选中节点 → 显示样式条（仅单选）
-  try {
-    mind.on('node_click', (node) => {
-      setTimeout(() => {
-        try {
-          const l = mind.renderer.activeNodeList;
-          if (l && l.length === 1) { styleNode = node; syncStyleBar(); $('styleBar').style.display = 'flex'; }
-          else { $('styleBar').style.display = 'none'; styleNode = null; }
-        } catch (e2) {}
-      }, 30);
     });
   } catch (e) {}
   // 点击空白 → 隐藏样式条/右键菜单
