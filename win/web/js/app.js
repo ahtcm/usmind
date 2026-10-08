@@ -201,13 +201,13 @@ function switchToTab(i) {
   try { mind.setTheme(doc.theme); } catch (e) {}
   try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
   setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
-  // 切换翻页动画：画布沿切换方向滑入（切右标签从右滑入，切左标签从左滑入）
+  // 切换翻书动画：画布像书页一样从左翻开（rotateY + 轻微位移）
   try {
     const mc = document.getElementById('mindMapContainer');
     if (mc) {
-      mc.classList.remove('mindmap-slide-right', 'mindmap-slide-left');
+      mc.classList.remove('mindmap-page');
       void mc.offsetWidth;
-      mc.classList.add(i > oldActiveTab ? 'mindmap-slide-right' : 'mindmap-slide-left');
+      mc.classList.add('mindmap-page');
     }
   } catch (e) {}
   dirty = false;

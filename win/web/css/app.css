@@ -27,6 +27,7 @@ body {
   font-size: 14px;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  perspective: 1400px;
 }
 
 #app { position: relative; height: 100vh; overflow: hidden; }
@@ -119,10 +120,11 @@ body {
   box-shadow: 0 3px 12px rgba(108,140,255,.25);
 }
 .tab-item:hover { color: #2a2e3d; background: #f5f7ff; box-shadow: 0 3px 12px rgba(20,30,60,.14); transform: translateY(-1px); }
-@keyframes tabSlideFromRight { from { transform: translateX(42px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
-@keyframes tabSlideFromLeft { from { transform: translateX(-42px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
-.mindmap-slide-right { animation: tabSlideFromRight .24s cubic-bezier(.2,.7,.3,1); }
-.mindmap-slide-left { animation: tabSlideFromLeft .24s cubic-bezier(.2,.7,.3,1); }
+@keyframes tabPageTurn {
+  from { transform: rotateY(-58deg) translateX(30px); opacity: .35; }
+  to   { transform: rotateY(0) translateX(0); opacity: 1; }
+}
+.mindmap-page { animation: tabPageTurn .36s cubic-bezier(.25,.8,.3,1); transform-origin: left center; transform-style: preserve-3d; }
 .tab-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; margin-left: 6px;
