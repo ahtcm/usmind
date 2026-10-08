@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261008c7">
+<link rel="stylesheet" href="css/app.css?v=20261008c8">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -68,9 +68,8 @@
       </button>
     </div>
     <div class="tb-right">
-      <button class="icon-btn" id="btnSettings" title="设置" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;">
-        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
-        <span style="font-size:12.5px;">设置</span>
+      <button class="icon-btn" id="btnSettings" title="设置">
+        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
       </button>
       <button class="icon-btn" id="btnToggleBar" title="收起工具栏">
         <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 15l7-7 7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -148,7 +147,11 @@
       <span>设置</span>
       <button class="panel-close" data-close="settingsPanel">✕</button>
     </div>
-    <div class="panel-body">
+    <div class="set-tabs">
+      <button class="set-tab active" data-stab="general">常规</button>
+      <button class="set-tab" data-stab="themes">主题模板</button>
+    </div>
+    <div class="panel-body" id="setTabGeneral">
       <div class="setting-row">
         <label>默认主题</label>
         <div id="themeDrop" class="custom-drop" style="width:100%;">
@@ -177,6 +180,39 @@
       </div>
       <div class="setting-row">
         <button class="btn btn-primary" id="btnSaveSettings" style="width:100%;justify-content:center;">保存设置</button>
+      </div>
+    </div>
+    <div class="panel-body" id="setTabThemes" style="display:none;overflow-y:auto;flex:1;">
+      <div class="theme-mgr-head">
+        <span class="muted-text" id="themeMgrCount"></span>
+        <button class="mini-btn" id="btnAddTheme">+ 新增主题</button>
+      </div>
+      <div id="themeMgrList"></div>
+    </div>
+  </div>
+
+  <!-- 主题编辑弹窗 -->
+  <div id="themeEditDialog" style="display:none;">
+    <div class="dialog-mask"></div>
+    <div class="dialog glass">
+      <div class="dialog-head">编辑主题模板</div>
+      <div class="dialog-body">
+        <div class="setting-row"><label>*名称</label><input type="text" id="teName" placeholder="如：我的主题"></div>
+        <div class="setting-row"><label>标识Key</label><input type="text" id="teKey" placeholder="如：my-theme"></div>
+        <div class="setting-row"><label>基于主题</label>
+          <select id="teBase" class="select-input"></select>
+        </div>
+        <div class="setting-row"><label>分支配色</label>
+          <div id="teColors" class="color-chips"></div>
+          <button class="mini-btn" id="teAddColor" style="margin-top:6px;">+ 添加颜色</button>
+        </div>
+        <div class="setting-row"><label>启用</label>
+          <label class="switch"><input type="checkbox" id="teEnabled" checked><span></span></label>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn" id="teCancel">取消</button>
+        <button class="btn btn-primary" id="teSave">确定</button>
       </div>
     </div>
   </div>

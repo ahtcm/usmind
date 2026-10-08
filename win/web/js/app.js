@@ -799,7 +799,23 @@ async function clearHistory() {
 }
 
 // ================= 设置 =================
+// 主题管理绑定（页签 + 编辑弹窗）
+document.querySelectorAll('.set-tab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.set-tab').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  const g = b.dataset.stab === 'themes';
+  $('setTabGeneral').style.display = g ? 'none' : '';
+  $('setTabThemes').style.display = g ? '' : 'none';
+  if (g) renderThemesList();
+}));
+const _ba = $('btnAddTheme'); if (_ba) _ba.addEventListener('click', () => openThemeEdit(''));
+const _ts = $('teSave'); if (_ts) _ts.addEventListener('click', saveThemeFromDialog);
+const _tc = $('teCancel'); if (_tc) _tc.addEventListener('click', () => $('themeEditDialog').classList.remove('open'));
+const _ta = $('teAddColor'); if (_ta) _ta.addEventListener('click', () => { const arr = currentTeColors(); arr.push('#4a6cf7'); renderTeColors(arr); });
+loadCustomThemes();
+
 async function fillSettings() {
+  loadCustomThemes();
   const r = await callNative('getSettings');
   const s = (r && r.ok) ? r : {};
   // 默认主题（自定义下拉）
@@ -852,6 +868,117 @@ async function saveSettingsFromUi(newThemeName) {
   }
   if (r && r.ok) toast('设置已保存并应用');
   else toast('设置保存失败: ' + JSON.stringify(r), 'error');
+}
+
+// ================= 主题模板管理（本地） =================
+function getCustomThemes() { try { return JSON.parse(localStorage.getItem('usmind.themes') || '[]'); } catch (e) { return []; } }
+function setCustomThemes(arr) { try { localStorage.setItem('usmind.themes', JSON.stringify(arr)); } catch (e) {} }
+
+function loadCustomThemes() {
+  getCustomThemes().forEach(t => {
+    if (!t || !t.name || THEMES.some(x => x.name === t.name)) return;
+    const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
+    const config = JSON.parse(JSON.stringify(base.config || {}));
+    const colors = (t.colors || []).filter(Boolean);
+    if (colors.length) config.branchColors = colors;
+    config.lineColor = colors[0] || config.lineColor;
+    const entry = { name: t.name, key: t.key || '', branchColors: colors.length ? colors : (base.branchColors || []), config };
+    THEMES.push(entry);
+    try { MindMap.defineTheme(t.name, config); } catch (e) {}
+  });
+}
+
+function renderThemesList() {
+  loadCustomThemes();
+  const list = $('themeMgrList');
+  if (!list) return;
+  const customs = getCustomThemes();
+  const all = THEMES.map(t => {
+    const c = customs.find(x => x.name === t.name);
+    return { name: t.name, key: t.key || (c && c.key) || '', colors: t.branchColors || [], builtin: !c };
+  });
+  $('themeMgrCount').textContent = '共 ' + all.length + ' 个主题模板';
+  list.innerHTML = '';
+  all.forEach(t => {
+    const item = document.createElement('div');
+    item.className = 'theme-item' + (t.builtin ? ' builtin' : '');
+    const dots = document.createElement('div');
+    dots.className = 't-dots';
+    (t.colors || []).slice(0, 6).forEach(c => { const i = document.createElement('i'); i.style.background = c; dots.appendChild(i); });
+    item.appendChild(dots);
+    const nm = document.createElement('span'); nm.className = 't-name'; nm.textContent = t.name; item.appendChild(nm);
+    const ky = document.createElement('span'); ky.className = 't-key'; ky.textContent = t.key || t.name; item.appendChild(ky);
+    const ops = document.createElement('div');
+    ops.className = 't-ops';
+    if (t.builtin) { const st = document.createElement('span'); st.className = 'muted-text'; st.style.fontSize = '11px'; st.textContent = '内置'; ops.appendChild(st); }
+    else {
+      const ed = document.createElement('button'); ed.className = 'mini-btn'; ed.textContent = '编辑'; ed.onclick = () => openThemeEdit(t.name); ops.appendChild(ed);
+      const del = document.createElement('button'); del.className = 'mini-btn'; del.style.color = '#c0392b'; del.textContent = '删除'; del.onclick = () => deleteTheme(t.name); ops.appendChild(del);
+    }
+    item.appendChild(ops);
+    list.appendChild(item);
+  });
+}
+
+function openThemeEdit(name) {
+  const customs = getCustomThemes();
+  const editing = customs.find(x => x.name === name);
+  $('teName').value = editing ? editing.name : '';
+  $('teKey').value = editing ? (editing.key || '') : '';
+  $('teEnabled').checked = editing ? editing.enabled !== false : true;
+  const sel = $('teBase');
+  sel.innerHTML = '';
+  THEMES.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
+  sel.value = editing ? (editing.base || THEMES[0].name) : THEMES[0].name;
+  renderTeColors(editing ? (editing.colors || []) : []);
+  $('themeEditDialog').classList.add('open');
+  $('themeEditDialog').dataset.editing = editing ? name : '';
+}
+function renderTeColors(colors) {
+  const box = $('teColors');
+  box.innerHTML = '';
+  (colors.length ? colors : ['#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4']).forEach((c, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    const inp = document.createElement('input');
+    inp.type = 'color'; inp.value = c;
+    inp.addEventListener('input', () => { const arr = currentTeColors(); if (arr[i]) arr[i] = inp.value; });
+    const rm = document.createElement('span'); rm.className = 'rm'; rm.textContent = '×';
+    rm.onclick = () => { const arr = currentTeColors(); arr.splice(i, 1); renderTeColors(arr); };
+    chip.appendChild(inp); chip.appendChild(rm);
+    box.appendChild(chip);
+  });
+}
+function currentTeColors() { return Array.from($('teColors').querySelectorAll('input[type=color]')).map(i => i.value); }
+function saveThemeFromDialog() {
+  const name = $('teName').value.trim();
+  if (!name) { toast('请填写主题名称', 'error'); return; }
+  const editingName = $('themeEditDialog').dataset.editing || '';
+  const colors = currentTeColors();
+  if (!colors.length) { toast('请至少保留一个分支颜色', 'error'); return; }
+  const customs = getCustomThemes();
+  if (editingName) {
+    const t = customs.find(x => x.name === editingName);
+    if (t) { t.name = name; t.key = $('teKey').value.trim(); t.base = $('teBase').value || THEMES[0].name; t.colors = colors; t.enabled = $('teEnabled').checked; }
+  } else {
+    if (customs.some(x => x.name === name)) { toast('已存在同名主题', 'error'); return; }
+    customs.push({ name, key: $('teKey').value.trim() || ('theme-' + Date.now()), base: $('teBase').value || THEMES[0].name, colors, enabled: $('teEnabled').checked });
+  }
+  setCustomThemes(customs);
+  const idx = THEMES.findIndex(x => x.name === editingName);
+  if (idx >= 0) THEMES.splice(idx, 1);
+  loadCustomThemes();
+  $('themeEditDialog').classList.remove('open');
+  toast('主题已保存');
+  renderThemesList();
+  fillSettings();
+}
+function deleteTheme(name) {
+  setCustomThemes(getCustomThemes().filter(x => x.name !== name));
+  const idx = THEMES.findIndex(x => x.name === name);
+  if (idx >= 0) THEMES.splice(idx, 1);
+  renderThemesList();
+  toast('已删除主题：' + name);
 }
 
 async function pickHistoryDir() {

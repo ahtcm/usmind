@@ -348,6 +348,43 @@ body {
 .drop-menu .dm-item:hover { background: rgba(108,140,255,.12); }
 .drop-menu .dm-item.active { background: rgba(108,140,255,.18); color: #4a6cf7; font-weight: 600; }
 
+/* 设置页签 */
+.set-tabs { display: flex; gap: 8px; padding: 12px 18px 0; }
+.set-tab { flex: 1; padding: 8px 0; border: none; background: rgba(255,255,255,.5); border-radius: 10px; color: #6a6f7e; font-size: 13px; cursor: pointer; transition: .15s; }
+.set-tab:hover { background: rgba(255,255,255,.8); }
+.set-tab.active { background: #4a6cf7; color: #fff; font-weight: 600; }
+/* 主题模板管理 */
+.theme-mgr-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.theme-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,.6); border: 1px solid rgba(0,0,0,.06); border-radius: 12px; margin-bottom: 8px; }
+.theme-item .t-name { font-size: 13px; font-weight: 600; color: #2a2e3d; flex: 0 0 auto; }
+.theme-item .t-key { font-size: 11px; color: #9aa0ae; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-item .t-dots { display: flex; gap: 3px; flex: 0 0 auto; }
+.theme-item .t-dots i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+.theme-item .t-ops { display: flex; gap: 4px; flex: 0 0 auto; }
+.theme-item .t-ops .mini-btn { padding: 2px 8px; font-size: 11px; }
+.theme-item.builtin { opacity: .8; }
+/* 颜色 chips */
+.color-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.color-chips .chip { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 8px; font-size: 11px; background: rgba(0,0,0,.04); }
+.color-chips .chip input[type=color] { width: 22px; height: 20px; border: none; padding: 0; background: none; cursor: pointer; }
+.color-chips .chip .rm { cursor: pointer; color: #c0392b; font-weight: 700; padding: 0 2px; }
+/* 开关 */
+.switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; background: #ccc; border-radius: 22px; transition: .2s; cursor: pointer; }
+.switch input:checked + span { background: #4a6cf7; }
+.switch span::before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .2s; }
+.switch input:checked + span::before { transform: translateX(18px); }
+/* 主题编辑弹窗 */
+#themeEditDialog { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; }
+#themeEditDialog.open { display: flex; }
+#themeEditDialog .dialog-mask { position: absolute; inset: 0; background: rgba(0,0,0,.25); backdrop-filter: blur(4px); }
+#themeEditDialog .dialog { position: relative; width: 420px; max-height: 82vh; overflow-y: auto; border-radius: 18px; background: rgba(255,255,255,.88); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,.8); box-shadow: 0 16px 48px rgba(0,0,0,.18); }
+#themeEditDialog .dialog-head { padding: 16px 18px; font-size: 15px; font-weight: 600; border-bottom: 1px solid rgba(0,0,0,.06); }
+#themeEditDialog .dialog-body { padding: 16px 18px; }
+#themeEditDialog .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 18px 16px; }
+#themeEditDialog .select-input { width: 100%; padding: 7px 10px; border: 1px solid rgba(0,0,0,.12); border-radius: 10px; font-size: 13px; background: #fff; color: #2a2e3d; }
+
 /* 图片节点圆角 */
 .smm-tree img { border-radius: 10px !important; }
 
