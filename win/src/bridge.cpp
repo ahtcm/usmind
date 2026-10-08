@@ -31,7 +31,9 @@ static const wchar_t* const kMethods[] = {
     L"openAttachment",  // 18 （附件用系统默认程序打开：base64 或 外置相对路径）
     L"writeAttachment", // 19 （写入外置附件 relPath+b64）
     L"openPathBinary",  // 20 （读任意文件→base64，自包含 zip 打开用）
-    L"saveBinary"       // 21 （base64→写二进制文件，自包含 zip 保存用）
+    L"saveBinary",      // 21 （base64→写二进制文件，自包含 zip 保存用）
+    L"saveSelfContained", // 22 （自包含 v3 保存：manifest + 媒体rel列表，二进制直拷）
+    L"openSelfContained"  // 23 （自包含 v3 打开：拆 manifest + 媒体写回附件目录）
 };
 static const int kMethodCount = sizeof(kMethods) / sizeof(kMethods[0]);
 
@@ -453,6 +455,70 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
             std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
                                : "{\"ok\":false,\"error\":\"保存失败\"}";
             *result = MakeJsonResult(j);
+        }
+        break;
+    }
+    case 22: { // saveSelfContained(manifestJson, mediaRelJson, saveAs) → {ok, path?, name?}
+        std::wstring manifest = ParamStr(p, 0);
+        std::wstring mediaJson = ParamStr(p, 1);
+        bool saveAs = ParamInt(p, 2) == 1;
+        // 解析 mediaJson 中的 rel 列表（["attachments/x","attachments/y"...]）
+        std::vector<std::wstring> rels;
+        {
+            std::string mj8 = wideToUtf8_2(mediaJson);
+            size_t q = 0;
+            while ((q = mj8.find("attachments/", q)) != std::string::npos) {
+                size_t e = mj8.find('"', q);
+                if (e == std::string::npos) break;
+                rels.push_back(utf8ToWide2(mj8.substr(q, e - q)));
+                q = e + 1;
+            }
+        }
+        std::string bin;
+        if (!buildSelfContained(wideToUtf8_2(manifest), rels, bin)) {
+            if (result) *result = MakeJsonResult("{\"ok\":false,\"error\":\"打包失败\"}");
+            break;
+        }
+        bool ok = false;
+        if (!saveAs && !currentPath.empty()) {
+            snapshotHistory(currentPath, currentName.empty() ? L"未命名导图" : currentName);
+            ok = writeFile(currentPath, bin);
+        } else {
+            std::wstring nm = currentName.empty() ? ParamStr(p, 3) : currentName;
+            std::wstring sp;
+            if (pickSaveFile((nm.empty() ? L"未命名导图" : nm) + L".usmind", sp)) {
+                snapshotHistory(sp, nm);
+                ok = writeFile(sp, bin);
+                if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
+            } else {
+                if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                break;
+            }
+        }
+        if (result) {
+            std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
+                               : "{\"ok\":false,\"error\":\"保存失败\"}";
+            *result = MakeJsonResult(j);
+        }
+        break;
+    }
+    case 23: { // openSelfContained(path) → {ok, manifest?, name?}；非 USMD → {ok:false, notUsmd:true}
+        std::wstring path = ParamStr(p, 0);
+        std::string data;
+        bool ok = !path.empty() && readFile(path, data);
+        if (result) {
+            if (ok) {
+                std::string manifest;
+                if (extractSelfContained(data, manifest)) {
+                    std::string j = "{\"ok\":true,\"manifest\":\"" + JsEscape(utf8ToWide2(manifest)) + "\","
+                                    "\"name\":\"" + JsEscape(fileNameOf(path)) + "\"}";
+                    *result = MakeJsonResult(j);
+                } else {
+                    *result = MakeJsonResult("{\"ok\":false,\"notUsmd\":true}");
+                }
+            } else {
+                *result = MakeJsonResult("{\"ok\":false,\"error\":\"无法读取文件\"}");
+            }
         }
         break;
     }

@@ -64,6 +64,11 @@ bool openAttachment(const std::string& b64, const std::wstring& name);
 bool writeAttachment(const std::wstring& relPath, const std::string& b64);
 // 外置附件是否存在
 bool attachmentExists(const std::wstring& relPath);
+// ---- 自包含包 v3（USMD\x01 二进制拼接，媒体直拷无 base64）----
+// 组装：manifest + 命名媒体列表（rel="attachments/xxx"，从附件目录直读）
+bool buildSelfContained(const std::string& manifest, const std::vector<std::wstring>& rels, std::string& out);
+// 解析：拆 manifest；媒体写回附件目录（同名）
+bool extractSelfContained(const std::string& in, std::string& manifest);
 // 读任意文件为 base64（二进制安全，自包含 zip 打开用）
 bool readFileB64(const std::wstring& path, std::string& outB64);
 // base64 → 写二进制文件（自包含 zip 保存用）

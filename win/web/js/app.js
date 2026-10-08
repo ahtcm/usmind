@@ -524,6 +524,25 @@ async function applyDoc(parsed, path, name) {
 
 async function openPath(path) {
   if (!path) return;
+  // 优先 v3 自包含格式（媒体自动落盘附件目录，引用无需改写）
+  const r3 = await callNative('openSelfContained', path);
+  if (r3 && r3.ok && r3.manifest) {
+    try {
+      const mf = JSON.parse(r3.manifest);
+      if (mf && Array.isArray(mf.tabs) && mf.tabs.length) {
+        restoreAllTabs(mf.tabs);
+        tabs[activeTab].path = path;
+        doc.path = path;
+        doc.name = mf.name || r3.name || doc.name;
+        booting = false;
+        updateTitle();
+        toast('已打开：' + doc.name);
+        callNative('notifyDocumentState', doc.name);
+        callNative('saveSettings', JSON.stringify({ lastFile: path }));
+        return;
+      }
+    } catch (e) { toast('打开失败：' + e.message, 'error'); return; }
+  }
   const r = await callNative('openPath', path);
   if (r && r.ok && (r.data || r.b64)) {
     try {
@@ -545,6 +564,27 @@ async function openPath(path) {
 
 async function openWithDialog() {
   const r = await callNative('openWithDialog');
+  if (r && r.ok && r.path) {
+    // 优先 v3 自包含格式
+    const r3 = await callNative('openSelfContained', r.path);
+    if (r3 && r3.ok && r3.manifest) {
+      try {
+        const mf = JSON.parse(r3.manifest);
+        if (mf && Array.isArray(mf.tabs) && mf.tabs.length) {
+          restoreAllTabs(mf.tabs);
+          tabs[activeTab].path = r.path;
+          doc.path = r.path;
+          doc.name = mf.name || r3.name || doc.name;
+          booting = false;
+          updateTitle();
+          toast('已打开：' + doc.name);
+          callNative('notifyDocumentState', doc.name);
+          callNative('saveSettings', JSON.stringify({ lastFile: r.path }));
+          return;
+        }
+      } catch (e) { toast('打开失败：' + e.message, 'error'); return; }
+    }
+  }
   if (r && r.ok && (r.data || r.b64)) {
     try {
       if (r.isZip) { await importSelfContained(r.b64, r.path, r.name); return; }
@@ -572,25 +612,6 @@ function newDoc() {
 function doNew() {
   newTab();
   booting = false;
-}
-
-async function saveNow(silent) {
-  if (!mind) return false;
-  const content = serializeDoc();
-  const r = await callNative('saveCurrent', content, doc.name);
-  if (r && r.ok) {
-    doc.path = r.path || doc.path;
-    doc.name = r.name || doc.name;
-    dirty = false;
-    updateTitle();
-    if (!silent) toast('已保存');
-    callNative('notifyDocumentState', doc.name);
-    callNative('saveSettings', JSON.stringify({ lastFile: doc.path }));
-    return true;
-  }
-  if (r && r.cancel) { /* 用户取消另存为 */ }
-  else if (!silent) toast('保存失败', 'error');
-  return false;
 }
 
 // ================= 引擎 =================
@@ -1301,16 +1322,10 @@ async function doExport(type) {
 
 // 导出多标签 JSON（含所有标签页，恢复时一键还原）
 async function exportJSONAllTabs(name) {
-  snapshotActiveTab();
+  const p = await buildSelfContainedPayload();
   const payload = {
     app: 'usmind', type: 'multi-tabs', version: 1,
-    tabs: tabs.map(t => ({
-      name: t.name || '未命名导图',
-      path: t.path || '',
-      theme: t.theme || userDefaultTheme,
-      layout: t.layout || 'logicalStructure',
-      data: t.data && t.data.root ? t.data.root : t.data,
-    })),
+    tabs: p.tabs,
   };
   const json = JSON.stringify(payload);
   const b64 = btoa(unescape(encodeURIComponent(json)));
@@ -1326,77 +1341,114 @@ function arrayBufferToBase64(buf) {
   return btoa(bin);
 }
 
-// 导出"自包含"包：结构与所有媒体打进单文件 .usmind（zip），拷走即开
-async function exportSelfContained() {
-  try {
-    if (typeof JSZip === 'undefined') return { ok: false, error: '缺少打包组件' };
-    await new Promise(r => setTimeout(r, 500)); // 等最近一次插入的媒体落库（renderFileNode 有 600ms 异步窗口）
-    const root = JSON.parse(JSON.stringify(mind.getData()));
-    // 归一化：https://media.local/attachments/xxx 与 attachments/xxx 视为同一媒体（避免重复打包）
-    const keyOf = (u) => {
-      try {
-        if (typeof u === 'string' && u.indexOf('https://media.local/') === 0) return 'attachments/' + decodeURIComponent(u.slice(20));
-        return u;
-      } catch (e) { return u; }
-    };
-    const mediaMap = new Map(); // 归一 key → { id, raw }
-    let idx = 0;
-    const norm = (u) => {
-      const k = keyOf(u);
-      if (!mediaMap.has(k)) { idx++; mediaMap.set(k, { id: 'media/att' + idx, raw: u }); }
-      return mediaMap.get(k).id;
-    };
-    const walk = (n) => {
-      if (!n) return;
-      const dd = n.data;
-      if (dd) {
-        const u = dd.attachUrl || dd.attachmentUrl;
-        if (u) {
-          dd.attachUrl = norm(u);
-          delete dd.attachmentUrl;
-        }
-        if (typeof dd.text === 'string' && dd.text.indexOf('src="') !== -1) {
-          // 只收外置引用（media.local/attachments 相对），blob/dataUrl 本体已由 attachUrl/image 字段收集，避免同媒体重复打包
-          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|attachments\/)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
-        }
-        if (dd.image && (dd.image.indexOf('https://media.local/') === 0 || dd.image.indexOf('data:') === 0)) {
-          dd.image = norm(dd.image);
+// 自包含保存载荷：多标签结构 + 媒体引用归一（dataUrl → 落盘附件目录 → 相对引用；外置相对引用保留）
+// 返回 { tabs, mediaRels }；mediaRels 顺序 = manifest 引用顺序（native 组装/解包按序）
+function dataUrlToB64(u) { const i = u.indexOf(','); return i >= 0 ? u.slice(i + 1) : u; }
+function extFromDataUrl(u) {
+  const m = /data:([^;,]+)/.exec(u);
+  const mt = m ? m[1].toLowerCase() : '';
+  const map = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'video/mp4': 'mp4', 'video/webm': 'webm', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'application/pdf': 'pdf', 'application/json': 'json', 'text/plain': 'txt', 'text/markdown': 'md' };
+  if (map[mt]) return map[mt];
+  const k = mt.split('/').pop().replace('+xml', '');
+  return k && k.length <= 6 ? k : 'bin';
+}
+async function buildSelfContainedPayload() {
+  snapshotActiveTab();
+  const mediaRels = [];
+  const seen = new Set();
+  async function ensureRel(u) {
+    if (!u || typeof u !== 'string') return u;
+    if (u.indexOf('attachments/') === 0) {
+      const k = u.replace(/[?#].*$/, '');
+      if (!seen.has(k)) { seen.add(k); mediaRels.push(k); }
+      return u;
+    }
+    if (u.indexOf('data:') === 0) {
+      const rel = 'attachments/att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + extFromDataUrl(u);
+      const r = await callNative('writeAttachment', rel, dataUrlToB64(u));
+      if (r && r.ok) { if (!seen.has(rel)) { seen.add(rel); mediaRels.push(rel); } return rel; }
+      return u;
+    }
+    return u; // blob:/http: 原样（blob 不持久化；http 外链保留）
+  }
+  async function walk(n) {
+    if (!n) return;
+    const dd = n.data;
+    if (dd) {
+      if (dd.attachUrl) dd.attachUrl = await ensureRel(dd.attachUrl);
+      if (dd.image && dd.image.indexOf('data:') === 0) dd.image = await ensureRel(dd.image);
+      if (typeof dd.text === 'string' && dd.text.indexOf('src="') !== -1) {
+        const srcs = [];
+        const pat = /src="(data:[^"]+|attachments\/[^"]+|blob:[^"]+)"/g;
+        let m;
+        while ((m = pat.exec(dd.text))) srcs.push({ raw: m[1], full: m[0] });
+        for (const s of srcs) {
+          const rel = await ensureRel(s.raw);
+          if (rel !== s.raw) dd.text = dd.text.split(s.full).join('src="' + rel + '"');
         }
       }
-      (n.children || []).forEach(walk);
-    };
-    walk(root);
+    }
+    (n.children || []).forEach(walk);
+  }
+  for (const t of tabs) {
+    if (!t || !t.data) continue;
+    try { restoreTreeMediaSrc(t.data.root || t.data); } catch (e) {}
+    await walk(t.data.root || t.data);
+  }
+  const tabsOut = tabs.map(t => ({
+    name: t.name || '未命名导图',
+    path: t.path || '',
+    theme: t.theme || userDefaultTheme,
+    layout: t.layout || 'logicalStructure',
+    data: t.data && t.data.root ? t.data.root : t.data,
+  }));
+  return { tabs: tabsOut, mediaRels };
+}
+
+// 保存 = 自包含包（多标签 + 全部资源，拷走即开）：native 二进制直拷，快
+async function saveNow(silent) {
+  if (!mind) return false;
+  try {
+    const p = await buildSelfContainedPayload();
     const manifest = {
-      format: 'usmind', version: 2, selfContained: true,
-      name: doc.name, theme: doc.theme, layout: doc.layout,
-      savedAt: new Date().toISOString(), data: { root },
+      format: 'usmind', version: 3, selfContained: true,
+      name: doc.name, savedAt: new Date().toISOString(),
+      tabs: p.tabs,
     };
-    const zip = new JSZip();
-    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-    for (const [, v] of mediaMap) {
-      try {
-        let buf;
-        if (v.raw.indexOf('data:') === 0) buf = await dataUrlToBlob(v.raw).arrayBuffer();
-        else { const r = await fetch(resolveMediaUrl(v.raw)); if (!r.ok) continue; buf = await r.arrayBuffer(); }
-        zip.file(v.id, buf);
-      } catch (eM) { /* 单个媒体失败跳过，引用保留但缺失 */ }
+    const r = await callNative('saveSelfContained', JSON.stringify(manifest), JSON.stringify(p.mediaRels), 0, doc.name);
+    if (r && r.ok) {
+      doc.path = r.path || doc.path;
+      doc.name = r.name || doc.name;
+      dirty = false;
+      updateTitle();
+      if (!silent) toast('已保存（自包含）');
+      callNative('notifyDocumentState', doc.name);
+      callNative('saveSettings', JSON.stringify({ lastFile: doc.path }));
+      return true;
     }
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-    const name0 = (doc.name || '导图').replace(/\.usmind$/i, '');
-    if (hasNative) {
-      const b64 = arrayBufferToBase64(await blob.arrayBuffer());
-      const r = await callNative('saveBinary', b64, '', name0 + '.usmind');
-      if (r && r.ok) { toast('已导出自包含包'); return { ok: true, mediaCount: mediaMap.size, bytes: b64.length }; }
-      toast('导出已取消', 'info');
-      return { ok: false, cancel: true };
-    } else {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = name0 + '.usmind';
-      a.click();
-      toast('已导出自包含包');
-      return { ok: true, mediaCount: mediaMap.size, bytes: blob.size };
-    }
+    if (r && r.cancel) { /* 用户取消另存为 */ }
+    else if (!silent) toast('保存失败', 'error');
+    return false;
+  } catch (e) {
+    if (!silent) toast('保存失败：' + e.message, 'error');
+    return false;
+  }
+}
+
+// 导出"自包含"包（v3 新格式）：结构与所有媒体直拷进单文件 .usmind，拷走即开（另存为）
+async function exportSelfContained() {
+  try {
+    const p = await buildSelfContainedPayload();
+    const manifest = {
+      format: 'usmind', version: 3, selfContained: true,
+      name: doc.name, savedAt: new Date().toISOString(),
+      tabs: p.tabs,
+    };
+    const r = await callNative('saveSelfContained', JSON.stringify(manifest), JSON.stringify(p.mediaRels), 1, doc.name);
+    if (r && r.ok) { toast('已导出自包含包'); return { ok: true, mediaCount: p.mediaRels.length }; }
+    if (r && r.cancel) { toast('导出已取消', 'info'); return { ok: false, cancel: true }; }
+    toast('导出失败', 'error');
+    return { ok: false, error: '导出失败' };
   } catch (e) {
     toast('导出失败：' + e.message, 'error');
     return { ok: false, error: e.message };

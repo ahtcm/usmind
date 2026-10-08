@@ -12,6 +12,7 @@
 #include <ctime>
 #include <sstream>
 #include <algorithm>
+#include <cstdint>
 
 namespace usmind {
 
@@ -504,6 +505,68 @@ bool attachmentExists(const std::wstring& relPath) {
     if (!safeRelPath(relPath)) return false;
     std::wstring full = attachmentDir() + L"\\" + relPath.substr(12);
     return fileExists(full);
+}
+
+// ---------------- 自包含包 v3（USMD\x01：header + manifest + 命名媒体，二进制直拷，零 zip 依赖） ----------------
+static void putLE32(std::string& out, uint32_t v) {
+    out.push_back((char)(v & 0xFF));
+    out.push_back((char)((v >> 8) & 0xFF));
+    out.push_back((char)((v >> 16) & 0xFF));
+    out.push_back((char)((v >> 24) & 0xFF));
+}
+static uint32_t getLE32(const std::string& s, size_t& p) {
+    if (p + 4 > s.size()) return 0;
+    uint32_t v = (uint32_t)(unsigned char)s[p]
+        | ((uint32_t)(unsigned char)s[p + 1] << 8)
+        | ((uint32_t)(unsigned char)s[p + 2] << 16)
+        | ((uint32_t)(unsigned char)s[p + 3] << 24);
+    p += 4;
+    return v;
+}
+static const char kUsmdMagic[5] = { 'U', 'S', 'M', 'D', 1 };
+
+// 组装自包含包：manifest JSON + 命名媒体列表（rel="attachments/xxx"，从附件目录直读）
+bool buildSelfContained(const std::string& manifest, const std::vector<std::wstring>& rels, std::string& out) {
+    out.clear();
+    out.append(kUsmdMagic, 5);
+    putLE32(out, (uint32_t)manifest.size());
+    out += manifest;
+    for (const auto& rel : rels) {
+        if (!safeRelPath(rel)) continue;
+        bool ok = false;
+        std::string raw = readTextFile(attachmentDir() + L"\\" + rel.substr(12), ok);
+        if (!ok) continue; // 缺失媒体跳过（引用保留但缺失）
+        std::string name = wideToUtf8(rel);
+        putLE32(out, (uint32_t)name.size());
+        out += name;
+        putLE32(out, (uint32_t)raw.size());
+        out += raw;
+    }
+    return true;
+}
+
+// 解析自包含包：拆出 manifest；命名媒体逐个写回附件目录（同名，引用无需改写）
+bool extractSelfContained(const std::string& in, std::string& manifest) {
+    if (in.size() < 9) return false;
+    if (memcmp(in.data(), kUsmdMagic, 5) != 0) return false;
+    size_t p = 5;
+    uint32_t ml = getLE32(in, p);
+    if (p + ml > in.size()) return false;
+    manifest = in.substr(p, ml);
+    p += ml;
+    while (p + 4 <= in.size()) {
+        uint32_t nl = getLE32(in, p);
+        if (p + nl > in.size()) return false;
+        std::string name = in.substr(p, nl);
+        p += nl;
+        uint32_t dl = getLE32(in, p);
+        if (p + dl > in.size()) return false;
+        std::string bytes = in.substr(p, dl);
+        p += dl;
+        std::wstring rel = utf8ToWide(name);
+        if (safeRelPath(rel)) writeFile(attachmentDir() + L"\\" + rel.substr(12), bytes);
+    }
+    return true;
 }
 
 // 读任意文件为 base64（二进制安全，用于自包含 zip 打开）
