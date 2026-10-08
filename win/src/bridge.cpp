@@ -447,7 +447,6 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
                 if (pickSaveFileAny(L"", name, sp)) {
                     snapshotHistory(sp, name);
                     ok = writeFileB64(sp, wideToUtf8_2(b64));
-                    if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
                 } else {
                     if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
                     break;
@@ -455,7 +454,6 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
             } else if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", sp)) {
                 snapshotHistory(sp, name);
                 ok = writeFileB64(sp, wideToUtf8_2(b64));
-                if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
             } else {
                 if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
                 break;
@@ -468,10 +466,12 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 22: { // saveSelfContained(manifestJson, mediaRelJson, saveAs) → {ok, path?, name?}
+    case 22: { // saveSelfContained(manifestJson, mediaRelJson, saveAs, name, path) → {ok, path?, name?}
         std::wstring manifest = ParamStr(p, 0);
         std::wstring mediaJson = ParamStr(p, 1);
         bool saveAs = ParamInt(p, 2) == 1;
+        std::wstring nmArg = ParamStr(p, 3);
+        std::wstring pathArg = ParamStr(p, 4);
         // 解析 mediaJson 中的 rel 列表（["attachments/x","attachments/y"...]）
         std::vector<std::wstring> rels;
         {
@@ -490,21 +490,35 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
             break;
         }
         bool ok = false;
-        if (!saveAs && !currentPath.empty()) {
-            snapshotHistory(currentPath, currentName.empty() ? L"未命名导图" : currentName);
-            ok = writeFile(currentPath, bin);
-        } else {
-            std::wstring nm = currentName.empty() ? ParamStr(p, 3) : currentName;
+        std::wstring target; // 最终写入路径
+        if (saveAs) {
+            std::wstring nm = currentName.empty() ? nmArg : currentName;
             std::wstring sp;
             if (pickSaveFile((nm.empty() ? L"未命名导图" : nm) + L".usmind", sp)) {
-                snapshotHistory(sp, nm);
-                ok = writeFile(sp, bin);
-                if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
+                target = sp;
+            } else {
+                if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                break;
+            }
+        } else if (!pathArg.empty()) {
+            // 前端已打开/保存过的文件：直接覆盖该路径（重启后 currentPath 丢失也可靠）
+            target = pathArg;
+        } else if (!currentPath.empty()) {
+            target = currentPath;
+        } else {
+            std::wstring nm = nmArg;
+            std::wstring sp;
+            if (pickSaveFile((nm.empty() ? L"未命名导图" : nm) + L".usmind", sp)) {
+                target = sp;
             } else {
                 if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
                 break;
             }
         }
+        snapshotHistory(target, currentName.empty() ? nmArg : currentName);
+        ok = writeFile(target, bin);
+        // 仅普通保存（非显式另存为导出）记住为工作文件，避免后续 Ctrl+S 覆盖到导出文件
+        if (ok && !saveAs) { currentPath = target; currentName = fileNameOf(target); }
         if (result) {
             std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
                                : "{\"ok\":false,\"error\":\"保存失败\"}";

@@ -1427,7 +1427,7 @@ async function saveNow(silent) {
       name: doc.name, savedAt: new Date().toISOString(),
       tabs: p.tabs,
     };
-    const r = await callNative('saveSelfContained', JSON.stringify(manifest), JSON.stringify(p.mediaRels), 0, doc.name);
+    const r = await callNative('saveSelfContained', JSON.stringify(manifest), JSON.stringify(p.mediaRels), 0, doc.name, doc.path);
     if (r && r.ok) {
       doc.path = r.path || doc.path;
       doc.name = r.name || doc.name;
