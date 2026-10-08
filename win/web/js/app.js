@@ -663,9 +663,33 @@ function applyTheme(name) {
   doc.theme = name;
   try { mind.setTheme(name); } catch (e) {}
   try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(name) }); } catch (e) {}
+  paintBranchNodeColors(name);
   dirty = true;
   updateTitle();
   toast('已切换主题：' + t.name);
+}
+
+// 自定义主题：分支节点背景跟随配色（中心/二级/其它节点用第1/2/3色）
+function paintBranchNodeColors(name) {
+  const root = mind.renderTree;
+  if (!root) return;
+  const customs = getCustomThemes();
+  const custom = customs.find(x => x.name === name);
+  const colors = (custom && custom.colors && custom.colors.filter(Boolean)) || [];
+  (function walk(n) {
+    if (n && n.data) { delete n.data.fillColor; delete n.data.color; }
+    (n.children || []).forEach(walk);
+  })(root);
+  if (!colors.length) return;
+  (function walk(n, depth) {
+    if (depth > 0 && n.data) {
+      const c = colors[Math.min(depth - 1, colors.length - 1)] || colors[0];
+      n.data.fillColor = c;
+      n.data.color = '#ffffff';
+    }
+    (n.children || []).forEach(ch => walk(ch, depth + 1));
+  })(root, 0);
+  try { mind.render && mind.render(); } catch (e) {}
 }
 
 function buildThemeGrid() {
@@ -812,6 +836,10 @@ const _ba = $('btnAddTheme'); if (_ba) _ba.addEventListener('click', () => openT
 const _ts = $('teSave'); if (_ts) _ts.addEventListener('click', saveThemeFromDialog);
 const _tc = $('teCancel'); if (_tc) _tc.addEventListener('click', () => $('themeEditDialog').classList.remove('open'));
 const _ta = $('teAddColor'); if (_ta) _ta.addEventListener('click', () => { const arr = currentTeColors(); arr.push('#4a6cf7'); renderTeColors(arr); });
+// 面板滚动：拦截滚轮冒泡，防止被导图缩放逻辑抢走
+document.querySelectorAll('.panel-body').forEach(pb => {
+  pb.addEventListener('wheel', e => { e.stopPropagation(); }, { passive: false });
+});
 loadCustomThemes();
 
 async function fillSettings() {
