@@ -654,7 +654,7 @@ function initMindMap() {
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
-  setTimeout(() => { try { applyBranchRainbow(); } catch (e) {} }, 600);
+  setTimeout(() => { try { applyBranchRainbow(); applyCanvasBg(); } catch (e) {} }, 600);
   updateZoom();
 }
 
@@ -666,6 +666,7 @@ function applyTheme(name) {
   try { mind.setTheme(name); } catch (e) {}
   try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(name) }); } catch (e) {}
   scheduleBranchRainbow();
+  applyCanvasBg();
   dirty = true;
   updateTitle();
   toast('已切换主题：' + t.name);
@@ -725,6 +726,30 @@ let rainbowTimer = null;
 function scheduleBranchRainbow() {
   if (rainbowTimer) clearTimeout(rainbowTimer);
   rainbowTimer = setTimeout(() => applyBranchRainbow(), 350);
+}
+
+// 背景视频（引擎不支持，前端自渲染，同原项目）
+function applyCanvasBg() {
+  const video = $('canvasBgVideo');
+  const mc = $('mindMapContainer');
+  if (mc) mc.style.background = 'transparent';
+  if (!video) return;
+  const t = themeBy(doc.theme);
+  const cfg = t && t.config;
+  const v = cfg && cfg.backgroundVideo;
+  if (!v || v === 'none') {
+    video.style.display = 'none';
+    try { video.pause(); } catch (e) {}
+    video.removeAttribute('src');
+    return;
+  }
+  let src = v;
+  if (v.indexOf('attachments/') === 0) { try { src = resolveMediaUrl(v); } catch (e) {} }
+  video.src = src;
+  video.style.display = 'block';
+  video.style.opacity = (cfg.backgroundOpacity != null ? cfg.backgroundOpacity : 1);
+  video.style.transform = 'scale(' + (cfg.backgroundZoom != null ? cfg.backgroundZoom : 1) + ')';
+  try { video.play().catch(() => {}); } catch (e) {}
 }
 
 function buildThemeGrid() {
@@ -897,16 +922,22 @@ if (_bif) _bif.addEventListener('change', () => {
   };
   rd.readAsDataURL(f);
 });
-// 背景视频选择（存配置，本地版暂不支持视频背景预览）
+// 背景视频选择：exe 走附件目录（media.local 流式），测试页走 blob 预览
 const _bv = $('teBgVideoBtn');
 if (_bv) _bv.addEventListener('click', () => $('teBgVideoFile').click());
 const _bvf = $('teBgVideoFile');
-if (_bvf) _bvf.addEventListener('change', () => {
+if (_bvf) _bvf.addEventListener('change', async () => {
   const f = _bvf.files && _bvf.files[0];
   if (!f) return;
-  $('teBgVideo').dataset.data = f.name;
+  let stored = '';
+  if (hasNative) {
+    stored = await storeFileExternal(f);
+  } else {
+    try { stored = URL.createObjectURL(f); } catch (e) { stored = ''; }
+  }
+  $('teBgVideo').dataset.data = stored || f.name;
   $('teBgVideo').value = '已选择：' + f.name;
-  toast('背景视频配置已保存（本地版暂不支持预览）');
+  _bvf.value = '';
 });
 // 面板滚动：拦截滚轮冒泡，防止被导图缩放逻辑抢走
 document.querySelectorAll('.panel-body').forEach(pb => {
@@ -1187,6 +1218,14 @@ function saveThemeFromDialog() {
   const idx = THEMES.findIndex(x => x.name === editingName);
   if (idx >= 0) THEMES.splice(idx, 1);
   loadCustomThemes();
+  if (doc.theme === name || doc.theme === editingName) {
+    try {
+      const ent = THEMES.find(x => x.name === doc.theme);
+      if (ent) { MindMap.defineTheme(doc.theme, ent.config); mind.setTheme(doc.theme); }
+    } catch (e) {}
+    scheduleBranchRainbow();
+    applyCanvasBg();
+  }
   $('themeEditDialog').classList.remove('open');
   toast('主题已保存');
   renderThemesList();
