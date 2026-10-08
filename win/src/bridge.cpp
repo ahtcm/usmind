@@ -432,7 +432,7 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 21: { // saveBinary(b64, path, name) → {ok, path?}（自包含 zip 保存）
+    case 21: { // saveBinary(b64, path, name) → {ok, path?}（自包含 zip 保存；.json 导出用任意扩展名）
         std::wstring b64 = ParamStr(p, 0);
         std::wstring path = ParamStr(p, 1);
         std::wstring name = ParamStr(p, 2);
@@ -442,7 +442,17 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
             ok = writeFileB64(path, wideToUtf8_2(b64));
         } else {
             std::wstring sp;
-            if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", sp)) {
+            bool isJson = name.size() >= 5 && name.compare(name.size() - 5, 5, L".json") == 0;
+            if (isJson) {
+                if (pickSaveFileAny(L"", name, sp)) {
+                    snapshotHistory(sp, name);
+                    ok = writeFileB64(sp, wideToUtf8_2(b64));
+                    if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
+                } else {
+                    if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                    break;
+                }
+            } else if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", sp)) {
                 snapshotHistory(sp, name);
                 ok = writeFileB64(sp, wideToUtf8_2(b64));
                 if (ok) { currentPath = sp; currentName = fileNameOf(sp); }
