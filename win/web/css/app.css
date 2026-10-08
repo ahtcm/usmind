@@ -44,6 +44,7 @@ body {
 }
 #topBar .tb-info { display: flex; align-items: center; gap: 7px; padding: 0 6px; }
 #topBar .tb-info .doc-title { color: #2a2e3d; font-size: 12.5px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#topBar .tb-info .doc-title-input { background: #fff; border: 1px solid #4a7dff; border-radius: 3px; color: #2a2e3d; font-size: 12.5px; outline: none; padding: 1px 4px; width: 180px; }
 #topBar .tb-info .save-state { font-size: 11px; color: #8a8f9e; }
 #topBar .tb-info .save-state.saving { color: #e8923a; }
 #topBar .tb-info .save-state.saved { color: #34a875; }

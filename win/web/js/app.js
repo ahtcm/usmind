@@ -261,6 +261,28 @@ function openInTab(path, name, parsed) {
   dirty = false;
   updateTitle(); updateStatus(); renderTabStrip(); syncLayoutSelect();
 }
+// 恢复多标签文件（JSON multi-tabs 导出）
+function restoreAllTabs(tabArr) {
+  if (!tabArr || !tabArr.length) { toast('文件没有标签数据', 'error'); return; }
+  const valid = tabArr.filter(t => t && t.data);
+  if (!valid.length) { toast('文件标签数据无效', 'error'); return; }
+  tabs = valid.map(t => ({
+    name: t.name || '未命名导图', path: '',
+    theme: t.theme || userDefaultTheme, layout: t.layout || 'logicalStructure',
+    data: t.data && t.data.root ? t.data.root : t.data,
+  }));
+  activeTab = 0;
+  const t = tabs[0];
+  doc.path = ''; doc.name = t.name; doc.theme = t.theme; doc.layout = t.layout;
+  suppressDirtyUntil = Date.now() + 2000;
+  try { mind.setData(t.data); } catch (e) { console.error('setData 失败', e); }
+  try { mind.setLayout(t.layout); } catch (e) {}
+  try { mind.setTheme(t.theme); } catch (e) {}
+  try { mind.render(); } catch (e) { console.error('render 失败', e); }
+  setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+  dirty = false; booting = false;
+  updateTitle(); updateStatus(); renderTabStrip(); syncLayoutSelect();
+}
 
 function themeBy(name) {
   return THEMES.find(t => t.name === name) || THEMES[0];
@@ -310,9 +332,42 @@ function updateTitle() {
   if (st) {
     if (dirty) { st.textContent = '● 未保存'; st.className = 'save-state saving'; }
     else if (doc.path) { st.textContent = '已保存'; st.className = 'save-state saved'; }
-    else { st.textContent = ''; st.className = 'save-state'; }
-  }
+    else { st.textContent = ''; st.className = 'save-state'; }  }
 }
+// 双击标题改名（改后即文件名）
+function renameDocTitle() {
+  const dt = $('docTitle');
+  if (!dt || dt.querySelector('input')) return;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'doc-title-input';
+  inp.value = doc.name || '未命名导图';
+  dt.replaceWith(inp);
+  inp.focus(); inp.select();
+  let done = false;
+  const finish = (save) => {
+    if (done) return; done = true;
+    if (save) {
+      const v = inp.value.trim();
+      const nm = v || '未命名导图';
+      doc.name = nm;
+      if (tabs[activeTab]) tabs[activeTab].name = nm;
+      markDirty();
+    }
+    const sp = document.createElement('span');
+    sp.id = 'docTitle'; sp.className = 'doc-title';
+    inp.replaceWith(sp);
+    updateTitle(); renderTabStrip();
+    callNative('notifyDocumentState', doc.name);
+  };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+}
+document.addEventListener('dblclick', (e) => {
+  if (e.target && e.target.id === 'docTitle') renameDocTitle();
+});
 function updateStatus() {
   let nodes = 0;
   try {
@@ -419,6 +474,10 @@ function serializeDoc() {
 function parseDoc(text) {
   let obj;
   try { obj = JSON.parse(text); } catch (e) { throw new Error('文件不是有效的 JSON'); }
+  // 多标签导出格式：{app:'usmind', type:'multi-tabs', tabs:[...]}
+  if (obj && obj.app === 'usmind' && obj.type === 'multi-tabs' && Array.isArray(obj.tabs)) {
+    return { multiTabs: obj.tabs };
+  }
   const isUsmind = obj && obj.format === 'usmind';
   let root = null;
   if (isUsmind) root = obj.data && obj.data.root ? obj.data.root : (obj.data && obj.data.data && obj.data.data.root ? obj.data.data.root : null);
@@ -470,6 +529,7 @@ async function openPath(path) {
     try {
       if (r.isZip) { await importSelfContained(r.b64, r.path || path, r.name); return; }
       const parsed = parseDoc(r.data);
+      if (parsed.multiTabs) { restoreAllTabs(parsed.multiTabs); booting = false; toast('已恢复 ' + parsed.multiTabs.length + ' 个标签'); return; }
       openInTab(r.path || path, r.name, parsed);
       booting = false;
       toast('已打开：' + (r.name || doc.name));
@@ -489,6 +549,7 @@ async function openWithDialog() {
     try {
       if (r.isZip) { await importSelfContained(r.b64, r.path, r.name); return; }
       const parsed = parseDoc(r.data);
+      if (parsed.multiTabs) { restoreAllTabs(parsed.multiTabs); booting = false; toast('已恢复 ' + parsed.multiTabs.length + ' 个标签'); return; }
       openInTab(r.path, r.name, parsed);
       toast('已打开：' + r.name);
     } catch (e) {
@@ -812,13 +873,32 @@ async function doExport(type) {
     else if (type === 'jpeg') await mind.doExport.export('jpeg', true, name);
     else if (type === 'svg') await mind.doExport.export('svg', true, name);
     else if (type === 'md') await mind.doExport.export('md', true, name);
-    else if (type === 'json') await mind.doExport.export('json', true, name);
+    else if (type === 'json') await exportJSONAllTabs(name);
     else if (type === 'xmind') await mind.doExport.export('xmind', true, name);
     else if (type === 'zip') await exportSelfContained();
     toast('导出已启动，请选择保存位置');
   } catch (e) {
     toast('导出失败：' + e.message, 'error');
   }
+}
+
+// 导出多标签 JSON（含所有标签页，恢复时一键还原）
+async function exportJSONAllTabs(name) {
+  snapshotActiveTab();
+  const payload = {
+    app: 'usmind', type: 'multi-tabs', version: 1,
+    tabs: tabs.map(t => ({
+      name: t.name || '未命名导图',
+      path: t.path || '',
+      theme: t.theme || userDefaultTheme,
+      layout: t.layout || 'logicalStructure',
+      data: t.data && t.data.root ? t.data.root : t.data,
+    })),
+  };
+  const json = JSON.stringify(payload);
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  const r = await callNative('saveBinary', b64, '', (name || '思维导图') + '.json');
+  if (!r || !r.ok) throw new Error('保存失败');
 }
 
 function arrayBufferToBase64(buf) {
