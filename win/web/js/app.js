@@ -67,11 +67,25 @@ let booting = true;
 let tabs = [];       // [{name, path, data, theme, layout}]
 let activeTab = -1;
 
+// 深拷贝导图数据：跳过 parent/_parent 等循环引用字段，避免 JSON.stringify 循环报错
+function cloneMindData(node) {
+  if (!node || typeof node !== 'object') return node;
+  if (Array.isArray(node)) return node.map(cloneMindData);
+  const out = {};
+  for (const k in node) {
+    if (k === 'parent' || k === '_parent' || k === 'owner') continue;
+    const v = node[k];
+    if (v && typeof v === 'object') {
+      out[k] = Array.isArray(v) ? v.map(cloneMindData) : cloneMindData(v);
+    } else out[k] = v;
+  }
+  return out;
+}
 function snapshotActiveTab() {
   if (activeTab < 0 || !mind) return;
   try {
     // 深拷贝快照：getData() 返回的是内部引用，不拷贝会导致所有标签共享同一份数据、切换无效
-    tabs[activeTab].data = JSON.parse(JSON.stringify(mind.getData()));
+    tabs[activeTab].data = cloneMindData(mind.getData());
     tabs[activeTab].name = doc.name;
     tabs[activeTab].path = doc.path;
     tabs[activeTab].theme = doc.theme;
@@ -173,7 +187,7 @@ function switchToTab(i) {
   doc.name = t.name || '未命名导图';
   doc.theme = t.theme || userDefaultTheme;
   doc.layout = t.layout || 'logicalStructure';
-  try { mind.setData(t.data); } catch (e) { console.error('setData', e); }
+  try { mind.setData(cloneMindData(t.data)); } catch (e) { console.error('setData', e); }
   try { mind.setLayout(doc.layout); } catch (e) {}
   try { mind.setTheme(doc.theme); } catch (e) {}
   try { mind.render(); } catch (e) {}
