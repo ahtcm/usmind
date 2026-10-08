@@ -346,16 +346,24 @@ function defaultData() {
 }
 
 function serializeDoc() {
-  const payload = { root: mind.getData() };
-  return JSON.stringify({
-    format: 'usmind',
-    version: 1,
-    name: doc.name,
-    theme: doc.theme,
-    layout: doc.layout,
-    savedAt: new Date().toISOString(),
-    data: payload,
-  }, null, 2);
+  const root = mind.getData();
+  // 保存前把渲染用 blob: src 还原为 dataUrl（保证 .usmind 自包含），序列化后恢复 blob 保持内存流畅
+  restoreTreeMediaSrc(root);
+  let json;
+  try {
+    json = JSON.stringify({
+      format: 'usmind',
+      version: 1,
+      name: doc.name,
+      theme: doc.theme,
+      layout: doc.layout,
+      savedAt: new Date().toISOString(),
+      data: { root },
+    }, null, 2);
+  } finally {
+    patchTreeMediaSrc(root);
+  }
+  return json;
 }
 
 // 解析 .usmind / 兼容裸引擎 JSON
@@ -391,6 +399,8 @@ async function applyDoc(parsed, path, name) {
     };
     fix(parsed.root, true);
   } catch (eF) {}
+  // 媒体 src 优化：打开文件后把 dataUrl 换成 blob objectURL，渲染不再反复解码大文件
+  try { patchTreeMediaSrc(parsed.root); } catch (eP) {}
   try { mind.setData(parsed.root); } catch (e) { console.error('setData 失败', e); }
   try { mind.setLayout(parsed.layout); } catch (e) {}
   try { mind.setTheme(parsed.theme); } catch (e) {}
@@ -869,6 +879,8 @@ function removeNodeAttachment(node) {
   try {
     const nd = nodeDataOf(node);
     const dd = (nd && nd.data) || nd;
+    // 释放媒体 blob objectURL 缓存
+    try { revokeMediaUrl(dd.attachUrl || dd.attachmentUrl); } catch (eR) {}
     delete dd.attachUrl;
     delete dd.attachName;
     delete dd.attachmentUrl;
@@ -1080,7 +1092,8 @@ function renderFileNode(child, file) {
       toast('已插入: ' + name);
     };
     if (type.indexOf('image/') === 0) {
-      getImageSize(src).then(size => {
+      const objUrl = mediaObjectUrl(src);
+      getImageSize(objUrl).then(size => {
         try {
           const MAX_W = 360, MAX_H = 240;
           const scale = Math.min(1, MAX_W / (size.width || 1), MAX_H / (size.height || 1));
@@ -1088,18 +1101,18 @@ function renderFileNode(child, file) {
           const h = Math.max(75, Math.round((size.height || 157) * scale));
           apply({ richText: true, text:
             '<div style="position:relative;width:'+w+'px;height:'+h+'px;overflow:hidden;border-radius:12px;line-height:0">'+
-            '<img src="'+src+'" style="width:100%;height:100%;object-fit:cover;display:block;margin:0"></div>' },
+            '<img src="'+objUrl+'" style="width:100%;height:100%;object-fit:cover;display:block;margin:0"></div>' },
             { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
         } catch (e3) {}
       });
     } else if (type.indexOf('audio/') === 0) {
       apply({ richText: true, text:
         '<div style="position:relative;width:280px;height:40px;overflow:hidden;border-radius:12px;line-height:0;background:#000">'+
-        '<audio controls style="width:100%;height:100%;display:block" src="'+src+'"></audio></div>' }, null);
+        '<audio controls style="width:100%;height:100%;display:block" src="'+mediaObjectUrl(src)+'"></audio></div>' }, null);
     } else if (type.indexOf('video/') === 0) {
       apply({ richText: true, text:
         '<div style="position:relative;width:300px;height:170px;overflow:hidden;border-radius:12px;background:#000;line-height:0">'+
-        '<video controls style="width:100%;height:100%;object-fit:cover;display:block;background:#000" src="'+src+'"></video></div>' },
+        '<video controls style="width:100%;height:100%;object-fit:cover;display:block;background:#000" src="'+mediaObjectUrl(src)+'"></video></div>' },
         { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
     } else {
       // 普通文件：文件名（红字虚线框，双击打开/预览）
@@ -1193,6 +1206,52 @@ function dataUrlToBlob(u) {
   return new Blob([bytes], { type: mime });
 }
 
+// 媒体渲染优化：dataUrl → Blob objectURL 缓存（避免大文件每次渲染都解码 base64 导致卡顿）
+const _mediaUrlCache = new Map();
+function mediaObjectUrl(dataUrl) {
+  if (!dataUrl || dataUrl.indexOf('data:') !== 0) return dataUrl;
+  if (_mediaUrlCache.has(dataUrl)) return _mediaUrlCache.get(dataUrl);
+  try {
+    const u = URL.createObjectURL(dataUrlToBlob(dataUrl));
+    _mediaUrlCache.set(dataUrl, u);
+    return u;
+  } catch (e) { return dataUrl; }
+}
+function revokeMediaUrl(dataUrl) {
+  if (_mediaUrlCache.has(dataUrl)) {
+    try { URL.revokeObjectURL(_mediaUrlCache.get(dataUrl)); } catch (e) {}
+    _mediaUrlCache.delete(dataUrl);
+  }
+}
+
+// 树级媒体 src 优化：dataUrl ↔ blob objectURL（渲染用 blob 流畅，保存前还原 dataUrl 保证文件自包含）
+function walkTree(node, fn) {
+  if (!node) return;
+  try { fn(node); } catch (e) {}
+  (node.children || []).forEach(c => walkTree(c, fn));
+}
+function patchTreeMediaSrc(root) {
+  walkTree(root, n => {
+    const t = n && n.data && n.data.text;
+    if (typeof t === 'string' && t.indexOf('data:') !== -1) {
+      n.data.text = t.replace(/src="(data:[^"]+)"/g, (m, d) => {
+        try { return 'src="' + mediaObjectUrl(d) + '"'; } catch (e) { return m; }
+      });
+    }
+  });
+}
+function restoreTreeMediaSrc(root) {
+  walkTree(root, n => {
+    const t = n && n.data && n.data.text;
+    if (typeof t === 'string' && t.indexOf('blob:') !== -1) {
+      n.data.text = t.replace(/src="(blob:[^"]+)"/g, (m, b) => {
+        for (const [d, u] of _mediaUrlCache) { if (u === b) return 'src="' + d + '"'; }
+        return m;
+      });
+    }
+  });
+}
+
 // docx/xlsx/pdf 内置预览（离线：mammoth / SheetJS / Chromium 原生 PDF）
 function openDocPreview(att) {
   try {
@@ -1276,15 +1335,15 @@ function openNodeAttachment(node) {
     const VID = ['mp4','webm','ogg','mov'];
     const AUD = ['mp3','wav','m4a','flac'];
     if (IMG.includes(ext)) {
-      $('imgViewerImg').src = att.url;
+      $('imgViewerImg').src = mediaObjectUrl(att.url);
       $('imgViewer').style.display = 'flex';
       return;
     }
     if (VID.includes(ext) || AUD.includes(ext)) {
       $('mediaFileName').textContent = att.name;
       const v = $('mediaVideo'), a = $('mediaAudio');
-      if (VID.includes(ext)) { v.src = att.url; v.style.display = 'block'; a.style.display = 'none'; }
-      else { a.src = att.url; a.style.display = 'block'; v.style.display = 'none'; }
+      if (VID.includes(ext)) { v.src = mediaObjectUrl(att.url); v.style.display = 'block'; a.style.display = 'none'; }
+      else { a.src = mediaObjectUrl(att.url); a.style.display = 'block'; v.style.display = 'none'; }
       $('mediaViewer').style.display = 'flex';
       return;
     }
@@ -1912,5 +1971,5 @@ boot();
 
 // 浏览器（无原生桥）环境暴露测试钩子；exe 内不暴露
 if (!hasNative && typeof window !== 'undefined') {
-  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, get mind() { return mind; } };
+  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, mediaObjectUrl: mediaObjectUrl, patchTreeMediaSrc: patchTreeMediaSrc, restoreTreeMediaSrc: restoreTreeMediaSrc, serializeDoc: serializeDoc, get mind() { return mind; } };
 }
