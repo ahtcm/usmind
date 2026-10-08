@@ -910,9 +910,9 @@ function renderThemesList() {
     const ky = document.createElement('span'); ky.className = 't-key'; ky.textContent = t.key || t.name; item.appendChild(ky);
     const ops = document.createElement('div');
     ops.className = 't-ops';
+    const ed = document.createElement('button'); ed.className = 'mini-btn'; ed.textContent = '编辑'; ed.onclick = () => openThemeEdit(t.name); ops.appendChild(ed);
     if (t.builtin) { const st = document.createElement('span'); st.className = 'muted-text'; st.style.fontSize = '11px'; st.textContent = '内置'; ops.appendChild(st); }
     else {
-      const ed = document.createElement('button'); ed.className = 'mini-btn'; ed.textContent = '编辑'; ed.onclick = () => openThemeEdit(t.name); ops.appendChild(ed);
       const del = document.createElement('button'); del.className = 'mini-btn'; del.style.color = '#c0392b'; del.textContent = '删除'; del.onclick = () => deleteTheme(t.name); ops.appendChild(del);
     }
     item.appendChild(ops);
@@ -923,16 +923,17 @@ function renderThemesList() {
 function openThemeEdit(name) {
   const customs = getCustomThemes();
   const editing = customs.find(x => x.name === name);
-  $('teName').value = editing ? editing.name : '';
-  $('teKey').value = editing ? (editing.key || '') : '';
+  const builtin = !editing ? THEMES.find(x => x.name === name) : null;
+  $('teName').value = editing ? editing.name : (builtin ? builtin.name : '');
+  $('teKey').value = editing ? (editing.key || '') : (builtin ? (builtin.key || '') : '');
   $('teEnabled').checked = editing ? editing.enabled !== false : true;
   const sel = $('teBase');
   sel.innerHTML = '';
   THEMES.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
-  sel.value = editing ? (editing.base || THEMES[0].name) : THEMES[0].name;
-  renderTeColors(editing ? (editing.colors || []) : []);
+  sel.value = editing ? (editing.base || THEMES[0].name) : (builtin ? builtin.name : THEMES[0].name);
+  renderTeColors(editing ? (editing.colors || []) : (builtin ? (builtin.branchColors || []) : []));
   $('themeEditDialog').classList.add('open');
-  $('themeEditDialog').dataset.editing = editing ? name : '';
+  $('themeEditDialog').dataset.editing = editing ? name : name || '';
 }
 function renderTeColors(colors) {
   const box = $('teColors');
@@ -958,8 +959,16 @@ function saveThemeFromDialog() {
   if (!colors.length) { toast('请至少保留一个分支颜色', 'error'); return; }
   const customs = getCustomThemes();
   if (editingName) {
-    const t = customs.find(x => x.name === editingName);
-    if (t) { t.name = name; t.key = $('teKey').value.trim(); t.base = $('teBase').value || THEMES[0].name; t.colors = colors; t.enabled = $('teEnabled').checked; }
+    const isBuiltin = !customs.some(x => x.name === editingName);
+    const rec = { name, key: $('teKey').value.trim() || ('theme-' + Date.now()), base: $('teBase').value || THEMES[0].name, colors, enabled: $('teEnabled').checked };
+    if (isBuiltin) {
+      const idx = THEMES.findIndex(x => x.name === editingName);
+      if (idx >= 0) THEMES.splice(idx, 1);
+      customs.push(rec);
+    } else {
+      const t = customs.find(x => x.name === editingName);
+      if (t) { t.name = name; t.key = $('teKey').value.trim(); t.base = $('teBase').value || THEMES[0].name; t.colors = colors; t.enabled = $('teEnabled').checked; }
+    }
   } else {
     if (customs.some(x => x.name === name)) { toast('已存在同名主题', 'error'); return; }
     customs.push({ name, key: $('teKey').value.trim() || ('theme-' + Date.now()), base: $('teBase').value || THEMES[0].name, colors, enabled: $('teEnabled').checked });
