@@ -1369,7 +1369,19 @@ async function buildSelfContainedPayload() {
       if (r && r.ok) { if (!seen.has(rel)) { seen.add(rel); mediaRels.push(rel); } return rel; }
       return u;
     }
-    return u; // blob:/http: 原样（blob 不持久化；http 外链保留）
+    if (u.indexOf('blob:') === 0) {
+      // blob 不持久化：落盘为附件，引用改相对路径
+      try {
+        const resp = await fetch(u);
+        const buf = await resp.arrayBuffer();
+        const mime = resp.headers.get('Content-Type') || '';
+        const rel = 'attachments/att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + extFromDataUrl('data:' + mime + ';base64,');
+        const r = await callNative('writeAttachment', rel, arrayBufferToBase64(buf));
+        if (r && r.ok) { if (!seen.has(rel)) { seen.add(rel); mediaRels.push(rel); } return rel; }
+      } catch (e) {}
+      return u;
+    }
+    return u; // http: 外链保留
   }
   async function walk(n) {
     if (!n) return;
