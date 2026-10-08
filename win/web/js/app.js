@@ -838,7 +838,7 @@ document.querySelectorAll('.set-tab').forEach(b => b.addEventListener('click', (
 const _ba = $('btnAddTheme'); if (_ba) _ba.addEventListener('click', () => openThemeEdit(''));
 const _ts = $('teSave'); if (_ts) _ts.addEventListener('click', saveThemeFromDialog);
 const _tc = $('teCancel'); if (_tc) _tc.addEventListener('click', () => $('themeEditDialog').classList.remove('open'));
-const _ta = $('teAddColor'); if (_ta) _ta.addEventListener('click', () => { const arr = currentTeColors(); arr.push('#4a6cf7'); renderTeColors(arr); });
+const _ta = $('teAddColor'); if (_ta) _ta.addEventListener('click', () => { const arr = currentTeColors(); arr.push('#4a6cf7'); renderTeColors(arr); updateTePreview(); });
 // 面板滚动：拦截滚轮冒泡，防止被导图缩放逻辑抢走
 document.querySelectorAll('.panel-body').forEach(pb => {
   pb.addEventListener('wheel', e => { e.stopPropagation(); }, { passive: false });
@@ -911,13 +911,15 @@ function loadCustomThemes() {
     const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
-    if (colors.length) {
-      config.branchColors = colors;
-      config.lineColor = colors[0];
-      // 节点背景跟随分支配色（中心=第1色，二级=第2色，其它=第3色，不足则回退）
-      if (config.root) { config.root.fillColor = colors[0]; config.root.color = '#ffffff'; }
-      if (config.second) { config.second.fillColor = colors[1] || colors[0]; config.second.color = '#ffffff'; }
-      if (config.node) { config.node.fillColor = colors[2] || colors[0]; config.node.color = '#ffffff'; }
+    if (colors.length) { config.branchColors = colors; config.lineColor = t.lineColor || colors[0]; }
+    if (t.canvasBg) config.backgroundColor = t.canvasBg;
+    if (t.lineWidth != null) config.lineWidth = t.lineWidth;
+    if (config.root) {
+      config.root.fillColor = t.rootFill || colors[0] || config.root.fillColor;
+      if (t.rootColor) config.root.color = t.rootColor;
+      if (t.rootBorder) config.root.borderColor = t.rootBorder;
+      if (t.rootRadius != null) config.root.borderRadius = t.rootRadius;
+      if (t.rootFontSize != null) config.root.fontSize = t.rootFontSize;
     }
     const entry = { name: t.name, key: t.key || '', branchColors: colors.length ? colors : (base.branchColors || []), config };
     THEMES.push(entry);
@@ -930,10 +932,10 @@ function renderThemesList() {
   const list = $('themeMgrList');
   if (!list) return;
   const customs = getCustomThemes();
-  const all = THEMES.map(t => {
+  const all = THEMES.map((t, i) => {
     const c = customs.find(x => x.name === t.name);
-    return { name: t.name, key: t.key || (c && c.key) || '', colors: t.branchColors || [], builtin: !c };
-  });
+    return { name: t.name, key: t.key || (c && c.key) || '', colors: t.branchColors || [], builtin: !c, sort: c ? (c.sort || 999) : (i + 1) };
+  }).sort((a, b) => a.sort - b.sort);
   $('themeMgrCount').textContent = '共 ' + all.length + ' 个主题模板';
   list.innerHTML = '';
   all.forEach(t => {
@@ -961,54 +963,97 @@ function openThemeEdit(name) {
   const customs = getCustomThemes();
   const editing = customs.find(x => x.name === name);
   const builtin = !editing ? THEMES.find(x => x.name === name) : null;
+  const cfg = editing ? null : (builtin ? builtin.config : null);
   $('teName').value = editing ? editing.name : (builtin ? builtin.name : '');
   $('teKey').value = editing ? (editing.key || '') : (builtin ? (builtin.key || '') : '');
+  $('teSort').value = editing ? (editing.sort || 1) : (builtin ? (THEMES.indexOf(builtin) + 1) : 1);
   $('teEnabled').checked = editing ? editing.enabled !== false : true;
   const sel = $('teBase');
   sel.innerHTML = '';
   THEMES.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
   sel.value = editing ? (editing.base || THEMES[0].name) : (builtin ? builtin.name : THEMES[0].name);
+  $('teBaseRow').style.display = (editing || builtin) ? 'none' : '';
   renderTeColors(editing ? (editing.colors || []) : (builtin ? (builtin.branchColors || []) : []));
+  $('teCanvasBg').value = editing ? (editing.canvasBg || (cfg && cfg.backgroundColor) || '#fafbff') : (cfg ? (cfg.backgroundColor || '#fafbff') : '#fafbff');
+  $('teLineColor').value = editing ? (editing.lineColor || (editing.colors || [])[0] || '#FF9F43') : (cfg ? (cfg.lineColor || '#FF9F43') : '#FF9F43');
+  $('teLineWidth').value = editing ? (editing.lineWidth != null ? editing.lineWidth : 4) : (cfg ? (cfg.lineWidth || 4) : 4);
+  $('teRootFill').value = editing ? (editing.rootFill || (editing.colors || [])[0] || '#FF9F43') : (cfg ? (cfg.root.fillColor || '#FF9F43') : '#FF9F43');
+  $('teRootColor').value = editing ? (editing.rootColor || '#ffffff') : (cfg ? (cfg.root.color || '#ffffff') : '#ffffff');
+  $('teRootBorder').value = editing ? (editing.rootBorder || '#ffffff') : (cfg ? (cfg.root.borderColor || '#ffffff') : '#ffffff');
+  $('teRootRadius').value = editing ? (editing.rootRadius != null ? editing.rootRadius : 20) : (cfg ? (cfg.root.borderRadius || 20) : 20);
+  $('teRootFontSize').value = editing ? (editing.rootFontSize != null ? editing.rootFontSize : 36) : (cfg ? (cfg.root.fontSize || 36) : 36);
+  updateTePreview();
   $('themeEditDialog').classList.add('open');
-  $('themeEditDialog').dataset.editing = editing ? name : name || '';
+  $('themeEditDialog').dataset.editing = name || '';
 }
 function renderTeColors(colors) {
   const box = $('teColors');
   box.innerHTML = '';
   (colors.length ? colors : ['#FF9F43', '#FECB33', '#FF6B6B', '#F08BB4']).forEach((c, i) => {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
+    const tc = document.createElement('div');
+    tc.className = 'tc';
     const inp = document.createElement('input');
     inp.type = 'color'; inp.value = c;
-    inp.addEventListener('input', () => { const arr = currentTeColors(); if (arr[i]) arr[i] = inp.value; });
-    const rm = document.createElement('span'); rm.className = 'rm'; rm.textContent = '×';
-    rm.onclick = () => { const arr = currentTeColors(); arr.splice(i, 1); renderTeColors(arr); };
-    chip.appendChild(inp); chip.appendChild(rm);
-    box.appendChild(chip);
+    inp.addEventListener('input', () => { const arr = currentTeColors(); if (arr[i]) arr[i] = inp.value; updateTePreview(); });
+    const x = document.createElement('span'); x.className = 'tc-x'; x.textContent = '×';
+    x.onclick = () => { const arr = currentTeColors(); arr.splice(i, 1); renderTeColors(arr); updateTePreview(); };
+    tc.appendChild(inp); tc.appendChild(x);
+    box.appendChild(tc);
   });
 }
 function currentTeColors() { return Array.from($('teColors').querySelectorAll('input[type=color]')).map(i => i.value); }
+function updateTePreview() {
+  const colors = currentTeColors();
+  const root = $('tpRoot');
+  root.style.background = $('teRootFill').value || (colors[0] || '#FF9F43');
+  root.style.color = $('teRootColor').value || '#fff';
+  root.style.borderRadius = ($('teRootRadius').value || 20) + 'px';
+  const br = $('tpBranches');
+  br.innerHTML = '';
+  (colors.length ? colors.slice(0, 4) : []).forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'tp-branch';
+    const sw = document.createElement('i'); sw.style.background = c;
+    const sp = document.createElement('span'); sp.textContent = '分支' + (i + 1);
+    row.appendChild(sw); row.appendChild(sp);
+    br.appendChild(row);
+  });
+}
 function saveThemeFromDialog() {
   const name = $('teName').value.trim();
   if (!name) { toast('请填写主题名称', 'error'); return; }
   const editingName = $('themeEditDialog').dataset.editing || '';
   const colors = currentTeColors();
   if (!colors.length) { toast('请至少保留一个分支颜色', 'error'); return; }
+  const rec = {
+    name, key: $('teKey').value.trim() || ('theme-' + Date.now()),
+    base: $('teBase').value || THEMES[0].name,
+    sort: parseInt($('teSort').value) || 1,
+    enabled: $('teEnabled').checked,
+    colors,
+    canvasBg: $('teCanvasBg').value,
+    lineColor: $('teLineColor').value,
+    lineWidth: parseInt($('teLineWidth').value) || 4,
+    rootFill: $('teRootFill').value,
+    rootColor: $('teRootColor').value,
+    rootBorder: $('teRootBorder').value,
+    rootRadius: parseInt($('teRootRadius').value) || 20,
+    rootFontSize: parseInt($('teRootFontSize').value) || 36
+  };
   const customs = getCustomThemes();
   if (editingName) {
     const isBuiltin = !customs.some(x => x.name === editingName);
-    const rec = { name, key: $('teKey').value.trim() || ('theme-' + Date.now()), base: $('teBase').value || THEMES[0].name, colors, enabled: $('teEnabled').checked };
     if (isBuiltin) {
       const idx = THEMES.findIndex(x => x.name === editingName);
       if (idx >= 0) THEMES.splice(idx, 1);
       customs.push(rec);
     } else {
       const t = customs.find(x => x.name === editingName);
-      if (t) { t.name = name; t.key = $('teKey').value.trim(); t.base = $('teBase').value || THEMES[0].name; t.colors = colors; t.enabled = $('teEnabled').checked; }
+      if (t) Object.assign(t, rec);
     }
   } else {
     if (customs.some(x => x.name === name)) { toast('已存在同名主题', 'error'); return; }
-    customs.push({ name, key: $('teKey').value.trim() || ('theme-' + Date.now()), base: $('teBase').value || THEMES[0].name, colors, enabled: $('teEnabled').checked });
+    customs.push(rec);
   }
   setCustomThemes(customs);
   const idx = THEMES.findIndex(x => x.name === editingName);
