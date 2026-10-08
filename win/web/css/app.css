@@ -81,14 +81,24 @@ body {
 
 @keyframes pop { from { opacity: 0; transform: translate(-50%, -4px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-/* ---------- 画布 ---------- */
+/* ---------- 画布背景（三层，同原项目） ---------- */
+.canvas-bg-color {
+  position: fixed; inset: 0; z-index: 0;
+  background: #fafbff; pointer-events: none;
+}
+.canvas-bg-image {
+  position: fixed; inset: 0; z-index: 0;
+  background-repeat: no-repeat; background-position: center center;
+  background-size: cover; pointer-events: none; transform-origin: center center;
+}
 .canvas-bg-video {
   position: fixed; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; z-index: 0; pointer-events: none; background: #000;
+  object-fit: cover; z-index: 0; pointer-events: none;
+  transform-origin: center center;
 }
 #mindMapContainer {
   position: absolute; inset: 0; overflow: hidden;
-  background: transparent; z-index: 1;
+  background: transparent !important; z-index:1;
 }
 #mindMapContainer .smm-container { width: 100%; height: 100%; }
 .smm-node-text { font-family: "Microsoft YaHei", sans-serif; }

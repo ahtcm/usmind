@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261008c13">
+<link rel="stylesheet" href="css/app.css?v=20261008c14">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -81,7 +81,9 @@
     <svg viewBox="0 0 24 24" width="16" height="16"><path d="M5 9l7 7 7-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 
-  <!-- 画布 -->
+  <!-- 画布背景三层（底色→图片→视频），引擎层透明，同原项目 -->
+  <div id="canvasBgColor" class="canvas-bg-color"></div>
+  <div id="canvasBgImage" class="canvas-bg-image" style="display:none"></div>
   <video id="canvasBgVideo" class="canvas-bg-video" autoplay loop muted playsinline style="display:none"></video>
   <main id="mindMapContainer"></main>
 

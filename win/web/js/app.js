@@ -650,6 +650,7 @@ function initMindMap() {
   try { mind.on('node_text_change', () => renderTabStrip()); } catch (e) {}
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
   mind.on('scale', () => updateZoom());
+  window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
   mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); });
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
@@ -730,26 +731,44 @@ function scheduleBranchRainbow() {
 
 // 背景视频（引擎不支持，前端自渲染，同原项目）
 function applyCanvasBg() {
-  const video = $('canvasBgVideo');
   const mc = $('mindMapContainer');
   if (mc) mc.style.background = 'transparent';
-  if (!video) return;
+  const colorEl = $('canvasBgColor');
+  const imgEl = $('canvasBgImage');
+  const video = $('canvasBgVideo');
   const t = themeBy(doc.theme);
-  const cfg = t && t.config;
-  const v = cfg && cfg.backgroundVideo;
-  if (!v || v === 'none') {
-    video.style.display = 'none';
-    try { video.pause(); } catch (e) {}
-    video.removeAttribute('src');
-    return;
+  const cfg = (t && t.config) || {};
+  const bgColor = cfg.backgroundColor || '#fafbff';
+  const img = (cfg.backgroundImage && cfg.backgroundImage !== 'none') ? cfg.backgroundImage : '';
+  const vid = (cfg.backgroundVideo && cfg.backgroundVideo !== 'none') ? cfg.backgroundVideo : '';
+  const op = (cfg.backgroundOpacity != null) ? cfg.backgroundOpacity : 1;
+  const zoom = (cfg.backgroundZoom != null) ? cfg.backgroundZoom : 1;
+  if (colorEl) colorEl.style.background = bgColor;
+  if (vid) {
+    let src = vid;
+    if (vid.indexOf('attachments/') === 0) { try { src = resolveMediaUrl(vid); } catch (e) {} }
+    if (video) {
+      video.src = src;
+      video.style.display = 'block';
+      video.style.opacity = op;
+      video.style.transform = 'scale(' + zoom + ')';
+      try { video.play().catch(() => {}); } catch (e) {}
+    }
+    if (imgEl) imgEl.style.display = 'none';
+  } else if (img) {
+    let src = img;
+    if (img.indexOf('attachments/') === 0) { try { src = resolveMediaUrl(img); } catch (e) {} }
+    if (imgEl) {
+      imgEl.style.backgroundImage = "url('" + String(src).replace(/'/g, '%27') + "')";
+      imgEl.style.display = 'block';
+      imgEl.style.opacity = op;
+      imgEl.style.transform = 'scale(' + zoom + ')';
+    }
+    if (video) { video.style.display = 'none'; try { video.pause(); } catch (e) {} video.removeAttribute('src'); }
+  } else {
+    if (imgEl) imgEl.style.display = 'none';
+    if (video) { video.style.display = 'none'; try { video.pause(); } catch (e) {} video.removeAttribute('src'); }
   }
-  let src = v;
-  if (v.indexOf('attachments/') === 0) { try { src = resolveMediaUrl(v); } catch (e) {} }
-  video.src = src;
-  video.style.display = 'block';
-  video.style.opacity = (cfg.backgroundOpacity != null ? cfg.backgroundOpacity : 1);
-  video.style.transform = 'scale(' + (cfg.backgroundZoom != null ? cfg.backgroundZoom : 1) + ')';
-  try { video.play().catch(() => {}); } catch (e) {}
 }
 
 function buildThemeGrid() {
@@ -1215,13 +1234,22 @@ function saveThemeFromDialog() {
     customs.push(rec);
   }
   setCustomThemes(customs);
+  let appliedName = '';
+  if (doc.theme === name || doc.theme === editingName) {
+    if (doc.theme === editingName && name !== editingName) doc.theme = name;
+    appliedName = doc.theme;
+  }
   const idx = THEMES.findIndex(x => x.name === editingName);
   if (idx >= 0) THEMES.splice(idx, 1);
   loadCustomThemes();
-  if (doc.theme === name || doc.theme === editingName) {
+  if (appliedName) {
     try {
-      const ent = THEMES.find(x => x.name === doc.theme);
-      if (ent) { MindMap.defineTheme(doc.theme, ent.config); mind.setTheme(doc.theme); }
+      const ent = THEMES.find(x => x.name === appliedName);
+      if (ent) {
+        MindMap.defineTheme(appliedName, ent.config);
+        mind.setTheme(appliedName);
+        mind.render(() => {});
+      }
     } catch (e) {}
     scheduleBranchRainbow();
     applyCanvasBg();
