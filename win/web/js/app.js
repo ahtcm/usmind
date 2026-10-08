@@ -25,6 +25,8 @@ function hideRenderLoading() {
 }
 window.addEventListener('error', (e) => showErr('脚本错误: ' + (e.message || String(e.error || '')) + '\n' + (e.filename || '')));
 window.addEventListener('unhandledrejection', (e) => showErr('未处理异常: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason))));
+// 全局禁止浏览器原生右键菜单（任何地方都不出现原生菜单，应用内自定义菜单不受影响）
+document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ================= 桥接 =================
 const hasNative = !!(window.chrome && window.chrome.webview && window.chrome.webview.hostObjects);
