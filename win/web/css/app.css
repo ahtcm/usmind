@@ -103,6 +103,7 @@ body {
   display: flex; align-items: center; gap: 6px;
   overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
   flex: 1; min-width: 0;
+  padding: 10px 0;   /* 留出 hover 上浮阴影空间，避免被滚动容器裁剪 */
 }
 #tabStrip::-webkit-scrollbar { display: none; }
 .tab-item {
