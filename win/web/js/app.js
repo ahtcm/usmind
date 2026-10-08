@@ -772,6 +772,7 @@ function arrayBufferToBase64(buf) {
 async function exportSelfContained() {
   try {
     if (typeof JSZip === 'undefined') return { ok: false, error: '缺少打包组件' };
+    await new Promise(r => setTimeout(r, 500)); // 等最近一次插入的媒体落库（renderFileNode 有 600ms 异步窗口）
     const root = JSON.parse(JSON.stringify(mind.getData()));
     // 归一化：https://media.local/attachments/xxx 与 attachments/xxx 视为同一媒体（避免重复打包）
     const keyOf = (u) => {
@@ -797,7 +798,7 @@ async function exportSelfContained() {
           delete dd.attachmentUrl;
         }
         if (typeof dd.text === 'string' && dd.text.indexOf('src="') !== -1) {
-          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|blob:|data:)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
+          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|attachments\/|blob:|data:)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
         }
         if (dd.image && (dd.image.indexOf('https://media.local/') === 0 || dd.image.indexOf('data:') === 0)) {
           dd.image = norm(dd.image);
