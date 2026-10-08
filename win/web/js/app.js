@@ -2077,15 +2077,26 @@ async function storeFileExternal(file) {
     return null;
   } catch (e) { return null; }
 }
-// 统一插入：hasNative 走外置（快），否则内嵌 dataUrl
-async function insertExternalOrInline(file, name, type) {
+// 统一插入：hasNative 走外置（快），否则内嵌 dataUrl；toSelf=true 时挂到当前选中节点本身（而非新建子节点）
+async function insertExternalOrInline(file, name, type, toSelf) {
+  const fin = (f) => { if (toSelf) attachToActiveNode(f); else insertFileToNode(f); };
   if (hasNative) {
     const rel = await storeFileExternal(file);
-    if (rel) { insertFileToNode({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), relPath: rel }); return; }
+    if (rel) { fin({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), relPath: rel }); return; }
   }
   const rd = new FileReader();
-  rd.onload = () => insertFileToNode({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), dataUrl: String(rd.result) });
+  rd.onload = () => fin({ name: name || file.name, type: type || file.type || mimeFromName(name || file.name), dataUrl: String(rd.result) });
   rd.readAsDataURL(file);
+}
+// 把附件直接挂到当前选中节点本身（无选中/无 currentNode 时回退为新建子节点）
+function attachToActiveNode(file) {
+  try {
+    let node = null;
+    try { const l = mind.renderer.activeNodeList; if (l && l[0]) node = l[0]; } catch (e) {}
+    if (!node) { try { node = mind.renderer.currentNode; } catch (e) {} }
+    if (!node || !node.nodeData) { insertFileToNode(file); return; }
+    renderFileNode(node, file);
+  } catch (e) { try { insertFileToNode(file); } catch (e2) {} }
 }
 
 // 树级媒体 src 优化：dataUrl ↔ blob objectURL（渲染用 blob 流畅，保存前还原 dataUrl 保证文件自包含）
@@ -2656,7 +2667,7 @@ function bindUi() {
         e.stopPropagation(); // 阻止库/其它监听器二次插入
         const blob = it.getAsFile();
         if (!blob) continue;
-        insertExternalOrInline(blob, blob.name || '图片.png', it.type);
+        insertExternalOrInline(blob, blob.name || '图片.png', it.type, true);
         return;
       }
       if (it.kind === 'file') {
@@ -2664,7 +2675,7 @@ function bindUi() {
         e.stopPropagation();
         const blob = it.getAsFile();
         if (!blob) continue;
-        insertExternalOrInline(blob, blob.name || '附件', blob.type || mimeFromName(blob.name || ''));
+        insertExternalOrInline(blob, blob.name || '附件', blob.type || mimeFromName(blob.name || ''), true);
         return;
       }
     }
