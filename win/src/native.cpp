@@ -223,8 +223,8 @@ std::wstring dirOf(const std::wstring& path) {
     return p == std::wstring::npos ? std::wstring() : path.substr(0, p + 1);
 }
 
-// ---------------- 历史 ----------------
-std::wstring historyDir() {
+// ---------------- 项目文件保存位置 ----------------
+std::wstring projectDir() {
     Settings s = loadSettings();
     if (!s.historyDir.empty()) {
         // 相对路径基于 exe 目录
@@ -235,8 +235,8 @@ std::wstring historyDir() {
     return appDir() + L"\\history";
 }
 
-bool ensureHistoryDir() {
-    std::wstring d = historyDir();
+bool ensureProjectDir() {
+    std::wstring d = projectDir();
     DWORD a = GetFileAttributesW(d.c_str());
     if (a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY)) return true;
     return CreateDirectoryW(d.c_str(), NULL) != 0 || GetFileAttributesW(d.c_str()) != INVALID_FILE_ATTRIBUTES;
@@ -250,91 +250,7 @@ static std::wstring nowStamp() {
     return std::wstring(b);
 }
 
-static std::wstring nowEpoch() {
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    ULARGE_INTEGER u;
-    u.LowPart = ft.dwLowDateTime;
-    u.HighPart = ft.dwHighDateTime;
-    // 1601 epoch → 1970 epoch（100ns 单位）
-    long long ms = (u.QuadPart - 116444736000000000LL) / 10000;
-    return std::to_wstring(ms);
-}
-
-bool snapshotHistory(const std::wstring& srcPath, const std::wstring& docName) {
-    if (!fileExists(srcPath)) return false; // 新文件无旧内容
-    if (!ensureHistoryDir()) return false;
-    std::string data;
-    if (!readFile(srcPath, data)) return false;
-    std::wstring id = nowEpoch();
-    std::wstring dest = historyDir() + L"\\" + id + L".json";
-    if (!writeFile(dest, data)) return false;
-    // 附带导图名便于展示（写入同名 .name 文件）
-    std::wstring namePath = historyDir() + L"\\" + id + L".name";
-    writeFile(namePath, wideToUtf8(docName));
-    return true;
-}
-
-std::vector<HistoryItem> listHistory() {
-    std::vector<HistoryItem> items;
-    std::wstring dir = historyDir();
-    std::wstring pat = dir + L"\\*.json";
-    WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW(pat.c_str(), &fd);
-    if (h == INVALID_HANDLE_VALUE) return items;
-    do {
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
-        std::wstring fn = fd.cFileName;
-        if (fn.size() < 6) continue;
-        std::wstring id = fn.substr(0, fn.size() - 5); // 去 .json
-        HistoryItem it;
-        it.id = id;
-        it.size = ((long long)fd.nFileSizeHigh << 32) | fd.nFileSizeLow;
-        // 时间 = 快照时刻（用文件修改时间）
-        FILETIME lft;
-        FileTimeToLocalFileTime(&fd.ftLastWriteTime, &lft);
-        SYSTEMTIME st;
-        FileTimeToSystemTime(&lft, &st);
-        wchar_t b[64];
-        swprintf(b, 64, L"%04d-%02d-%02d %02d:%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute);
-        it.time = b;
-        // 导图名
-        std::wstring namePath = dir + L"\\" + id + L".name";
-        bool ok = false;
-        std::string nm = readTextFile(namePath, ok);
-        it.name = ok ? utf8ToWide(nm) : L"";
-        if (it.name.empty()) it.name = L"历史版本";
-        items.push_back(it);
-    } while (FindNextFileW(h, &fd));
-    FindClose(h);
-    // 时间倒序（新→旧）
-    std::sort(items.begin(), items.end(), [](const HistoryItem& a, const HistoryItem& b) { return a.id > b.id; });
-    return items;
-}
-
-bool readHistoryItem(const std::wstring& id, std::string& out) {
-    std::wstring p = historyDir() + L"\\" + id + L".json";
-    return readFile(p, out);
-}
-
-bool clearHistory() {
-    std::wstring dir = historyDir();
-    std::wstring pat = dir + L"\\*";
-    WIN32_FIND_DATAW fd;
-    HANDLE h = FindFirstFileW(pat.c_str(), &fd);
-    if (h == INVALID_HANDLE_VALUE) return true;
-    do {
-        std::wstring fn = fd.cFileName;
-        if (fn == L"." || fn == L"..") continue;
-        std::wstring full = dir + L"\\" + fn;
-        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
-        DeleteFileW(full.c_str());
-    } while (FindNextFileW(h, &fd));
-    FindClose(h);
-    return true;
-}
-
-bool setHistoryDir(const std::wstring& dir) {
+bool setProjectDir(const std::wstring& dir) {
     // 相对路径改为基于 exe 的相对路径（设置内存储相对形式更便携）
     Settings s = loadSettings();
     std::wstring base = appDir();
@@ -344,7 +260,7 @@ bool setHistoryDir(const std::wstring& dir) {
         s.historyDir = dir;
     }
     saveSettings(s);
-    return ensureHistoryDir();
+    return ensureProjectDir();
 }
 
 // ---------------- 对话框 ----------------
@@ -652,7 +568,7 @@ bool pickFolder(std::wstring& out) {
     DWORD opts = 0;
     pDlg->GetOptions(&opts);
     pDlg->SetOptions(opts | FOS_PICKFOLDERS);
-    pDlg->SetTitle(L"选择历史版本保存目录");
+    pDlg->SetTitle(L"选择项目文件保存目录");
     bool got = false;
     if (SUCCEEDED(pDlg->Show(NULL))) {
         IShellItem* item = NULL;

@@ -13,17 +13,10 @@ struct FileInfo {
 };
 
 struct Settings {
-    std::wstring historyDir;    // 历史目录（空 = 默认 exe/history）
+    std::wstring historyDir;    // 项目文件保存位置（空 = 默认 exe/history）
     std::wstring defaultTheme;  // 默认主题名
     int          registerAssoc; // 1 = 已注册 .usmind 文件关联
     std::wstring lastFile;      // 上次打开的文件
-};
-
-struct HistoryItem {
-    std::wstring id;    // 文件名（不含扩展名）
-    std::wstring time;  // 可读时间
-    std::wstring name;  // 对应导图名
-    long long    size;  // 字节
 };
 
 // 应用根目录（exe 所在目录，运行时计算，代码内无绝对路径）
@@ -43,15 +36,10 @@ std::wstring fileNameOf(const std::wstring& path);
 // 二进制 → base64（自包含 zip 走桥用）
 std::string base64Encode(const std::string& in);
 
-// ---- 历史 ----
-std::wstring historyDir();
-bool ensureHistoryDir();
-// 保存前把 srcPath 现有内容快照到历史目录（新文件无旧内容则跳过）
-bool snapshotHistory(const std::wstring& srcPath, const std::wstring& docName);
-std::vector<HistoryItem> listHistory();
-bool readHistoryItem(const std::wstring& id, std::string& out);
-bool clearHistory();
-bool setHistoryDir(const std::wstring& dir);
+// ---- 项目文件保存位置 ----
+std::wstring projectDir();
+bool ensureProjectDir();
+bool setProjectDir(const std::wstring& dir);
 
 // ---- 原生对话框 ----
 bool pickOpenFile(std::wstring& outPath, std::string& outData); // 打开 .usmind

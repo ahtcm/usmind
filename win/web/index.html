@@ -63,9 +63,6 @@
       <button class="icon-btn" id="btnTheme" title="主题样式">
         <svg viewBox="0 0 24 24" width="17" height="17"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5-1-2-1-3s1-2 2-2h2a4 4 0 0 0 4-4c0-4-4-7-9-7z" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor"/><circle cx="10" cy="7" r="1.1" fill="currentColor"/><circle cx="15" cy="7.5" r="1.1" fill="currentColor"/></svg>
       </button>
-      <button class="icon-btn" id="btnHistory" title="历史版本">
-        <svg viewBox="0 0 24 24" width="17" height="17"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
     </div>
     <div class="tb-right">
       <button class="icon-btn" id="btnSettings" title="设置">
@@ -132,18 +129,6 @@
     <div class="panel-body" id="themeGrid"></div>
   </div>
 
-  <!-- 历史面板 -->
-  <div class="panel" id="historyPanel">
-    <div class="panel-head">
-      <span>历史版本</span>
-      <div class="head-actions">
-        <button class="mini-btn danger" id="btnClearHistory">清空历史</button>
-        <button class="panel-close" data-close="historyPanel">✕</button>
-      </div>
-    </div>
-    <div class="panel-body" id="historyList"></div>
-  </div>
-
   <!-- 设置面板 -->
   <div class="panel" id="settingsPanel">
     <div class="panel-head">
@@ -163,12 +148,12 @@
         </div>
       </div>
       <div class="setting-row">
-        <label>历史版本保存位置</label>
+        <label>项目文件保存位置</label>
         <div class="row-inline">
           <input type="text" id="setHistoryDir" readonly placeholder="默认：程序目录 \history">
           <button class="mini-btn" id="btnPickHistoryDir">选择…</button>
         </div>
-        <div class="row-desc" id="historyDirDesc"></div>
+        <div class="row-desc" id="historyDirDesc">新文档默认保存到该目录；目录已有同名文件时才弹出确认</div>
       </div>
       <div class="setting-row">
         <label>文件关联</label>
@@ -209,10 +194,7 @@
       </div>
       <div class="setting-row">
         <label>关于</label>
-        <div class="row-desc" id="aboutText">USMIND 思维导图 · 本地版 1.0.0 · 纯本地存储，无需联网</div>
-      </div>
-      <div class="setting-row">
-        <button class="btn btn-primary" id="btnSaveSettings" style="width:100%;justify-content:center;">保存设置</button>
+        <div class="row-desc" id="aboutText">USMIND 思维导图 · 本地版 1.0.0 · 纯本地存储，无需联网 · 所有设置修改即时生效</div>
       </div>
     </div>
     <div class="panel-body" id="setTabThemes" style="display:none;overflow-y:auto;flex:1;">

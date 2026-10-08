@@ -23,7 +23,7 @@ static const wchar_t* const kMethods[] = {
     L"getHistory",      // 10
     L"restoreHistory",  // 11
     L"clearHistory",    // 12
-    L"setHistoryDir",   // 13
+    L"setProjectDir",   // 13（项目文件保存位置）
     L"registerAssoc",   // 14
     L"notifyDocumentState", // 15 （前端上报文件名变化，用于标题栏）
     L"pickFolder",      // 16 （目录选择，历史目录设置用）
@@ -169,7 +169,7 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
     switch (method) {
     case 1: { // getAppInfo
         std::string j = "{\"ok\":true,\"version\":\"" + wideToUtf8_2(appVersion()) + "\","
-                        "\"historyDir\":\"" + JsEscape(historyDir()) + "\"}";
+                        "\"projectDir\":\"" + JsEscape(projectDir()) + "\"}";
         if (result) *result = MakeJsonResult(j);
         break;
     }
@@ -278,10 +278,8 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
     case 7: { // saveTo(path, content, name) → {ok}
         std::wstring path = ParamStr(p, 0);
         std::wstring content = ParamStr(p, 1);
-        std::wstring name = ParamStr(p, 2);
         bool ok = false;
         if (!path.empty()) {
-            snapshotHistory(path, name.empty() ? fileNameOf(path) : name);
             ok = writeFile(path, wideToUtf8_2(content));
         }
         if (result) *result = MakeBoolResult(ok);
@@ -291,7 +289,6 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         std::wstring content = ParamStr(p, 0);
         std::wstring name = ParamStr(p, 1);
         if (!currentPath.empty()) {
-            snapshotHistory(currentPath, currentName.empty() ? name : currentName);
             bool ok = writeFile(currentPath, wideToUtf8_2(content));
             if (result) {
                 std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
@@ -299,19 +296,33 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
                 *result = MakeJsonResult(j);
             }
         } else {
-            // 未关联文件：弹另存为
-            std::wstring path;
-            if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", path)) {
-                snapshotHistory(path, name);
-                bool ok = writeFile(path, wideToUtf8_2(content));
-                if (ok) { currentPath = path; currentName = fileNameOf(path); }
+            // 未关联文件：优先静默保存到项目目录（同名才弹框确认）
+            std::wstring nm = name.empty() ? L"未命名导图" : name;
+            std::wstring target = projectDir() + L"\\" + nm;
+            if (fileExists(target)) {
+                // 项目目录已有同名文件：弹框确认（另存为）
+                std::wstring path;
+                if (pickSaveFile(nm, path)) {
+                    bool ok = writeFile(path, wideToUtf8_2(content));
+                    if (ok) { currentPath = path; currentName = fileNameOf(path); }
+                    if (result) {
+                        std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
+                                           : "{\"ok\":false}";
+                        *result = MakeJsonResult(j);
+                    }
+                } else {
+                    if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                }
+            } else {
+                // 无同名：直接保存到项目目录
+                ensureProjectDir();
+                bool ok = writeFile(target, wideToUtf8_2(content));
+                if (ok) { currentPath = target; currentName = fileNameOf(target); }
                 if (result) {
                     std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
                                        : "{\"ok\":false}";
                     *result = MakeJsonResult(j);
                 }
-            } else {
-                if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
             }
         }
         break;
@@ -323,44 +334,23 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 10: { // getHistory → [{id,time,name,size}]
-        auto items = listHistory();
-        std::string j = "{\"ok\":true,\"items\":[";
-        bool first = true;
-        for (auto& it : items) {
-            if (!first) j += ",";
-            first = false;
-            j += "{\"id\":\"" + JsEscape(it.id) + "\",\"time\":\"" + JsEscape(it.time) + "\","
-                 "\"name\":\"" + JsEscape(it.name) + "\",\"size\":" + std::to_string(it.size) + "}";
-        }
-        j += "]}";
-        if (result) *result = MakeJsonResult(j);
+    case 10: { // getHistory —— 已移除历史版本功能
+        if (result) *result = MakeJsonResult("{\"ok\":false}");
         break;
     }
-    case 11: { // restoreHistory(id) → {ok,data}
-        std::wstring id = ParamStr(p, 0);
-        std::string data;
-        bool ok = readHistoryItem(id, data);
-        if (result) {
-            if (ok) {
-                std::string j = "{\"ok\":true,\"data\":\"" + JsEscape(utf8ToWide2(data)) + "\"}";
-                *result = MakeJsonResult(j);
-            } else {
-                *result = MakeJsonResult("{\"ok\":false}");
-            }
-        }
+    case 11: { // restoreHistory —— 已移除历史版本功能
+        if (result) *result = MakeJsonResult("{\"ok\":false}");
         break;
     }
-    case 12: { // clearHistory
-        bool ok = clearHistory();
-        if (result) *result = MakeBoolResult(ok);
+    case 12: { // clearHistory —— 已移除历史版本功能
+        if (result) *result = MakeBoolResult(false);
         break;
     }
-    case 13: { // setHistoryDir(dir) → {ok,dir}
+    case 13: { // setProjectDir(dir) → {ok,dir}
         std::wstring dir = ParamStr(p, 0);
-        bool ok = setHistoryDir(dir);
+        bool ok = setProjectDir(dir);
         if (result) {
-            std::string j = ok ? "{\"ok\":true,\"dir\":\"" + JsEscape(historyDir()) + "\"}" : "{\"ok\":false}";
+            std::string j = ok ? "{\"ok\":true,\"dir\":\"" + JsEscape(projectDir()) + "\"}" : "{\"ok\":false}";
             *result = MakeJsonResult(j);
         }
         break;
@@ -443,21 +433,18 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         std::wstring name = ParamStr(p, 2);
         bool ok = false;
         if (!path.empty()) {
-            snapshotHistory(path, name.empty() ? fileNameOf(path) : name);
             ok = writeFileB64(path, wideToUtf8_2(b64));
         } else {
             std::wstring sp;
             bool isJson = name.size() >= 5 && name.compare(name.size() - 5, 5, L".json") == 0;
             if (isJson) {
                 if (pickSaveFileAny(L"", name, sp)) {
-                    snapshotHistory(sp, name);
                     ok = writeFileB64(sp, wideToUtf8_2(b64));
                 } else {
                     if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
                     break;
                 }
-            } else if (pickSaveFile(name.empty() ? L"未命名导图.usmind" : name + L".usmind", sp)) {
-                snapshotHistory(sp, name);
+            } else if (pickSaveFile(name.empty() ? L"未命名导图" : name, sp)) {
                 ok = writeFileB64(sp, wideToUtf8_2(b64));
             } else {
                 if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
@@ -504,7 +491,7 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         if (saveAs) {
             std::wstring nm = currentName.empty() ? nmArg : currentName;
             std::wstring sp;
-            if (pickSaveFile((nm.empty() ? L"未命名导图" : nm) + L".usmind", sp)) {
+            if (pickSaveFile(nm.empty() ? L"未命名导图" : nm, sp)) {
                 target = sp;
             } else {
                 if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
@@ -516,16 +503,22 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         } else if (!currentPath.empty()) {
             target = currentPath;
         } else {
-            std::wstring nm = nmArg;
-            std::wstring sp;
-            if (pickSaveFile((nm.empty() ? L"未命名导图" : nm) + L".usmind", sp)) {
-                target = sp;
+            // 新文档：优先静默保存到项目目录，目录已有同名文件才弹框确认
+            std::wstring nm = nmArg.empty() ? L"未命名导图" : nmArg;
+            std::wstring cand = projectDir() + L"\\" + nm;
+            if (!fileExists(cand)) {
+                ensureProjectDir();
+                target = cand;
             } else {
-                if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
-                break;
+                std::wstring sp;
+                if (pickSaveFile(nm, sp)) {
+                    target = sp;
+                } else {
+                    if (result) *result = MakeJsonResult("{\"ok\":false,\"cancel\":true}");
+                    break;
+                }
             }
         }
-        snapshotHistory(target, currentName.empty() ? nmArg : currentName);
         ok = writeFile(target, bin);
         // 仅普通保存（非显式另存为导出）记住为工作文件，避免后续 Ctrl+S 覆盖到导出文件
         if (ok && !saveAs) { currentPath = target; currentName = fileNameOf(target); }

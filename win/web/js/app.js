@@ -140,6 +140,23 @@ function renderTabStrip() {
     const el = document.createElement('div');
     el.className = 'tab-item' + (i === activeTab ? ' active' : '');
     el.title = labelText;
+    // 标签可按住拖动排序
+    el.draggable = true;
+    el.dataset.tabIndex = String(i);
+    el.addEventListener('dragstart', (e) => {
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+    });
+    el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const from = parseInt(e.dataTransfer.getData('text/plain') || '-1');
+      el.classList.remove('dragging');
+      if (from >= 0 && from < tabs.length && from !== i) moveTab(from, i);
+    });
+    el.addEventListener('dragend', () => el.classList.remove('dragging'));
 
     const label = document.createElement('span');
     label.className = 'tab-label';
@@ -191,6 +208,15 @@ function closeTab(i) {
   } else if (i < activeTab) {
     activeTab--;
   }
+  renderTabStrip();
+}
+// 标签拖拽排序（不重载画布数据）
+function moveTab(from, to) {
+  const t = tabs.splice(from, 1)[0];
+  tabs.splice(to, 0, t);
+  if (from === activeTab) activeTab = to;
+  else if (from < activeTab && to >= activeTab) activeTab--;
+  else if (from > activeTab && to <= activeTab) activeTab++;
   renderTabStrip();
 }
 function switchToTab(i) {
@@ -432,7 +458,12 @@ function initLayoutDrop() {
 }
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => { if (dirty && doc.path) saveNow(true); }, 3000);
+  const sec = localSetting('autoSaveSec', 3);
+  autoSaveTimer = setTimeout(() => {
+    if (!dirty) return;
+    if (!localSetting('autoSave', true)) return;
+    saveNow(true); // 有路径覆盖原文件；新文档静默存到项目目录（同名才弹框）
+  }, Math.max(1, parseInt(sec) || 3) * 1000);
 }
 
 // ================= 文档 =================
@@ -441,9 +472,9 @@ function defaultData() {
     root: {
       data: { text: '中心主题' },
       children: [
-        { data: { text: '主题一' }, children: [] },
-        { data: { text: '主题二' }, children: [] },
-        { data: { text: '主题三' }, children: [] },
+        { data: { text: '分支主题' }, children: [] },
+        { data: { text: '分支主题' }, children: [] },
+        { data: { text: '分支主题' }, children: [] },
       ],
     },
   };
@@ -648,8 +679,8 @@ function initMindMap() {
     maxHistoryCount: 60,
     textAutoWrapWidth: 99999,
     mousewheelAction: 'zoom',
-    defaultInsertSecondLevelNodeText: '新主题',
-    defaultInsertBelowSecondLevelNodeText: '新主题',
+    defaultInsertSecondLevelNodeText: '分支主题',
+    defaultInsertBelowSecondLevelNodeText: '分支主题',
     useLeftKeySelectionRightKeyDrag: false,
     isLimitMindMapInCanvas: false,
     isLimitMindMapInCanvasWhenHasScrollbar: false,
@@ -685,6 +716,17 @@ function initMindMap() {
       if (!txt) return;
       const dirtyMark = tabs[activeTab] && tabs[activeTab].dirty ? ' ●' : '';
       if (act.textContent !== txt + dirtyMark) act.textContent = txt + dirtyMark;
+    } catch (e) {}
+  }, 200);
+  // 双击编辑框飘到左上角修复：节点未完成布局时库用 (0,0) 定位输入框，
+  // 发现 left/top 为 0 即调用库自带 updateTextEditNode 按真实屏幕坐标刷新（不打断编辑）
+  setInterval(() => {
+    try {
+      const te = mind && mind.renderer && mind.renderer.textEdit;
+      if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
+      if (parseFloat(te.textEditNode.style.left) === 0 || parseFloat(te.textEditNode.style.top) === 0) {
+        if (te.updateTextEditNode) te.updateTextEditNode();
+      }
     } catch (e) {}
   }, 200);
   // 监听节点编辑结束
@@ -855,7 +897,6 @@ function openPanel(id) {
   $('overlay').classList.add('show');
   $(id).classList.add('open');
   if (id === 'themePanel') buildThemeGrid();
-  if (id === 'historyPanel') refreshHistory();
   if (id === 'settingsPanel') fillSettings();
 }
 function closePanel(id) {
@@ -865,81 +906,6 @@ function closePanel(id) {
 function closeAllPanels() {
   document.querySelectorAll('.panel.open').forEach(p => p.classList.remove('open'));
   $('overlay').classList.remove('show');
-}
-
-// ================= 历史 =================
-async function refreshHistory() {
-  const list = $('historyList');
-  list.innerHTML = '';
-  const r = await callNative('getHistory');
-  const items = (r && r.ok && r.items) ? r.items : [];
-  if (!items.length) {
-    const empty = document.createElement('div');
-    empty.className = 'history-empty';
-    empty.textContent = '暂无历史版本\n（每次保存前会自动备份上一版）';
-    list.appendChild(empty);
-    return;
-  }
-  items.forEach(it => {
-    const row = document.createElement('div');
-    row.className = 'history-item';
-    const icon = document.createElement('div');
-    icon.className = 'hi-icon';
-    icon.textContent = '🕘';
-    const main = document.createElement('div');
-    main.className = 'hi-main';
-    const nm = document.createElement('div');
-    nm.className = 'hi-name';
-    nm.textContent = it.name || '历史版本';
-    const tm = document.createElement('div');
-    tm.className = 'hi-time';
-    tm.textContent = it.time + ' · ' + (it.size > 1024 ? Math.round(it.size / 1024) + ' KB' : it.size + ' B');
-    main.appendChild(nm);
-    main.appendChild(tm);
-    const btn = document.createElement('button');
-    btn.className = 'hi-restore';
-    btn.textContent = '回退';
-    btn.addEventListener('click', () => restoreHistoryItem(it));
-    const del = document.createElement('button');
-    del.className = 'hi-del';
-    del.textContent = '×';
-    del.title = '删除此版本';
-    del.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await callNative('deleteHistory', it.id);
-      refreshHistory();
-    });
-    row.appendChild(icon);
-    row.appendChild(main);
-    row.appendChild(btn);
-    row.appendChild(del);
-    list.appendChild(row);
-  });
-}
-
-async function restoreHistoryItem(it) {
-  if (!confirm('回退到 ' + (it.time || '') + ' 的版本？\n当前内容将保持在工作区，下次保存时写入文件。')) return;
-  const r = await callNative('restoreHistory', it.id);
-  if (r && r.ok && r.data) {
-    try {
-      const parsed = parseDoc(r.data);
-      await applyDoc(parsed, doc.path, doc.name);
-      dirty = true;
-      updateTitle();
-      toast('已回退到历史版本，请保存确认');
-    } catch (e) {
-      toast('回退失败：' + e.message, 'error');
-    }
-  } else {
-    toast('回退失败', 'error');
-  }
-}
-
-async function clearHistory() {
-  if (!confirm('确定清空所有历史版本缓存？此操作不可恢复。')) return;
-  const r = await callNative('clearHistory');
-  if (r && r.ok) { toast('历史缓存已清空'); refreshHistory(); }
-  else toast('清空失败', 'error');
 }
 
 // ================= 设置 =================
@@ -1036,10 +1002,10 @@ async function fillSettings() {
     });
   }
   themeMenu.style.display = 'none';
-  // 历史目录
+  // 项目文件保存位置
   const app = await callNative('getAppInfo');
   $('setHistoryDir').value = s.historyDir || '（默认：程序目录 \\history）';
-  $('historyDirDesc').textContent = app && app.historyDir ? '当前实际目录：' + app.historyDir : '';
+  $('historyDirDesc').textContent = (app && app.projectDir) ? '当前实际目录：' + app.projectDir + '　·　新文档保存时目录已有同名文件才弹出确认' : '';
   $('assocState').textContent = s.registerAssoc ? '已注册，双击 .usmind 文件即可打开' : '未注册';
   // 本地偏好（localStorage）
   $('setRainbow').checked = localSetting('rainbow', true);
@@ -1072,15 +1038,12 @@ async function saveSettingsFromUi(newThemeName) {
     }
   } catch (e) {}
   const payload = { defaultTheme: newTheme };
-  let r;
   try {
-    r = await callNative('saveSettings', JSON.stringify(payload));
+    await callNative('saveSettings', JSON.stringify(payload));
   } catch (e) {
     toast('调用失败: ' + (e && e.message ? e.message : String(e)), 'error');
     return;
   }
-  if (r && r.ok) toast('设置已保存并应用');
-  else toast('设置保存失败: ' + JSON.stringify(r), 'error');
 }
 
 // ================= 主题模板管理（本地） =================
@@ -1308,13 +1271,13 @@ function deleteTheme(name) {
   toast('已删除主题：' + name);
 }
 
-async function pickHistoryDir() {
+async function pickProjectDir() {
   const r = await callNative('pickFolder');
   if (r && r.ok && r.dir) {
-    const s = await callNative('setHistoryDir', r.dir);
+    const s = await callNative('setProjectDir', r.dir);
     if (s && s.ok) {
       $('setHistoryDir').value = r.dir;
-      toast('历史目录已更新');
+      toast('项目文件保存位置已更新');
       fillSettings();
     } else {
       toast('目录设置失败', 'error');
@@ -2667,6 +2630,14 @@ function bindUi() {
   // 库节点粘贴（Ctrl+C 复制节点后 Ctrl+V）前，强制当前节点为选中节点，避免库兜底粘贴到根
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+      // 非编辑态且剪贴板含图片：接管粘贴，阻止库自带 ctrl+v 双插（一大一小）
+      try {
+        const types = e.clipboardData && e.clipboardData.types ? Array.from(e.clipboardData.types) : [];
+        const hasImg = types.some(t => t.indexOf('image') === 0);
+        const tag = document.activeElement && document.activeElement.tagName;
+        const editing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+        if (hasImg && !editing) { e.preventDefault(); e.stopPropagation(); }
+      } catch (eI) {}
       const act = (mind.renderer && mind.renderer.activeNodeList && mind.renderer.activeNodeList[0]) || null;
       if (act) { try { mind.renderer.currentNode = act; } catch (e2) {} }
     }
@@ -2681,6 +2652,7 @@ function bindUi() {
     for (const it of items) {
       if (it.type && it.type.startsWith('image/')) {
         e.preventDefault();
+        e.stopPropagation(); // 阻止库/其它监听器二次插入
         const blob = it.getAsFile();
         if (!blob) continue;
         insertExternalOrInline(blob, blob.name || '图片.png', it.type);
@@ -2688,6 +2660,7 @@ function bindUi() {
       }
       if (it.kind === 'file') {
         e.preventDefault();
+        e.stopPropagation();
         const blob = it.getAsFile();
         if (!blob) continue;
         insertExternalOrInline(blob, blob.name || '附件', blob.type || mimeFromName(blob.name || ''));
@@ -2791,17 +2764,20 @@ function bindUi() {
   }, 1000);
   $('imgViewer').addEventListener('click', () => { $('imgViewer').style.display = 'none'; });
   $('imgViewerClose').addEventListener('click', (e) => { e.stopPropagation(); $('imgViewer').style.display = 'none'; });
-  $('btnHistory').addEventListener('click', () => openPanel('historyPanel'));
   $('btnSettings').addEventListener('click', () => openPanel('settingsPanel'));
   $('overlay').addEventListener('click', closeAllPanels);
   document.querySelectorAll('.panel-close').forEach(b => b.addEventListener('click', () => closePanel(b.dataset.close)));
-  $('btnClearHistory').addEventListener('click', clearHistory);
-  $('btnPickHistoryDir').addEventListener('click', pickHistoryDir);
+  $('btnPickHistoryDir').addEventListener('click', pickProjectDir);
   $('btnRegAssoc').addEventListener('click', async () => {
     const r = await callNative('registerAssoc');
     if (r && r.ok) { toast('文件关联已注册'); fillSettings(); }
   });
-  $('btnSaveSettings').addEventListener('click', saveSettingsFromUi);
+  // 修改即保存：设置里任何控件变化立即生效
+  ['setRainbow', 'setAutoSave', 'setAutoSaveSec', 'setDefLayout', 'setMaxAttach', 'setAllowTypes'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('change', () => saveSettingsFromUi());
+  });
+  $('setAutoSaveSec').addEventListener('input', () => saveSettingsFromUi());
   // 工具栏收起/展开
   $('btnToggleBar').addEventListener('click', () => {
     $('topBar').style.display = 'none';
