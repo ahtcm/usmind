@@ -798,7 +798,8 @@ async function exportSelfContained() {
           delete dd.attachmentUrl;
         }
         if (typeof dd.text === 'string' && dd.text.indexOf('src="') !== -1) {
-          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|attachments\/|blob:|data:)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
+          // 只收外置引用（media.local/attachments 相对），blob/dataUrl 本体已由 attachUrl/image 字段收集，避免同媒体重复打包
+          dd.text = dd.text.replace(/src="((?:https:\/\/media\.local\/attachments\/|attachments\/)[^"]+)"/g, (m, u) => 'src="' + norm(u) + '"');
         }
         if (dd.image && (dd.image.indexOf('https://media.local/') === 0 || dd.image.indexOf('data:') === 0)) {
           dd.image = norm(dd.image);
