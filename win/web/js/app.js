@@ -67,16 +67,18 @@ let booting = true;
 let tabs = [];       // [{name, path, data, theme, layout}]
 let activeTab = -1;
 
-// 深拷贝导图数据：跳过 parent/_parent 等循环引用字段，避免 JSON.stringify 循环报错
-function cloneMindData(node) {
+// 深拷贝导图数据：跳过 parent/_parent 等循环引用字段，seen 集合兜底防任意循环（如栈溢出导致快照失败、切换无效）
+function cloneMindData(node, seen) {
   if (!node || typeof node !== 'object') return node;
-  if (Array.isArray(node)) return node.map(cloneMindData);
+  if (Array.isArray(node)) return node.map(n => cloneMindData(n, seen));
+  if (seen.has(node)) return seen.get(node);
   const out = {};
+  seen.set(node, out);
   for (const k in node) {
     if (k === 'parent' || k === '_parent' || k === 'owner') continue;
     const v = node[k];
     if (v && typeof v === 'object') {
-      out[k] = Array.isArray(v) ? v.map(cloneMindData) : cloneMindData(v);
+      out[k] = Array.isArray(v) ? v.map(n => cloneMindData(n, seen)) : cloneMindData(v, seen);
     } else out[k] = v;
   }
   return out;
@@ -84,13 +86,14 @@ function cloneMindData(node) {
 function snapshotActiveTab() {
   if (activeTab < 0 || !mind) return;
   try {
-    // 深拷贝快照：getData() 返回的是内部引用，不拷贝会导致所有标签共享同一份数据、切换无效
-    tabs[activeTab].data = cloneMindData(mind.getData());
+    // 深拷贝快照；统一为"直接根节点"格式（库 setData 期望 {data,children}，不接受 {root:...}）
+    const gd = mind.getData();
+    tabs[activeTab].data = gd && gd.root ? cloneMindData(gd.root, new Map()) : cloneMindData(gd, new Map());
     tabs[activeTab].name = doc.name;
     tabs[activeTab].path = doc.path;
     tabs[activeTab].theme = doc.theme;
     tabs[activeTab].layout = doc.layout;
-  } catch (e) {}
+  } catch (e) { console.error('快照失败', e); }
 }
 function stripHtml(s) {
   if (!s) return '';
@@ -154,7 +157,8 @@ function renderTabStrip() {
           if (i === activeTab && mind) {
             try {
               const rd = mind.getData();
-              if (rd && rd.root && rd.root.data) { rd.root.data.text = newName.trim(); mind.setData(rd); mind.render(); }
+              const rootN = rd && rd.root ? rd.root : rd;
+              if (rootN && rootN.data) { rootN.data.text = newName.trim(); mind.setData(cloneMindData(rootN, new Map())); mind.render(); }
             } catch (err) {}
           }
           t.dirty = true;
@@ -187,10 +191,12 @@ function switchToTab(i) {
   doc.name = t.name || '未命名导图';
   doc.theme = t.theme || userDefaultTheme;
   doc.layout = t.layout || 'logicalStructure';
-  try { mind.setData(cloneMindData(t.data)); } catch (e) { console.error('setData', e); }
+  // 统一直接根节点格式（旧快照可能是 {root:...}，库 setData 不接受）
+  const dd = t.data && t.data.root ? t.data.root : t.data;
+  try { mind.setData(cloneMindData(dd, new Map())); } catch (e) { showErr('切换失败 setData: ' + e.message); }
   try { mind.setLayout(doc.layout); } catch (e) {}
   try { mind.setTheme(doc.theme); } catch (e) {}
-  try { mind.render(); } catch (e) {}
+  try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
   setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
   // 切换丝滑：画布淡入
   try {
