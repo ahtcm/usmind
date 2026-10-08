@@ -473,3 +473,14 @@ body {
 #att-preview .attp-body span.cm-attribute { color: #9cdcfe; }
 #att-preview .attp-body span.cm-meta { color: #d4d4d4; }
 #att-preview .attp-body span.cm-error { color: #f44747; }
+/* 文档预览（docx/xlsx/pdf） */
+.doc-pdf-frame { width: 100%; height: 100%; border: none; border-radius: 6px; }
+.doc-docx { line-height: 1.7; color: #333; font-size: 14px; }
+.doc-docx h1, .doc-docx h2, .doc-docx h3 { margin: 10px 0 6px; }
+.doc-docx img { max-width: 100%; }
+.doc-docx table { border-collapse: collapse; margin: 8px 0; }
+.doc-docx table td, .doc-docx table th { border: 1px solid #d0d3d6; padding: 4px 8px; }
+.doc-xlsx { color: #333; }
+.doc-xlsx table { border-collapse: collapse; font-size: 13px; }
+.doc-xlsx table td, .doc-xlsx table th { border: 1px solid #c9cdd6; padding: 4px 8px; min-width: 40px; white-space: nowrap; }
+.doc-xlsx table th { background: #f1f3f5; font-weight: 600; }

@@ -382,6 +382,15 @@ async function applyDoc(parsed, path, name) {
   doc.name = name || parsed.name || '未命名导图';
   doc.theme = parsed.theme;
   doc.layout = parsed.layout;
+  // 修复旧数据：画布原点(0,0)的非根节点删除位置字段，让库重新布局到父旁（修复早期插入偏移的附件）
+  try {
+    const fix = (n, isRoot) => {
+      if (!n || !n.data) return;
+      if (!isRoot && n.data.x === 0 && n.data.y === 0) { delete n.data.x; delete n.data.y; }
+      (n.children || []).forEach(c => fix(c, false));
+    };
+    fix(parsed.root, true);
+  } catch (eF) {}
   try { mind.setData(parsed.root); } catch (e) { console.error('setData 失败', e); }
   try { mind.setLayout(parsed.layout); } catch (e) {}
   try { mind.setTheme(parsed.theme); } catch (e) {}
@@ -1037,15 +1046,19 @@ function applyNodeStylesDirect(node, styles) {
     const nd = nodeDataOf(node);
     const dd = (nd && nd.data) || nd;
     if (!dd || !styles) return;
-    if (styles.shape) dd.shape = styles.shape;
-    if (styles.borderRadius != null) dd.borderRadius = styles.borderRadius;
-    if (styles.borderWidth != null) dd.borderWidth = styles.borderWidth;
-    if (styles.borderColor) dd.borderColor = styles.borderColor;
-    if (styles.borderDasharray) dd.borderDasharray = styles.borderDasharray;
-    if (styles.fillColor) dd.fillColor = styles.fillColor;
-    if (styles.paddingX != null) dd.paddingX = styles.paddingX;
-    if (styles.paddingY != null) dd.paddingY = styles.paddingY;
-    if (styles.textColor) dd.textColor = styles.textColor;
+    const patch = {};
+    if (styles.shape) patch.shape = styles.shape;
+    if (styles.borderRadius != null) patch.borderRadius = styles.borderRadius;
+    if (styles.borderWidth != null) patch.borderWidth = styles.borderWidth;
+    if (styles.borderColor) patch.borderColor = styles.borderColor;
+    if (styles.borderDasharray) patch.borderDasharray = styles.borderDasharray;
+    if (styles.fillColor) patch.fillColor = styles.fillColor;
+    if (styles.paddingX != null) patch.paddingX = styles.paddingX;
+    if (styles.paddingY != null) patch.paddingY = styles.paddingY;
+    if (styles.textColor) patch.textColor = styles.textColor;
+    for (const k in patch) dd[k] = patch[k];
+    // 同步数据树（getData 递归按 uid），保证保存/重开后样式不丢；skipRender 直写不重建
+    if (Object.keys(patch).length) setNodeDataPersist(node, patch, true);
   } catch (e) {}
 }
 // 在已创建的子节点上按类型渲染媒体/文件
@@ -1171,6 +1184,48 @@ function openTextPreview(node, att) {
   } catch (e) {}
 }
 
+function dataUrlToBlob(u) {
+  const parts = String(u).split(',');
+  const mime = (parts[0].match(/data:([^;]+)/) || [, 'application/octet-stream'])[1];
+  const bin = atob(parts[1] || '');
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+// docx/xlsx/pdf 内置预览（离线：mammoth / SheetJS / Chromium 原生 PDF）
+function openDocPreview(att) {
+  try {
+    const ext = (att.name.split('.').pop() || '').toLowerCase();
+    const body = $('docPreviewBody'), nameEl = $('docPreviewName');
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在加载…</div>';
+    nameEl.textContent = att.name;
+    $('docPreview').style.display = 'flex';
+    const blob = dataUrlToBlob(att.url);
+    if (ext === 'pdf') {
+      const url = URL.createObjectURL(blob);
+      body.innerHTML = '<iframe class="doc-pdf-frame" src="' + url + '"></iframe>';
+      return;
+    }
+    const read = blob.arrayBuffer ? blob.arrayBuffer() : Promise.reject(new Error('浏览器不支持 arrayBuffer'));
+    read.then(buf => {
+      if (ext === 'docx' || ext === 'doc') {
+        if (!window.mammoth) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 mammoth 库</div>'; return; }
+        mammoth.convertToHtml({ arrayBuffer: buf }).then(res => {
+          body.innerHTML = '<div class="doc-docx">' + (res.value || '<em>（空文档）</em>') + '</div>';
+        }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">docx 解析失败：' + (e && e.message || e) + '</div>'; });
+      } else {
+        if (!window.XLSX) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 SheetJS 库</div>'; return; }
+        const wb = XLSX.read(buf, { type: 'array' });
+        const html = wb.SheetNames.map(sn => {
+          return '<h4 style="margin:8px 0;color:#333;">' + sn + '</h4>' + XLSX.utils.sheet_to_html(wb.Sheets[sn]);
+        }).join('<hr style="border:none;border-top:1px solid #eee;">');
+        body.innerHTML = '<div class="doc-xlsx">' + html + '</div>';
+      }
+    }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">读取失败：' + (e && e.message || e) + '</div>'; });
+  } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
+}
+
 // 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
 function openNodeAttachment(node) {
   try {
@@ -1195,6 +1250,8 @@ function openNodeAttachment(node) {
     }
     // 文本/代码 → 内置 CodeMirror 预览编辑
     if (isTextExt(ext)) { openTextPreview(node, att); return; }
+    // docx/xlsx/pdf → 内置预览（mammoth/SheetJS/Chromium PDF）
+    if (ext === 'pdf' || ext === 'docx' || ext === 'doc' || ext === 'xlsx' || ext === 'xls') { openDocPreview(att); return; }
     // 其他文件：C++ 解码写临时文件并系统打开；浏览器环境降级为下载
     const b64 = att.url.split(',')[1] || '';
     if (hasNative) {
@@ -1671,6 +1728,10 @@ function bindUi() {
     $('mediaVideo').pause(); $('mediaAudio').pause();
     $('mediaViewer').style.display = 'none';
   });
+  $('docPreviewClose').addEventListener('click', () => {
+    $('docPreviewBody').innerHTML = '';
+    $('docPreview').style.display = 'none';
+  });
   $('imgFileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1809,5 +1870,5 @@ boot();
 
 // 浏览器（无原生桥）环境暴露测试钩子；exe 内不暴露
 if (!hasNative && typeof window !== 'undefined') {
-  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, get mind() { return mind; } };
+  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, get mind() { return mind; } };
 }
