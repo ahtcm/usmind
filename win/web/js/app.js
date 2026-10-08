@@ -184,6 +184,7 @@ function closeTab(i) {
 }
 function switchToTab(i) {
   if (i === activeTab) return;
+  const oldActiveTab = activeTab;
   snapshotActiveTab();
   activeTab = i;
   const t = tabs[i];
@@ -200,10 +201,14 @@ function switchToTab(i) {
   try { mind.setTheme(doc.theme); } catch (e) {}
   try { mind.render(); } catch (e) { showErr('切换失败 render: ' + e.message); }
   setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
-  // 切换丝滑：画布淡入
+  // 切换翻页动画：画布沿切换方向滑入（切右标签从右滑入，切左标签从左滑入）
   try {
     const mc = document.getElementById('mindMapContainer');
-    if (mc) { mc.classList.remove('mindmap-fade'); void mc.offsetWidth; mc.classList.add('mindmap-fade'); }
+    if (mc) {
+      mc.classList.remove('mindmap-slide-right', 'mindmap-slide-left');
+      void mc.offsetWidth;
+      mc.classList.add(i > oldActiveTab ? 'mindmap-slide-right' : 'mindmap-slide-left');
+    }
   } catch (e) {}
   dirty = false;
   updateTitle();

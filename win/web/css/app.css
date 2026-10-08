@@ -119,8 +119,10 @@ body {
   box-shadow: 0 3px 12px rgba(108,140,255,.25);
 }
 .tab-item:hover { color: #2a2e3d; background: #f5f7ff; box-shadow: 0 3px 12px rgba(20,30,60,.14); transform: translateY(-1px); }
-@keyframes tabFadeIn { from { opacity: .75; } to { opacity: 1; } }
-.mindmap-fade { animation: tabFadeIn .15s ease-out; }
+@keyframes tabSlideFromRight { from { transform: translateX(42px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@keyframes tabSlideFromLeft { from { transform: translateX(-42px); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+.mindmap-slide-right { animation: tabSlideFromRight .24s cubic-bezier(.2,.7,.3,1); }
+.mindmap-slide-left { animation: tabSlideFromLeft .24s cubic-bezier(.2,.7,.3,1); }
 .tab-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; margin-left: 6px;
