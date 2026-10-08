@@ -880,8 +880,14 @@ function loadCustomThemes() {
     const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
-    if (colors.length) config.branchColors = colors;
-    config.lineColor = colors[0] || config.lineColor;
+    if (colors.length) {
+      config.branchColors = colors;
+      config.lineColor = colors[0];
+      // 节点背景跟随分支配色（中心=第1色，二级=第2色，其它=第3色，不足则回退）
+      if (config.root) { config.root.fillColor = colors[0]; config.root.color = '#ffffff'; }
+      if (config.second) { config.second.fillColor = colors[1] || colors[0]; config.second.color = '#ffffff'; }
+      if (config.node) { config.node.fillColor = colors[2] || colors[0]; config.node.color = '#ffffff'; }
+    }
     const entry = { name: t.name, key: t.key || '', branchColors: colors.length ? colors : (base.branchColors || []), config };
     THEMES.push(entry);
     try { MindMap.defineTheme(t.name, config); } catch (e) {}
