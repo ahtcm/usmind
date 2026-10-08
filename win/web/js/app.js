@@ -681,14 +681,17 @@ function paintBranchNodeColors(name) {
     (n.children || []).forEach(walk);
   })(root);
   if (!colors.length) return;
-  (function walk(n, depth) {
-    if (depth > 0 && n.data) {
-      const c = colors[Math.min(depth - 1, colors.length - 1)] || colors[0];
+  // 分支节点按彩虹配色循环：第2层=colors[分支索引]，第3层起=colors[分支索引+深度偏移]
+  (function walk(n, bi, depth) {
+    if (depth >= 1 && n.data) {
+      const c = colors[(bi + depth - 1) % colors.length];
       n.data.fillColor = c;
       n.data.color = '#ffffff';
     }
-    (n.children || []).forEach(ch => walk(ch, depth + 1));
-  })(root, 0);
+    const kids = n.children || [];
+    if (depth === 0) kids.forEach((ch, i) => walk(ch, i, 1));
+    else kids.forEach(ch => walk(ch, bi, depth + 1));
+  })(root, 0, 0);
   try { mind.render && mind.render(); } catch (e) {}
 }
 
