@@ -1459,7 +1459,7 @@ async function saveNow(silent) {
       return true;
     }
     if (r && r.cancel) { /* 用户取消另存为 */ }
-    else if (!silent) toast('保存失败', 'error');
+    else if (!silent) toast('保存失败' + (r ? ' ' + JSON.stringify(r) : ''), 'error');
     return false;
   } catch (e) {
     if (!silent) toast('保存失败：' + e.message, 'error');

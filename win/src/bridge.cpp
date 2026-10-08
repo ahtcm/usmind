@@ -68,13 +68,15 @@ static std::string JsEscape(const std::wstring& w) {
     }
     return out;
 }
-// 生成 JSON 返回（BSTR）
+// 生成 JSON 返回（BSTR）：先按 UTF-8→UTF-16 的实际长度分配，避免中文字符转换后 BSTR 尾部残留空字符导致 JS JSON.parse 失败
 static VARIANT MakeJsonResult(const std::string& json) {
     VARIANT v;
     VariantInit(&v);
     v.vt = VT_BSTR;
-    v.bstrVal = SysAllocStringLen(NULL, (UINT)json.size());
-    MultiByteToWideChar(CP_UTF8, 0, json.c_str(), (int)json.size(), v.bstrVal, (int)json.size());
+    int len = MultiByteToWideChar(CP_UTF8, 0, json.c_str(), (int)json.size(), NULL, 0);
+    if (len <= 0) len = 1;
+    v.bstrVal = SysAllocStringLen(NULL, (UINT)len);
+    MultiByteToWideChar(CP_UTF8, 0, json.c_str(), (int)json.size(), v.bstrVal, len);
     return v;
 }
 static VARIANT MakeBoolResult(bool ok) {
@@ -82,8 +84,10 @@ static VARIANT MakeBoolResult(bool ok) {
     VariantInit(&v);
     v.vt = VT_BSTR;
     std::string j = ok ? "{\"ok\":true}" : "{\"ok\":false}";
-    v.bstrVal = SysAllocStringLen(NULL, (UINT)j.size());
-    MultiByteToWideChar(CP_UTF8, 0, j.c_str(), (int)j.size(), v.bstrVal, (int)j.size());
+    int len = MultiByteToWideChar(CP_UTF8, 0, j.c_str(), (int)j.size(), NULL, 0);
+    if (len <= 0) len = 1;
+    v.bstrVal = SysAllocStringLen(NULL, (UINT)len);
+    MultiByteToWideChar(CP_UTF8, 0, j.c_str(), (int)j.size(), v.bstrVal, len);
     return v;
 }
 // 取第 idx 个参数（DISPPARAMS 逆序存储）
@@ -461,8 +465,13 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
             }
         }
         if (result) {
-            std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
-                               : "{\"ok\":false,\"error\":\"保存失败\"}";
+            std::string j;
+            if (ok) {
+                j = "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}";
+            } else {
+                std::string eb = std::to_string((unsigned long)GetLastError());
+                j = "{\"ok\":false,\"error\":\"保存失败\",\"errno\":" + eb + "}";
+            }
             *result = MakeJsonResult(j);
         }
         break;
@@ -521,8 +530,13 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         // 仅普通保存（非显式另存为导出）记住为工作文件，避免后续 Ctrl+S 覆盖到导出文件
         if (ok && !saveAs) { currentPath = target; currentName = fileNameOf(target); }
         if (result) {
-            std::string j = ok ? "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}"
-                               : "{\"ok\":false,\"error\":\"保存失败\"}";
+            std::string j;
+            if (ok) {
+                j = "{\"ok\":true,\"path\":\"" + JsEscape(currentPath) + "\",\"name\":\"" + JsEscape(currentName) + "\"}";
+            } else {
+                std::string eb = std::to_string((unsigned long)GetLastError());
+                j = "{\"ok\":false,\"error\":\"保存失败\",\"errno\":" + eb + "}";
+            }
             *result = MakeJsonResult(j);
         }
         break;
