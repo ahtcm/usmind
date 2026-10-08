@@ -1226,6 +1226,46 @@ function openDocPreview(att) {
   } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
 }
 
+// markdown 附件：渲染预览（marked + KaTeX 公式），可切换 CodeMirror 编辑
+function openMarkdownPreview(node, att) {
+  try {
+    const body = $('docPreviewBody'), nameEl = $('docPreviewName');
+    nameEl.textContent = att.name;
+    body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在渲染…</div>';
+    $('docPreview').style.display = 'flex';
+    const b64 = att.url.split(',')[1] || '';
+    let text = '';
+    try { text = decodeURIComponent(escape(atob(b64))); } catch (e) { try { text = atob(b64); } catch (e2) {} }
+    const raw = text || '';
+    let html = '';
+    if (window.marked) {
+      html = marked.parse(raw);
+    } else {
+      html = '<pre>' + raw.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</pre>';
+    }
+    // KaTeX 渲染公式（$$ 块级 → display；$ 内联 → inline）
+    try {
+      if (window.katex) {
+        html = html.replace(/\$\$([\s\S]+?)\$\$/g, (m, tex) => {
+          try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }); } catch (e) { return m; }
+        });
+        html = html.replace(/(^|[^$])\$([^$\n]+?)\$(?![\d$])/g, (m, pre, tex) => {
+          try { return pre + katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }); } catch (e) { return m; }
+        });
+      }
+    } catch (eK) {}
+    body.innerHTML = '<div class="doc-md">' + html + '</div>'
+      + '<div style="margin-top:12px;text-align:right;"><button id="mdEditBtn" style="padding:6px 14px;border:1px solid #d0d3d6;border-radius:8px;background:#f6f8fa;cursor:pointer;font-size:13px;color:#333;">用编辑器打开</button></div>';
+    try {
+      $('mdEditBtn').addEventListener('click', () => {
+        $('docPreview').style.display = 'none';
+        $('docPreviewBody').innerHTML = '';
+        openTextPreview(node, att);
+      });
+    } catch (eE) {}
+  } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
+}
+
 // 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
 function openNodeAttachment(node) {
   try {
@@ -1248,6 +1288,8 @@ function openNodeAttachment(node) {
       $('mediaViewer').style.display = 'flex';
       return;
     }
+    // markdown → 渲染预览（marked + KaTeX，可切换 CodeMirror 编辑）
+    if (ext === 'md' || ext === 'markdown') { openMarkdownPreview(node, att); return; }
     // 文本/代码 → 内置 CodeMirror 预览编辑
     if (isTextExt(ext)) { openTextPreview(node, att); return; }
     // docx/xlsx/pdf → 内置预览（mammoth/SheetJS/Chromium PDF）
@@ -1870,5 +1912,5 @@ boot();
 
 // 浏览器（无原生桥）环境暴露测试钩子；exe 内不暴露
 if (!hasNative && typeof window !== 'undefined') {
-  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, get mind() { return mind; } };
+  window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, get mind() { return mind; } };
 }

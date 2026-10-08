@@ -484,3 +484,23 @@ body {
 .doc-xlsx table { border-collapse: collapse; font-size: 13px; }
 .doc-xlsx table td, .doc-xlsx table th { border: 1px solid #c9cdd6; padding: 4px 8px; min-width: 40px; white-space: nowrap; }
 .doc-xlsx table th { background: #f1f3f5; font-weight: 600; }
+
+/* markdown 渲染预览 */
+.doc-md { line-height: 1.75; color: #333; font-size: 14px; max-width: 860px; }
+.doc-md h1, .doc-md h2, .doc-md h3, .doc-md h4 { margin: 14px 0 8px; line-height: 1.4; }
+.doc-md h1 { font-size: 24px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+.doc-md h2 { font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.doc-md h3 { font-size: 17px; }
+.doc-md p { margin: 8px 0; }
+.doc-md ul, .doc-md ol { margin: 8px 0; padding-left: 26px; }
+.doc-md li { margin: 3px 0; }
+.doc-md code { background: #f1f3f5; border-radius: 4px; padding: 2px 5px; font-family: Consolas, Monaco, monospace; font-size: 13px; color: #c7254e; }
+.doc-md pre { background: #f6f8fa; border: 1px solid #e8eaed; border-radius: 8px; padding: 12px; overflow: auto; }
+.doc-md pre code { background: none; padding: 0; color: #24292f; }
+.doc-md blockquote { border-left: 4px solid #dfe2e5; color: #6a737d; margin: 10px 0; padding: 2px 14px; background: #f8f9fa; }
+.doc-md table { border-collapse: collapse; margin: 10px 0; }
+.doc-md table td, .doc-md table th { border: 1px solid #c9cdd6; padding: 5px 10px; }
+.doc-md table th { background: #f1f3f5; font-weight: 600; }
+.doc-md img { max-width: 100%; border-radius: 6px; }
+.doc-md a { color: #2b7de9; }
+.doc-md hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
