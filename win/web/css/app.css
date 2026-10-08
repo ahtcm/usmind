@@ -92,6 +92,7 @@ body {
 #tabBar {
   position: absolute; bottom: 12px; left: 12px;
   display: flex; align-items: center; gap: 4px; z-index: 40;
+  max-width: calc(100% - 340px);
 }
 #tabBar .scroll-arrow {
   width: 22px; height: 22px; border: none; background: transparent; color: #8a8f9e;
@@ -101,6 +102,7 @@ body {
 #tabStrip {
   display: flex; align-items: center; gap: 6px;
   overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+  flex: 1; min-width: 0;
 }
 #tabStrip::-webkit-scrollbar { display: none; }
 .tab-item {
