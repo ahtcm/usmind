@@ -131,6 +131,7 @@ function renderTabStrip() {
     el.title = labelText;
 
     const label = document.createElement('span');
+    label.className = 'tab-label';
     label.textContent = labelText + (t.dirty ? ' ●' : '');
     el.appendChild(label);
 
@@ -555,8 +556,20 @@ function initMindMap() {
     markDirty();
     renderTabStrip();
   });
-  // 轮询刷新标签名（内联编辑时 data_change 可能不触发；100ms 保证"快速跟随"）
-  setInterval(() => { try { renderTabStrip(); } catch (e) {} }, 100);
+  // 轮询刷新活跃标签文字（内联编辑时 data_change 可能不触发）：
+  // 只更新文字不重建 DOM，避免 100ms 全量重建导致点击事件丢失（需多次点击才选中）
+  setInterval(() => {
+    try {
+      const act = document.querySelector('.tab-item.active .tab-label');
+      if (!act || !mind) return;
+      const rd = mind.getData();
+      const rootN = rd && rd.root ? rd.root : rd;
+      const txt = rootN && rootN.data && rootN.data.text ? stripHtml(rootN.data.text) : '';
+      if (!txt) return;
+      const dirtyMark = tabs[activeTab] && tabs[activeTab].dirty ? ' ●' : '';
+      if (act.textContent !== txt + dirtyMark) act.textContent = txt + dirtyMark;
+    } catch (e) {}
+  }, 200);
   // 监听节点编辑结束
   try { mind.on('node_text_change', () => renderTabStrip()); } catch (e) {}
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
