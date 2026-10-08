@@ -630,6 +630,7 @@ function initMindMap() {
   mind.on('data_change', () => {
     markDirty();
     renderTabStrip();
+    scheduleBranchRainbow();
   });
   // 轮询刷新活跃标签文字（内联编辑时 data_change 可能不触发）：
   // 只更新文字不重建 DOM，避免 100ms 全量重建导致点击事件丢失（需多次点击才选中）
@@ -653,6 +654,7 @@ function initMindMap() {
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
+  setTimeout(() => { try { applyBranchRainbow(); } catch (e) {} }, 600);
   updateZoom();
 }
 
@@ -663,14 +665,66 @@ function applyTheme(name) {
   doc.theme = name;
   try { mind.setTheme(name); } catch (e) {}
   try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(name) }); } catch (e) {}
+  scheduleBranchRainbow();
   dirty = true;
   updateTitle();
   toast('已切换主题：' + t.name);
 }
 
-// 分支节点背景：引擎按主题层级配色（root=第1色，second=第2色，node=第3色），已在 loadCustomThemes 写入主题 config
-function paintBranchNodeColors(name) {
-  // 引擎不支持逐分支节点配色，保留空实现避免误写节点数据
+// ===== 彩虹分支节点配色（移植自原项目 Editor.vue）=====
+let rainbowIdx = 0;
+function hexRgb(hex) {
+  if (!hex || typeof hex !== 'string') return [0, 0, 0];
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function mix(hex1, hex2, ratio) {
+  const a = hexRgb(hex1), b = hexRgb(hex2);
+  const c = a.map((v, i) => Math.round(v * ratio + b[i] * (1 - ratio)));
+  return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+function isDarkColor(hex) {
+  if (!hex || typeof hex !== 'string') return false;
+  const [r, g, b] = hexRgb(hex);
+  return (r * 299 + g * 587 + b * 114) / 1000 < 150;
+}
+function getBranchColors() {
+  const colors = branchColorsOf(doc.theme);
+  return colors.length ? colors : FALLBACK_COLORS;
+}
+function applyBranchTo(node, depth, branchColor) {
+  if (!node || !node.data) return;
+  if (depth === 0) {
+    delete node.data.fillColor; delete node.data.color; delete node.data.borderColor; delete node.data.lineColor; delete node.data.borderWidth;
+    (node.children || []).forEach(c => applyBranchTo(c, 1, null));
+  } else if (depth === 1) {
+    const colors = getBranchColors();
+    const c = colors[rainbowIdx++ % colors.length];
+    node.data.fillColor = c;
+    node.data.color = isDarkColor(c) ? '#ffffff' : '#1a1a1a';
+    node.data.borderColor = c;
+    node.data.borderWidth = 1;
+    node.data.lineColor = c;
+    (node.children || []).forEach(cn => applyBranchTo(cn, 2, c));
+  } else {
+    node.data.fillColor = mix(branchColor, '#ffffff', 0.14);
+    node.data.color = isDarkColor(branchColor) ? '#475569' : '#334155';
+    node.data.borderColor = mix(branchColor, '#ffffff', 0.38);
+    node.data.borderWidth = 1;
+    node.data.lineColor = branchColor;
+    (node.children || []).forEach(cn => applyBranchTo(cn, depth + 1, branchColor));
+  }
+}
+function applyBranchRainbow() {
+  if (!mind || !mind.renderer || !mind.renderer.renderTree) return;
+  rainbowIdx = 0;
+  applyBranchTo(mind.renderer.renderTree, 0, null);
+  mind.render(() => {});
+}
+let rainbowTimer = null;
+function scheduleBranchRainbow() {
+  if (rainbowTimer) clearTimeout(rainbowTimer);
+  rainbowTimer = setTimeout(() => applyBranchRainbow(), 350);
 }
 
 function buildThemeGrid() {
@@ -896,6 +950,13 @@ async function fillSettings() {
   $('setHistoryDir').value = s.historyDir || '（默认：程序目录 \\history）';
   $('historyDirDesc').textContent = app && app.historyDir ? '当前实际目录：' + app.historyDir : '';
   $('assocState').textContent = s.registerAssoc ? '已注册，双击 .usmind 文件即可打开' : '未注册';
+  // 本地偏好（localStorage）
+  $('setRainbow').checked = localSetting('rainbow', true);
+  $('setAutoSave').checked = localSetting('autoSave', true);
+  $('setAutoSaveSec').value = localSetting('autoSaveSec', 3);
+  $('setDefLayout').value = localSetting('defLayout', 'logicalStructure');
+  $('setMaxAttach').value = localSetting('maxAttach', 200);
+  $('setAllowTypes').value = localSetting('allowTypes', '*');
 }
 
 async function saveSettingsFromUi(newThemeName) {
@@ -904,6 +965,21 @@ async function saveSettingsFromUi(newThemeName) {
     applyTheme(newTheme);
   }
   userDefaultTheme = newTheme;
+  // 本地偏好（localStorage）
+  const ls = getLocalSettings();
+  ls.rainbow = $('setRainbow').checked;
+  ls.autoSave = $('setAutoSave').checked;
+  ls.autoSaveSec = parseInt($('setAutoSaveSec').value) || 3;
+  ls.defLayout = $('setDefLayout').value;
+  ls.maxAttach = parseInt($('setMaxAttach').value) || 200;
+  ls.allowTypes = $('setAllowTypes').value.trim() || '*';
+  setLocalSettings(ls);
+  // 即时应用彩虹线开关
+  try {
+    if (mind && mind.setRainbowLinesConfig) {
+      mind.setRainbowLinesConfig({ open: ls.rainbow, colorsList: branchColorsOf(doc.theme) });
+    }
+  } catch (e) {}
   const payload = { defaultTheme: newTheme };
   let r;
   try {
@@ -920,15 +996,19 @@ async function saveSettingsFromUi(newThemeName) {
 function getCustomThemes() { try { return JSON.parse(localStorage.getItem('usmind.themes') || '[]'); } catch (e) { return []; } }
 function setCustomThemes(arr) { try { localStorage.setItem('usmind.themes', JSON.stringify(arr)); } catch (e) {} }
 
+// 本地偏好设置（前端 localStorage 持久化，无需服务端）
+function getLocalSettings() { try { return JSON.parse(localStorage.getItem('usmind.localSettings') || '{}'); } catch (e) { return {}; } }
+function setLocalSettings(s) { try { localStorage.setItem('usmind.localSettings', JSON.stringify(s)); } catch (e) {} }
+function localSetting(k, d) { const s = getLocalSettings(); return s[k] != null ? s[k] : d; }
+
 function loadCustomThemes() {
   getCustomThemes().forEach(t => {
     if (!t || !t.name || THEMES.some(x => x.name === t.name)) return;
     const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
-    if (colors.length) { config.branchColors = colors; config.lineColor = t.lineColor || colors[0]; }
-    if (config.second && colors.length) { config.second.fillColor = colors[1] || colors[0]; config.second.color = '#ffffff'; }
-    if (config.node && colors.length) { config.node.fillColor = colors[2] || colors[0]; config.node.color = '#ffffff'; }
+    if (colors.length) { config.branchColors = colors; if (t.lineColor) config.lineColor = t.lineColor; }
+    // 节点背景与原项目一致：second/node 不按配色染色（白底），branchColors 仅用于彩虹分支线
     if (t.canvasBg) config.backgroundColor = t.canvasBg;
     if (t.lineWidth != null) config.lineWidth = t.lineWidth;
     if (t.bgImage) config.backgroundImage = t.bgImage;
@@ -937,7 +1017,7 @@ function loadCustomThemes() {
     if (t.bgZoom != null) config.backgroundZoom = t.bgZoom;
     if (t.attachText) config.attachTextColor = t.attachText;
     if (config.root) {
-      config.root.fillColor = t.rootFill || colors[0] || config.root.fillColor;
+      config.root.fillColor = t.rootFill || config.root.fillColor;
       if (t.rootColor) config.root.color = t.rootColor;
       if (t.rootBorder) config.root.borderColor = t.rootBorder;
       if (t.rootRadius != null) config.root.borderRadius = t.rootRadius;

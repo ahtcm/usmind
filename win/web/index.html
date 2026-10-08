@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261008c11">
+<link rel="stylesheet" href="css/app.css?v=20261008c12">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -173,6 +173,36 @@
           <span id="assocState" class="muted-text">双击 .usmind 文件打开</span>
           <button class="mini-btn" id="btnRegAssoc">重新注册</button>
         </div>
+      </div>
+      <div class="setting-row">
+        <label>彩虹分支线</label>
+        <label class="switch-line"><input type="checkbox" id="setRainbow" checked><span>按主题配色渲染分支线</span></label>
+      </div>
+      <div class="setting-row">
+        <label>自动保存</label>
+        <div class="row-inline">
+          <label class="switch-line"><input type="checkbox" id="setAutoSave" checked></label>
+          <input type="number" id="setAutoSaveSec" min="1" max="600" value="3" style="width:74px;"> <span class="muted-text">秒（停顿后自动保存）</span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>默认导图结构</label>
+        <select id="setDefLayout" class="select-input">
+          <option value="logicalStructure">逻辑结构图（向右）</option>
+          <option value="logicalStructureLeft">逻辑结构图（向左）</option>
+          <option value="organizationStructure">组织结构图（向下）</option>
+          <option value="catalogOrganization">目录组织图</option>
+          <option value="timeline2">时间轴</option>
+          <option value="fishbone">鱼骨图</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>附件大小上限</label>
+        <div class="row-inline"><input type="number" id="setMaxAttach" min="1" max="102400" value="200" style="width:94px;"> <span class="muted-text">MB</span></div>
+      </div>
+      <div class="setting-row">
+        <label>允许附件类型</label>
+        <input type="text" id="setAllowTypes" value="*" placeholder="* 全部，或 jpg,pdf,docx">
       </div>
       <div class="setting-row">
         <label>关于</label>
