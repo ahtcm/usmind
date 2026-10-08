@@ -70,7 +70,8 @@ let activeTab = -1;
 function snapshotActiveTab() {
   if (activeTab < 0 || !mind) return;
   try {
-    tabs[activeTab].data = mind.getData();
+    // 深拷贝快照：getData() 返回的是内部引用，不拷贝会导致所有标签共享同一份数据、切换无效
+    tabs[activeTab].data = JSON.parse(JSON.stringify(mind.getData()));
     tabs[activeTab].name = doc.name;
     tabs[activeTab].path = doc.path;
     tabs[activeTab].theme = doc.theme;
