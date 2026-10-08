@@ -56,6 +56,7 @@ bool setHistoryDir(const std::wstring& dir);
 // ---- 原生对话框 ----
 bool pickOpenFile(std::wstring& outPath, std::string& outData); // 打开 .usmind
 bool pickAnyFile(std::wstring& outName, std::string& outB64); // 选任意文件返回base64
+bool copyAttachmentFile(std::wstring& outName, std::wstring& outRelPath); // 选文件直接复制到附件目录
 // 用系统默认程序打开 base64 附件（解码→临时文件→ShellExecute）；相对路径直接打开外置附件
 bool openAttachment(const std::string& b64, const std::wstring& name);
 // ---- 附件外置存储（exe/data/attachments）----

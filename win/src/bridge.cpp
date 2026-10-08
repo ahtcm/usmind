@@ -376,25 +376,26 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
         }
         break;
     }
-    case 17: { // pickAnyFile → {ok, name, relPath?, b64?}（外置模式：直接写 attachments 返回相对路径）
-        std::wstring name;
+    case 17: { // pickAnyFile → {ok, name, relPath?, b64?}（优先直接复制到附件目录，大文件稳）
+        std::wstring name, rel;
         std::string b64;
-        bool ok = pickAnyFile(name, b64);
-        if (result) {
-            std::string j;
-            if (ok) {
-                // 生成唯一相对路径 att_<毫秒>_<原名>，写入外置附件目录
+        std::string j;
+        if (copyAttachmentFile(name, rel)) {
+            j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"relPath\":\"" + JsEscape(rel) + "\"}";
+        } else {
+            bool ok = pickAnyFile(name, b64);
+            if (ok && !b64.empty()) {
                 wchar_t ts[40] = { 0 };
                 swprintf(ts, 40, L"%lld", (long long)GetTickCount64());
-                std::wstring rel = L"attachments/att_" + std::wstring(ts) + L"_" + fileNameOf(name);
-                if (writeAttachment(rel, b64)) {
-                    j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"relPath\":\"" + JsEscape(rel) + "\"}";
+                std::wstring rel2 = L"attachments/att_" + std::wstring(ts) + L"_" + fileNameOf(name);
+                if (writeAttachment(rel2, b64)) {
+                    j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"relPath\":\"" + JsEscape(rel2) + "\"}";
                 } else {
                     j = "{\"ok\":true,\"name\":\"" + JsEscape(name) + "\",\"b64\":\"" + b64 + "\"}";
                 }
             } else j = "{\"ok\":false}";
-            *result = MakeJsonResult(j);
         }
+        if (result) *result = MakeJsonResult(j);
         break;
     }
     case 18: { // openAttachment(b64, name) → {ok, path}

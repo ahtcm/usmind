@@ -402,6 +402,44 @@ bool pickAnyFile(std::wstring& outName, std::string& outB64) {
     return got;
 }
 
+// ---- 附件外置存储前置声明（copyAttachmentFile/openAttachment 使用）----
+static bool safeRelPath(const std::wstring& rel);
+std::wstring attachmentDir();
+
+// 选择任意文件并直接复制到外置附件目录（不经 base64，大文件也稳）
+// 成功返回相对路径 attachments/att_<毫秒>_<原名>；用户取消返回 false
+bool copyAttachmentFile(std::wstring& outName, std::wstring& outRelPath) {
+    IFileOpenDialog* pDlg = NULL;
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDlg));
+    if (FAILED(hr)) return false;
+    pDlg->SetTitle(L"选择附件文件");
+    bool got = false;
+    if (SUCCEEDED(pDlg->Show(NULL))) {
+        IShellItem* item = NULL;
+        if (SUCCEEDED(pDlg->GetResult(&item))) {
+            wchar_t* path = NULL;
+            if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                std::wstring wp = path;
+                CoTaskMemFree(path);
+                outName = fileNameOf(wp);
+                wchar_t ts[40] = { 0 };
+                swprintf(ts, 40, L"%lld", (long long)GetTickCount64());
+                std::wstring rel = L"attachments/att_" + std::wstring(ts) + L"_" + outName;
+                if (safeRelPath(rel)) {
+                    std::wstring full = attachmentDir() + L"\\" + rel.substr(12);
+                    if (CopyFileW(wp.c_str(), full.c_str(), FALSE)) {
+                        outRelPath = rel;
+                        got = true;
+                    }
+                }
+            }
+            item->Release();
+        }
+    }
+    pDlg->Release();
+    return got;
+}
+
 // ---- 附件外置存储前置声明（openAttachment 使用）----
 static bool safeRelPath(const std::wstring& rel);
 std::wstring attachmentDir();
