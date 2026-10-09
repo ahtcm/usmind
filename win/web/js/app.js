@@ -2931,3 +2931,23 @@ boot();
 if (!hasNative && typeof window !== 'undefined') {
   window.__winTest = { openNodeAttachment: openNodeAttachment, openTextPreview: openTextPreview, setNodeAttachment: setNodeAttachment, nodeAttachData: nodeAttachData, insertFileToNode: insertFileToNode, openDocPreview: openDocPreview, openMarkdownPreview: openMarkdownPreview, mediaObjectUrl: mediaObjectUrl, resolveMediaUrl: resolveMediaUrl, storeFileExternal: storeFileExternal, exportSelfContained: exportSelfContained, importSelfContained: importSelfContained, patchTreeMediaSrc: patchTreeMediaSrc, restoreTreeMediaSrc: restoreTreeMediaSrc, serializeDoc: serializeDoc, get mind() { return mind; } };
 }
+
+// ---- 附件偏移终极兜底 ----
+// 库可能在任意时机把文本编辑框（textEditNode）show 出来（双击附件时它与 CodeMirror 并存，
+// 保存后若未隐藏会残留在画布原点=视口左下角，表现为"附件文字偏移/无框文件名"）。
+// 定时器只针对"编辑对象是附件节点"的场景强制隐藏，普通节点文字编辑完全不受影响。
+let _attEditGuardTimer = null;
+function startAttEditGuard() {
+  if (_attEditGuardTimer) return;
+  _attEditGuardTimer = setInterval(() => {
+    try {
+      const te = mind && mind.renderer && mind.renderer.textEdit;
+      if (!te || !te.textEditNode) return;
+      if (te.textEditNode.style.display === 'none') return;
+      const cn = te.currentNode;
+      const isAtt = !!(cn && cn.getData && (cn.getData('attachmentUrl') || cn.getData('attachUrl') || cn.getData('attachmentName')));
+      if (isAtt) forceHideTextEdit();
+    } catch (e) {}
+  }, 400);
+}
+try { startAttEditGuard(); } catch (e) {}
