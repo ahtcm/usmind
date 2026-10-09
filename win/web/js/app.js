@@ -1931,6 +1931,8 @@ function renderFileNode(child, file) {
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
 async function openTextPreview(node, att) {
   try {
+    // 兜底：打开 CodeMirror 前强制隐藏库文本编辑框
+    try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
     if (typeof CodeMirror === 'undefined') { toast('预览组件缺失', 'error'); return; }
     const name = att.name || '附件';
     const ext = (name.split('.').pop() || '').toLowerCase();
@@ -2229,6 +2231,8 @@ async function openMarkdownPreview(node, att) {
 // 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
 function openNodeAttachment(node) {
   try {
+    // 兜底：打开附件前强制隐藏库文本编辑框（防双击附件时编辑框残留画布原点）
+    try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
     const att = nodeAttachData(node);
     if (!att) return;
     const ext = (att.name.split('.').pop() || '').toLowerCase();
@@ -2723,6 +2727,10 @@ function bindUi() {
     if (mind && mind.on) {
       mind.on('node_dblclick', (node) => {
         try {
+          // 我们接管双击（预览/打开附件）前，强制隐藏库的文本编辑框：
+          // 库默认双击会启动 textEditNode（编辑框），若与其后的 CodeMirror/预览弹窗并存，
+          // 保存后编辑框不隐藏会残留在画布原点（视口左下角出现"无框文件名"文字）
+          try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
           const d = node.nodeData || node;
           const img = d.image || (d.data && d.data.image);
           if (img) {
