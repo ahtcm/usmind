@@ -2098,6 +2098,27 @@ function attachToActiveNode(file) {
     renderFileNode(node, file);
   } catch (e) { try { insertFileToNode(file); } catch (e2) {} }
 }
+// 粘贴纯文本：在当前选中节点下新建子节点（替代被拦截的库 ctrl+v 文本粘贴）
+function insertTextAsNode(text) {
+  try {
+    let node = null;
+    try { const l = mind.renderer.activeNodeList; if (l && l[0]) node = l[0]; } catch (e) {}
+    if (!node) { try { node = mind.renderer.currentNode; } catch (e) {} }
+    if (node && node.nodeData) {
+      mind.execCommand('INSERT_CHILD_NODE', node, [], { text: text });
+      return;
+    }
+  } catch (e) {}
+  try { mind.execCommand('INSERT_CHILD_NODE'); } catch (e) {}
+  try {
+    const d = mind.getData();
+    if (d && d.root && d.root.children && d.root.children.length) {
+      const last = d.root.children[d.root.children.length - 1];
+      if (last && last.data) last.data.text = text;
+      mind.render();
+    }
+  } catch (e2) {}
+}
 
 // 树级媒体 src 优化：dataUrl ↔ blob objectURL（渲染用 blob 流畅，保存前还原 dataUrl 保证文件自包含）
 function walkTree(node, fn) {
@@ -2638,18 +2659,14 @@ function bindUi() {
     attachNode = null;
   });
 
-  // Ctrl+V 粘贴图片/文件（统一走 insertFileToNode：在当前选中节点下新建子节点并渲染）
+  // Ctrl+V 粘贴接管：非编辑态一律拦截库自带的 ctrl+v（keydown 里 clipboardData 为 null，
+  // 无法在 keydown 判断剪贴板内容；不拦则库会插一张小图+我们 paste 事件再插大图 → 一大一小双图）
   // 库节点粘贴（Ctrl+C 复制节点后 Ctrl+V）前，强制当前节点为选中节点，避免库兜底粘贴到根
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
-      // 非编辑态且剪贴板含图片：接管粘贴，阻止库自带 ctrl+v 双插（一大一小）
-      try {
-        const types = e.clipboardData && e.clipboardData.types ? Array.from(e.clipboardData.types) : [];
-        const hasImg = types.some(t => t.indexOf('image') === 0);
-        const tag = document.activeElement && document.activeElement.tagName;
-        const editing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
-        if (hasImg && !editing) { e.preventDefault(); e.stopPropagation(); }
-      } catch (eI) {}
+      const tag = document.activeElement && document.activeElement.tagName;
+      const editing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+      if (!editing) { e.preventDefault(); e.stopPropagation(); }
       const act = (mind.renderer && mind.renderer.activeNodeList && mind.renderer.activeNodeList[0]) || null;
       if (act) { try { mind.renderer.currentNode = act; } catch (e2) {} }
     }
@@ -2678,6 +2695,13 @@ function bindUi() {
         insertExternalOrInline(blob, blob.name || '附件', blob.type || mimeFromName(blob.name || ''), true);
         return;
       }
+    }
+    // 纯文本粘贴（无图无文件）：新建子节点（保持原库行为；keydown 已拦截库的 ctrl+v）
+    const text = e.clipboardData.getData('text/plain');
+    if (text && text.trim()) {
+      e.preventDefault();
+      e.stopPropagation();
+      insertTextAsNode(text.trim().slice(0, 200));
     }
   }, true);
 
