@@ -3310,12 +3310,20 @@ function fixAttachNodeTexts() {
   } catch (e) {}
   try {
     const tree = mind.getData();
+    let needRender = false;
     const walk = (t) => {
       if (t && t.data) {
         const d = t.data;
         if (d.attachmentName && (d.text !== d.attachmentName || d.richText)) {
           const inst = d.uid ? mind.renderer.findNodeByUid(d.uid) : null;
           if (inst) mind.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false });
+        }
+        // 图片节点（text 含 <img>）：强制背景透明+零内边距+无边框，图片即节点，不留背景露边
+        if (typeof d.text === 'string' && d.text.indexOf('<img') !== -1) {
+          if (d.fillColor !== 'transparent' || d.paddingX || d.paddingY || d.borderWidth) {
+            d.fillColor = 'transparent'; d.paddingX = 0; d.paddingY = 0; d.borderWidth = 0; d.borderColor = 'transparent';
+            needRender = true;
+          }
         }
         // 清理旧版本残留的库 emoji 📎 图标（统一由 injectAttachIcons 注入 SVG 别针）
         if (Array.isArray(d.icon)) {
@@ -3326,6 +3334,7 @@ function fixAttachNodeTexts() {
       if (t && t.children) t.children.forEach(walk);
     };
     walk(tree);
+    if (needRender) { try { mind.render(); } catch (eR) {} }
   } catch (e) {}
   try {
     const c = document.querySelector('.smm-container');
