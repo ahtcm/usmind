@@ -2233,17 +2233,21 @@ async function openMarkdownPreview(node, att) {
 }
 
 // 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
-// 强制隐藏库的文本编辑框（三层：库方法写回+状态复位+DOM直藏）。
+// 强制隐藏库的文本编辑框（状态复位+DOM直藏；**不调库的 hideEditTextBox**——
+// 它会对当前编辑节点执行 SET_NODE_TEXT 写回，用编辑框文本覆盖节点 text；
+// 对 richText 节点（图片/音视频附件）会破坏其 richText HTML → 图片消失）。
 // 原因：双击附件时库 emit node_dblclick 后才启动文本编辑（show 晚于我们的 hide），
-// 只调一次 hideEditTextBox 会被库随后 show 覆盖 → 编辑框残留画布原点（附件文字"偏移"）。
+// 只调一次会被库随后 show 覆盖 → 编辑框残留画布原点（附件文字"偏移"）。
 function forceHideTextEdit() {
   try {
     const te = mind && mind.renderer && mind.renderer.textEdit;
     if (!te) return;
-    try { te.hideEditTextBox(); } catch (e) {}
     try { te.showTextEdit = false; } catch (e) {}
     try { te.currentNode = null; } catch (e) {}
     try { if (te.textEditNode) te.textEditNode.style.display = 'none'; } catch (e) {}
+    try { if (te.textEditNode) te.textEditNode.innerHTML = ''; } catch (e) {}
+    // 库 startTextEdit 会 keyCommand.save()（暂停快捷键）；未走 hideEditTextBox 收尾时手动恢复
+    try { if (mind && mind.keyCommand) mind.keyCommand.restore(); } catch (e) {}
   } catch (e) {}
 }
 function openNodeAttachment(node) {
