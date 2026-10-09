@@ -1301,9 +1301,11 @@ async function pickProjectDir() {
 async function doExport(type) {
   if (!mind) return;
   try {
+    // 公式/富文本字体（KaTeX）可能仍在异步加载：先等字体就绪再导出，避免导出时公式换行/错位
+    try { await document.fonts.ready; } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png') await mind.doExport.export('png', true, name);
-    else if (type === 'jpeg') await mind.doExport.export('jpeg', true, name);
+    else if (type === 'jpeg') await exportJpegSelf(name);
     else if (type === 'svg') await mind.doExport.export('svg', true, name);
     else if (type === 'md') await mind.doExport.export('md', true, name);
     else if (type === 'json') await exportJSONAllTabs(name);
@@ -1312,6 +1314,43 @@ async function doExport(type) {
     toast('导出已启动，请选择保存位置');
   } catch (e) {
     toast('导出失败：' + e.message, 'error');
+  }
+}
+
+// JPEG 导出（库不支持 jpeg）：用 getSvgData 生成完整 SVG DOM，挂到文档渲染 foreignObject
+// （公式/图片等 richText 内容在文档内可渲染），再 drawImage 到 canvas 转 JPEG，saveBinary 弹框保存
+async function exportJpegSelf(name) {
+  try {
+    const sd = mind.getSvgData({ paddingX: 24, paddingY: 24 });
+    const svgEl = sd && sd.svg && sd.svg.node;
+    if (!svgEl) throw new Error('SVG 生成失败');
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-9999px;top:0;overflow:hidden;pointer-events:none';
+    holder.appendChild(svgEl);
+    document.body.appendChild(holder);
+    await new Promise(r => setTimeout(r, 400)); // 等 foreignObject 内 HTML 渲染
+    let w = sd.rect && sd.rect.width, h = sd.rect && sd.rect.height;
+    try {
+      const r = svgEl.getBoundingClientRect();
+      if (r && r.width > 0) { w = r.width; h = r.height; }
+    } catch (e2) {}
+    if (!w || !h) throw new Error('SVG 尺寸无效');
+    const scale = 2;
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(w * scale));
+    cv.height = Math.max(1, Math.round(h * scale));
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(svgEl, 0, 0, cv.width, cv.height);
+    const data = cv.toDataURL('image/jpeg', 0.92);
+    if (holder.parentNode) holder.remove();
+    const b64 = data.split(',')[1];
+    const r2 = await callNative('saveBinary', b64, '', (name || '思维导图') + '.jpg');
+    if (!r2 || !r2.ok) throw new Error('保存被取消');
+  } catch (e) {
+    if (e && e.message && e.message.indexOf('保存被取消') >= 0) return;
+    toast('JPEG 导出失败：' + (e && e.message ? e.message : String(e)), 'error');
   }
 }
 
@@ -2382,7 +2421,9 @@ function finishIcon() {
 function renderLatex(latex) {
   if (!window.katex) return '<span style="color:#e74c3c">[公式引擎未加载]</span>';
   try {
-    return window.katex.renderToString(latex, { throwOnError: false, displayMode: true });
+    const inner = window.katex.renderToString(latex, { throwOnError: false, displayMode: true });
+    // 包一层防拆行容器：导出（PNG/SVG）时避免公式内容因字体测量差异被截成两行
+    return '<span style="display:inline-block;white-space:nowrap;vertical-align:middle">' + inner + '</span>';
   } catch (e) {
     return '<span style="color:#e74c3c">[公式错误]</span>';
   }
@@ -2444,16 +2485,18 @@ function mathConfirm() {
     if (mathEditNode) {
       mind.renderer.setNodeDataRender(mathEditNode, { text: full, richText: true, mathLatex: raw });
     } else {
-      let pd = mathTarget ? nodeDataOf(mathTarget) : null;
-      if (!pd) {
-        const sel = currentSelectedNode();
-        if (sel) pd = nodeDataOf(sel);
+      // 插入模式：写到选中节点本身（同原项目 setNodeDataRender 整体替换），而不是新建子节点
+      let target = null;
+      try { target = mathTarget && (mathTarget._node || mathTarget); } catch (e) {}
+      if (!target) { const sel = currentSelectedNode(); if (sel) target = sel._node || sel; }
+      if (target && target.getData) {
+        try { mind.renderer.setNodeDataRender(target, { text: full, richText: true, mathLatex: raw }); }
+        catch (e) { target = null; }
       }
-      if (!pd) {
+      if (!target) {
+        // 最终兜底：无可用节点实例时，才新建为根的子节点
         const d = mind.getData();
-        pd = d.root || d;
-      }
-      if (pd) {
+        const pd = d.root || d;
         pd.children = pd.children || [];
         pd.children.push({ data: { text: full, richText: true, mathLatex: raw }, children: [] });
       }
