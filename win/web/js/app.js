@@ -1344,12 +1344,36 @@ function rebuildRawMathNodes() {
     walk(rootNode);
   } catch (e) {}
 }
+function clearSelectionForExport() {
+  try { if (mind.renderer.clearActiveNodeList) mind.renderer.clearActiveNodeList(); } catch (e) {}
+  try {
+    const walk = (t) => {
+      if (!t) return;
+      const node = t._node || t;
+      try {
+        if (node.hoverNode) {
+          if (node.hoverNode.node) { node.hoverNode.node.style.display = 'none'; node.hoverNode.node.style.visibility = 'hidden'; }
+          else if (node.hoverNode.remove) node.hoverNode.remove();
+        }
+      } catch (e) {}
+      (t.children || []).forEach(walk);
+    };
+    walk(mind.renderer.renderTree);
+  } catch (e) {}
+  try {
+    document.querySelectorAll('svg [class*="hover"], svg [class*="Hover"], [class*="add-btn"], [class*="AddBtn"]').forEach((el) => { try { el.style.display = 'none'; } catch (e) {} });
+  } catch (e) {}
+}
 async function doExport(type) {
   if (!mind) return;
   try {
+    // 导出前清 hover/选中（否则蓝色选中框、悬浮按钮会进导出图）
+    clearSelectionForExport();
     // 公式/富文本字体（KaTeX）可能仍在异步加载：先等字体就绪再导出，避免导出时公式换行/错位
     try { await document.fonts.ready; } catch (e) {}
     try { rebuildRawMathNodes(); await new Promise(r => setTimeout(r, 300)); } catch (e) {} // 重建后等布局重排完成，导出布局才与屏幕一致
+    // 字体就绪后强制全量重渲染，节点尺寸按已加载字体重新测量（避免导出节点被撑大/留白过多）
+    try { mind.render(); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png' || type === 'jpeg' || type === 'jpg') await exportChunkedImages(type, name);
     else if (type === 'svg') await exportSvgSelf(name);
@@ -1437,8 +1461,18 @@ async function renderChunkByHtml(svgStr, W, ch, y0, X, Y, bg) {
     const top = it.y - (Y || 0) - y0;
     if (top + 20 < 0 || top > ch) return;
     const holder = document.createElement('div');
-    holder.style.cssText = 'position:absolute;left:' + left + 'px;top:' + top + 'px;';
-    it.fo.childNodes.forEach((c) => holder.appendChild(c.cloneNode(true)));
+    // 继承 foreignObject 的样式（font-size/line-height/字体等）并固定宽高，节点才与屏幕一致
+    const foStyle = it.fo.getAttribute('style') || '';
+    const w = parseFloat(it.fo.getAttribute('width') || '0');
+    const h = parseFloat(it.fo.getAttribute('height') || '0');
+    holder.style.cssText = 'position:absolute;left:' + left + 'px;top:' + top + 'px;width:' + w + 'px;height:' + h + 'px;overflow:hidden;' + foStyle;
+    // 还原 XML 转义的 <p>/<br>（库的非富文本节点 <p> 无 xmlns，XML 序列化时被转义成 &lt;p&gt;；
+    // 直接克隆 DOM 会显示字面 "<p>" 字符串并撑大节点）
+    let foHtml = it.fo.innerHTML || '';
+    foHtml = foHtml.replace(/&lt;p&gt;/g, '<p>').replace(/&lt;\/p&gt;/g, '</p>').replace(/&lt;br&gt;/g, '<br>');
+    holder.innerHTML = foHtml;
+    // 覆盖富文本 <p> 的默认 margin/padding，防止把节点撑高变形
+    holder.querySelectorAll('p').forEach((p) => { p.style.margin = '0'; p.style.padding = '0'; });
     // 视频/音频：贴链接占位（html2canvas 无法稳定绘制媒体画面）
     holder.querySelectorAll('video, audio').forEach((m) => {
       const label = m.nodeName === 'VIDEO' ? '▶ 视频' : '♪ 音频';
@@ -3494,12 +3528,22 @@ if (typeof window !== 'undefined' && location.search.indexOf('autotest=export') 
       rebuildRawMathNodes();
       await new Promise(r => setTimeout(r, 800));
       try { await document.fonts.ready; } catch (e) {}
+      clearSelectionForExport();
+      try { mind.render(); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
       const { str: strRaw } = await mind.doExport.getSvgData();
+      window.__exportTestSvg = strRaw;
       const { W, H, X, Y } = parseSvgSize(strRaw);
       if (!W || !H) { document.title = 'EXPORT_TEST_ERR:SIZE'; return; }
       const canvas = await renderChunkByHtml(strRaw, W, H, 0, X, Y, '#ffffff');
       window.__exportTestData = canvas.toDataURL('image/png');
       window.__exportTestMeta = JSON.stringify({ W, H, X, Y });
+      // SVG 自导出测试（同 exportSvgSelf 逻辑，不弹保存框）
+      try {
+        let sout = strRaw;
+        const kc2 = await getKatexCssForSvg();
+        if (kc2) sout = sout.replace('</svg>', '<style>' + kc2 + '</style></svg>');
+        window.__exportTestSvgSelf = sout;
+      } catch (e) { window.__exportTestSvgSelf = ''; }
       document.title = 'EXPORT_TEST_OK';
     } catch (e) { document.title = 'EXPORT_TEST_ERR:' + String(e && e.message || e).slice(0, 200); }
   }, 2500);
