@@ -2907,7 +2907,42 @@ function bindUi() {
       else if (k === ',') { e.preventDefault(); openPanel('settingsPanel'); }
     }
     if (e.key === 'Escape') closeAllPanels();
+    // 诊断浮层：Ctrl+Shift+D 显示渲染树各节点真实坐标（排查附件左移/框文分离）
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+      e.preventDefault();
+      toggleDiagPanel();
+    }
   });
+}
+
+// 诊断浮层：渲染树节点 uid/text/内部坐标/DOM坐标/父节点（仅调试用，不影响业务）
+function toggleDiagPanel() {
+  let dg = document.getElementById('diagPanel');
+  if (dg) { dg.remove(); return; }
+  const lines = [];
+  try {
+    const walk = (t, dep) => {
+      if (!t) return;
+      const no = t._node || t;
+      const nd = t.data || {};
+      let info = '';
+      try {
+        const L = no._left, T = no._top;
+        const el = no.shapeNode || no.node;
+        let g = '';
+        if (el) { try { const r = el.getBoundingClientRect(); g = ' g:' + Math.round(r.left) + ',' + Math.round(r.top); } catch (e2) {} }
+        info = ' L:' + L + ' T:' + T + g + ' shape:' + (!!el) + ' par:' + (no.parent ? String(no.parent.getData('uid')).slice(0, 6) : '-');
+      } catch (e) { info = ' ERR:' + (e.message || e); }
+      lines.push(' '.repeat(dep * 2) + String(nd.uid || '').slice(0, 6) + ' ' + String(nd.text || '').slice(0, 12).replace(/\s+/g, ' ') + (nd.attachmentUrl || nd.attachUrl ? ' [ATT]' : '') + ' ' + info);
+      (t.children || []).forEach(c => walk(c, dep + 1));
+    };
+    walk(mind.renderer.renderTree, 0);
+  } catch (e) { lines.push('WALK_ERR: ' + (e.message || e)); }
+  dg = document.createElement('div');
+  dg.id = 'diagPanel';
+  dg.style.cssText = 'position:fixed;top:8px;right:8px;z-index:99999;background:rgba(20,20,30,.94);color:#8ff;font:11px/1.5 Consolas,monospace;padding:10px 12px;border-radius:10px;max-height:70vh;overflow:auto;white-space:pre;box-shadow:0 4px 24px rgba(0,0,0,.4);user-select:text;';
+  dg.textContent = lines.join('\n') || '(empty)';
+  document.body.appendChild(dg);
 }
 
 // ================= 启动 =================
@@ -2967,3 +3002,79 @@ function startAttEditGuard() {
   }, 200);
 }
 try { startAttEditGuard(); } catch (e) {}
+
+// ---- 自动化自测钩子（?autotest=1，headless/测试页用）----
+if (typeof window !== 'undefined' && location.search.indexOf('autotest=1') >= 0) {
+  setTimeout(() => {
+    try {
+      // 插桩：记录 insertFileToNode 与 execCommand 调用
+      window.__diag = { ins: 0, ec: {} };
+      try {
+        const origIns = insertFileToNode;
+        insertFileToNode = function (file) { window.__diag.ins++; return origIns.call(this, file); };
+      } catch (e) {}
+      try {
+        const origEC = mind.execCommand.bind(mind);
+        mind.execCommand = function (name, ...args) {
+          window.__diag.ec[name] = (window.__diag.ec[name] || 0) + 1;
+          return origEC(name, ...args);
+        };
+      } catch (e) {}
+      const fakeFile = { name: '测试附件.txt', size: 10, type: 'text/plain', lastModified: Date.now(), dataUrl: 'data:text/plain;base64,MTIzNDU2' };
+      try {
+        const l = mind.renderer.activeNodeList;
+        if (l && l.length) l.forEach(n => { try { mind.renderer.removeActiveNode(n); } catch (e) {} });
+        // 选中根节点
+        try { mind.renderer.activeNodeList = [mind.renderer.renderTree._node]; mind.renderer.drawActiveNode(); } catch (e) {}
+      } catch (e) {}
+      try { insertFileToNode(fakeFile); } catch (e) { document.title = 'AUTOTEST_INSERT_ERR:' + e.message; }
+      setTimeout(() => {
+        try {
+          const d = mind.getData();
+          const diag = { dataTree: [], renderTree: [], textEdit: null };
+          const walkD = (n, dep, path) => {
+            if (!n) return;
+            const nd = n.data || n;
+            diag.dataTree.push({ dep, path, uid: nd.uid || '', text: (nd.text || '').slice(0, 24), att: !!(nd.attachmentUrl || nd.attachUrl || nd.attachmentName), icon: (nd.icon || []).length });
+            (n.children || []).forEach((c, i) => walkD(c, dep + 1, path + '.' + i));
+          };
+          walkD(d.root || d, 0, 'r');
+          const walkR = (t, dep, path) => {
+            if (!t) return;
+            const nd = t.data || {};
+            let L = '', T = '';
+            try {
+              const no = t._node || t;
+              if (no) {
+                try { if (no.getLeft) { L = Math.round(no.getLeft()); T = Math.round(no.getTop()); } } catch (e) {}
+                try {
+                  const el = no.shapeNode || no.node;
+                  if (el) { const r = el.getBoundingClientRect(); L = (L === '' ? '' : L + '/') + 'g' + Math.round(r.left) + ',' + Math.round(r.top); }
+                } catch (e2) {}
+                try { if (no.parent) L = 'P:' + (no.parent.getData('uid') || '').slice(0, 6) + ' ' + L; } catch (e3) {}
+              }
+            } catch (e) {}
+            diag.renderTree.push({ dep, path, uid: nd.uid || '', text: (nd.text || '').slice(0, 24), att: !!(nd.attachmentUrl || nd.attachUrl || nd.attachmentName), rich: !!nd.richText, L, T });
+            (t.children || []).forEach((c, i) => walkR(c, dep + 1, path + '.' + i));
+          };
+          try { walkR(mind.renderer.renderTree, 0, 'r'); } catch (e) {}
+          try {
+            const te = mind.renderer.textEdit;
+            diag.textEdit = { show: te.showTextEdit, nodeUid: te.currentNode ? te.currentNode.getData('uid') : null, disp: te.textEditNode ? te.textEditNode.style.display : 'n/a', content: te.textEditNode ? te.textEditNode.textContent.slice(0, 24) : '' };
+          } catch (e) {}
+          const out = JSON.stringify({ diag: window.__diag || null, tree: diag }, null, 1);
+          document.title = 'AUTOTEST_OK';
+          const div = document.createElement('div');
+          div.id = 'autotest-out';
+          div.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:#fff;color:#222;font:11px/1.4 monospace;max-height:90vh;overflow:auto;white-space:pre-wrap;padding:8px;';
+          div.textContent = out;
+          document.body.appendChild(div);
+        } catch (e) {
+          document.title = 'AUTOTEST_DIAG_ERR:' + e.message;
+        }
+      }, 7000);
+    } catch (e) {
+      document.title = 'AUTOTEST_ERR:' + e.message;
+    }
+  }, 2000);
+}
