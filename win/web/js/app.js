@@ -279,11 +279,28 @@ function openInTab(path, name, parsed) {
   activeTab = tabs.length - 1;
   doc.path = path; doc.name = t.name; doc.theme = t.theme; doc.layout = t.layout;
   suppressDirtyUntil = Date.now() + 2000;
-  try { mind.setData(t.data); } catch (e) {}
-  try { mind.setLayout(doc.layout); } catch (e) {}
-  try { mind.setTheme(doc.theme); } catch (e) {}
-  try { mind.render(); } catch (e) {}
-  setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+  // 异步渲染（与切换导图同一套逻辑）：启动早期同步 setData/render 可能因库未稳定而失败，
+  // 导致双击打开后画布空白；延迟一拍让库稳定、loading 先显示再渲染，
+  // 渲染后再做一次"画布为空则强制重渲染"的确认，保证打开即有内容
+  showRenderLoading();
+  setTimeout(() => {
+    try { mind.setData(t.data); } catch (e) { showErr('打开失败 setData: ' + e.message); }
+    try { mind.setLayout(doc.layout); } catch (e) {}
+    try { mind.setTheme(doc.theme); } catch (e) {}
+    try { mind.render(); } catch (e) { showErr('打开失败 render: ' + e.message); }
+    hideRenderLoading();
+    setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+    setTimeout(() => {
+      try {
+        const tree = mind.renderer.renderTree;
+        const hasNode = !!(tree && (tree._node || tree.node || tree.shapeNode));
+        if (!hasNode) {
+          try { mind.render(); } catch (e) {}
+          setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+        }
+      } catch (e) {}
+    }, 350);
+  }, 40);
   dirty = false;
   updateTitle(); updateStatus(); renderTabStrip(); syncLayoutSelect();
 }
@@ -301,11 +318,23 @@ function restoreAllTabs(tabArr) {
   const t = tabs[0];
   doc.path = ''; doc.name = t.name; doc.theme = t.theme; doc.layout = t.layout;
   suppressDirtyUntil = Date.now() + 2000;
-  try { mind.setData(t.data); } catch (e) { console.error('setData 失败', e); }
-  try { mind.setLayout(t.layout); } catch (e) {}
-  try { mind.setTheme(t.theme); } catch (e) {}
-  try { mind.render(); } catch (e) { console.error('render 失败', e); }
-  setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+  // 异步渲染（与 openInTab/切换一致）：启动早期同步渲染可能失败导致画布空白
+  showRenderLoading();
+  setTimeout(() => {
+    try { mind.setData(t.data); } catch (e) { console.error('setData 失败', e); }
+    try { mind.setLayout(t.layout); } catch (e) {}
+    try { mind.setTheme(t.theme); } catch (e) {}
+    try { mind.render(); } catch (e) { console.error('render 失败', e); }
+    hideRenderLoading();
+    setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
+    setTimeout(() => {
+      try {
+        const tree = mind.renderer.renderTree;
+        const hasNode = !!(tree && (tree._node || tree.node || tree.shapeNode));
+        if (!hasNode) { try { mind.render(); } catch (e) {} }
+      } catch (e) {}
+    }, 350);
+  }, 40);
   dirty = false; booting = false;
   updateTitle(); updateStatus(); renderTabStrip(); syncLayoutSelect();
 }
