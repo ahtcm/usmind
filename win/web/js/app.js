@@ -1931,8 +1931,8 @@ function renderFileNode(child, file) {
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
 async function openTextPreview(node, att) {
   try {
-    // 兜底：打开 CodeMirror 前强制隐藏库文本编辑框
-    try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
+    // 兜底：打开 CodeMirror 前强制隐藏库文本编辑框（库的 show 晚于双击监听，需状态+DOM 双重复位）
+    forceHideTextEdit();
     if (typeof CodeMirror === 'undefined') { toast('预览组件缺失', 'error'); return; }
     const name = att.name || '附件';
     const ext = (name.split('.').pop() || '').toLowerCase();
@@ -1946,10 +1946,13 @@ async function openTextPreview(node, att) {
     wrap.innerHTML = '<div class="attp-mask"></div><div class="attp-box"><div class="attp-head"><span class="attp-title"></span><button class="attp-close">×</button></div><div class="attp-body"></div></div>';
     document.body.appendChild(wrap);
     wrap.querySelector('.attp-title').textContent = name;
-    const close = () => { if (wrap && wrap.parentNode) wrap.remove(); };
+    const close = () => { if (wrap && wrap.parentNode) wrap.remove(); forceHideTextEdit(); };
     wrap.querySelector('.attp-close').addEventListener('click', close);
     wrap.querySelector('.attp-mask').addEventListener('click', close);
     const body = wrap.querySelector('.attp-body');
+    // 库可能在双击监听之后才异步启动文本编辑：延迟补发强制隐藏
+    setTimeout(forceHideTextEdit, 180);
+    setTimeout(forceHideTextEdit, 600);
     const cmWrap = document.createElement('div');
     cmWrap.style.cssText = 'border:1px solid #333;border-radius:10px;overflow:hidden;background:#1e1e1e';
     body.appendChild(cmWrap);
@@ -1997,6 +2000,7 @@ async function openTextPreview(node, att) {
         close();
         toast('已保存');
         markDirty();
+        forceHideTextEdit();
       } catch (e) { toast('保存失败: ' + e.message, 'error'); }
       saveBtn.disabled = false; saveBtn.textContent = '保存';
     });
@@ -2229,10 +2233,23 @@ async function openMarkdownPreview(node, att) {
 }
 
 // 打开附件：图片→查看器，音视频→播放器，文本/代码→内置预览编辑，其他→系统默认程序（浏览器环境降级下载）
+// 强制隐藏库的文本编辑框（三层：库方法写回+状态复位+DOM直藏）。
+// 原因：双击附件时库 emit node_dblclick 后才启动文本编辑（show 晚于我们的 hide），
+// 只调一次 hideEditTextBox 会被库随后 show 覆盖 → 编辑框残留画布原点（附件文字"偏移"）。
+function forceHideTextEdit() {
+  try {
+    const te = mind && mind.renderer && mind.renderer.textEdit;
+    if (!te) return;
+    try { te.hideEditTextBox(); } catch (e) {}
+    try { te.showTextEdit = false; } catch (e) {}
+    try { te.currentNode = null; } catch (e) {}
+    try { if (te.textEditNode) te.textEditNode.style.display = 'none'; } catch (e) {}
+  } catch (e) {}
+}
 function openNodeAttachment(node) {
   try {
     // 兜底：打开附件前强制隐藏库文本编辑框（防双击附件时编辑框残留画布原点）
-    try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
+    forceHideTextEdit();
     const att = nodeAttachData(node);
     if (!att) return;
     const ext = (att.name.split('.').pop() || '').toLowerCase();
@@ -2730,7 +2747,8 @@ function bindUi() {
           // 我们接管双击（预览/打开附件）前，强制隐藏库的文本编辑框：
           // 库默认双击会启动 textEditNode（编辑框），若与其后的 CodeMirror/预览弹窗并存，
           // 保存后编辑框不隐藏会残留在画布原点（视口左下角出现"无框文件名"文字）
-          try { if (mind.renderer && mind.renderer.textEdit) mind.renderer.textEdit.hideEditTextBox(); } catch (eH) {}
+          forceHideTextEdit();
+          setTimeout(forceHideTextEdit, 120); // 库可能晚于监听启动编辑，延迟补发
           const d = node.nodeData || node;
           const img = d.image || (d.data && d.data.image);
           if (img) {
