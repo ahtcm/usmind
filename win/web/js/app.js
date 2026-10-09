@@ -1606,36 +1606,10 @@ function setNodeAttachment(node, url, name) {
     const nd = nodeDataOf(node);
     const dd = (nd && nd.data) || nd;
     if (dd) { dd.attachmentUrl = url; dd.attachmentName = name; }
-    // 节点显示 📎 图标：经 execCommand 走库的变更流程（直接改字段不会触发内容重建）
-    try {
-      let real = null;
-      if (nd && nd._node) real = nd._node;                 // 渲染树挂载的节点实例
-      if (!real && mind && mind.renderer && mind.renderer.renderTree) {
-        const uid = nd && nd.data && nd.data.uid;
-        const findInTree = (t) => {
-          if (!t) return null;
-          if (t.data && t.data.uid === uid) return t;
-          if (t.children) for (const c of t.children) { const r = findInTree(c); if (r) return r; }
-          return null;
-        };
-        real = findInTree(mind.renderer.renderTree) || null;
-      }
-      if (real && real.getData) {
-        const icons = real.getData('icon') || [];
-        if (icons.indexOf('emoji_📎') < 0) icons.push('emoji_📎');
-        // 直写 icon 数据（不走 execCommand：其部分重渲染+节点缓存复用会让附件节点文字停在
-        // 布局前的旧坐标，造成"文字左偏/框文分离"）；下面统一全量重建渲染。
-        try {
-          const ndd = nodeDataOf(real);
-          const ddd = (ndd && ndd.data) || ndd;
-          if (ddd) { ddd.icon = icons; ddd.attachmentUrl = url; ddd.attachmentName = name; }
-        } catch (e2) {}
-      } else {
-        if (dd) dd.icon = ['emoji_📎'];
-      }
-    } catch (e) { try { if (dd) dd.icon = ['emoji_📎']; } catch (e3) {} }
   } catch (e) {}
-  // 清渲染缓存强制全量重建：确保附件节点（直写数据+图标）的文字按最新布局坐标绘制，不残留旧位置
+  // 附件图标由 injectAttachIcons() 注入（SVG 回形针 foreignObject，右上角，与原项目一致），
+  // 不再使用库的 emoji 📎 图标机制（其节点缓存复用会导致图标偏移/文字左偏）
+  // 清渲染缓存强制全量重建：确保附件节点文字按最新布局坐标绘制，不残留旧位置
   try { if (mind && mind.renderer) { mind.renderer.nodeCache = {}; mind.renderer.lastNodeCache = {}; } } catch (eC) {}
   try { mind.render(); } catch (e) {}
   markDirty();
@@ -3005,6 +2979,11 @@ function fixAttachNodeTexts() {
           const inst = d.uid ? mind.renderer.findNodeByUid(d.uid) : null;
           if (inst) mind.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false });
         }
+        // 清理旧版本残留的库 emoji 📎 图标（统一由 injectAttachIcons 注入 SVG 别针）
+        if (Array.isArray(d.icon)) {
+          const rest = d.icon.filter(i => i !== 'emoji_📎');
+          if (rest.length !== d.icon.length) d.icon = rest;
+        }
       }
       if (t && t.children) t.children.forEach(walk);
     };
@@ -3035,8 +3014,82 @@ function fixAttachNodeTexts() {
       });
     }
   } catch (e) {}
+  try { injectAttachIcons(); } catch (e) {}
 }
-let _attEditGuardTimer = null;
+
+// 注入附件别针图标（移植自原项目）：SVG foreignObject 回形针，节点右上角，磨砂底，点击打开附件
+function injectAttachIcons() {
+  if (!mind || !mind.renderer) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  let uidMap = null;
+  const nameMap = {};
+  try {
+    const tree = mind.getData();
+    uidMap = {};
+    const walk = (t) => {
+      if (t && t.data) {
+        if (t.data.uid) uidMap[t.data.uid] = t.data;
+        if (t.data.attachmentUrl && t.data.attachmentName) nameMap[t.data.attachmentName] = t.data;
+      }
+      if (t && t.children) t.children.forEach(walk);
+    };
+    walk(tree);
+  } catch (e) {}
+  const openAtt = (d) => {
+    try { openNodeAttachment({ getData: (k) => (d ? d[k] : undefined) }); } catch (e) {
+      try { openTextPreview({ getData: (k) => (d ? d[k] : undefined) }, d); } catch (e2) {}
+    }
+  };
+  const injectIntoGroup = (gEl, d) => {
+    if (!gEl || gEl.querySelector('.smm-att-icon')) return;
+    let shape = gEl.querySelector('.smm-text-node-wrap, [class*=text]');
+    let bb = null;
+    if (shape) { try { bb = shape.getBBox(); } catch (e) {} }
+    if (!bb && gEl.getBBox) { try { bb = gEl.getBBox(); } catch (e) {} }
+    const fo = document.createElementNS(NS, 'foreignObject');
+    fo.setAttribute('class', 'smm-att-icon');
+    const x = bb ? Math.max(0, bb.x + bb.width - 26) : 0;
+    const y = bb ? Math.max(0, bb.y + 2) : 0;
+    fo.setAttribute('x', x);
+    fo.setAttribute('y', y);
+    fo.setAttribute('width', '24');
+    fo.setAttribute('height', '24');
+    const div = document.createElement('div');
+    div.style.cssText = 'width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:7px;color:#fff;line-height:1;transition:transform .15s ease,background .15s ease';
+    div.title = d.attachmentName || '附件';
+    div.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
+    div.addEventListener('mouseenter', () => { div.style.transform = 'scale(1.15)'; div.style.background = 'rgba(14,124,134,.85)'; });
+    div.addEventListener('mouseleave', () => { div.style.transform = 'scale(1)'; div.style.background = 'rgba(20,22,26,.55)'; });
+    div.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openAtt(d);
+    });
+    fo.appendChild(div);
+    gEl.appendChild(fo);
+  };
+  try {
+    const cache = mind.renderer.nodeCache || {};
+    Object.keys(cache).forEach(uid => {
+      const n = cache[uid];
+      const gEl = (n && n.group && n.group.node) ? n.group.node : (n && n.group ? n.group : null);
+      if (!gEl || gEl.querySelector('.smm-att-icon')) return;
+      const d = (uidMap && uidMap[uid]) || (n && n.data) || {};
+      if (!d.attachmentUrl) return;
+      injectIntoGroup(gEl, d);
+    });
+  } catch (e) {}
+  try {
+    const svg = document.querySelector('.smm-container svg');
+    if (!svg) return;
+    svg.querySelectorAll('title').forEach(t => {
+      const name = (t.textContent || '').trim();
+      if (!name || !nameMap[name]) return;
+      const gEl = t.closest('g.smm-node') || t.closest('g');
+      if (!gEl || gEl.querySelector('.smm-att-icon')) return;
+      injectIntoGroup(gEl, nameMap[name]);
+    });
+  } catch (e) {}
+}
 function startAttEditGuard() {
   if (_attEditGuardTimer) return;
   _attEditGuardTimer = setInterval(() => {
@@ -3066,6 +3119,13 @@ function startAttEditGuard() {
   }, 200);
 }
 try { startAttEditGuard(); } catch (e) {}
+// 轮询对齐附件节点文字（不依赖 render_end 时序，同原项目；800ms 避免频繁 DOM 开销）
+let _attFixTimer = null;
+function startAttFixLoop() {
+  if (_attFixTimer) return;
+  _attFixTimer = setInterval(() => { try { fixAttachNodeTexts(); } catch (e) {} }, 800);
+}
+try { startAttFixLoop(); } catch (e) {}
 
 // ---- 自动化自测钩子（?autotest=1，headless/测试页用）----
 if (typeof window !== 'undefined' && location.search.indexOf('autotest=1') >= 0) {
