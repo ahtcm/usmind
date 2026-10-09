@@ -1349,7 +1349,7 @@ async function doExport(type) {
   try {
     // 公式/富文本字体（KaTeX）可能仍在异步加载：先等字体就绪再导出，避免导出时公式换行/错位
     try { await document.fonts.ready; } catch (e) {}
-    try { rebuildRawMathNodes(); } catch (e) {}
+    try { rebuildRawMathNodes(); await new Promise(r => setTimeout(r, 300)); } catch (e) {} // 重建后等布局重排完成，导出布局才与屏幕一致
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png' || type === 'jpeg' || type === 'jpg') await exportChunkedImages(type, name);
     else if (type === 'svg') await exportSvgSelf(name);
