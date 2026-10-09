@@ -1912,6 +1912,12 @@ function renderFileNode(child, file) {
       apply({ text: name, richText: false },
         { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6, textColor:'#e53935' });
     }
+    // 附件字段写入后：触发一次完整渲染（render_end 会跑 fixAttachNodeTexts+injectAttachIcons），
+    // 并显式再注入一次别针——保证"粘贴附件即显示别针"，不依赖下次编辑保存。
+    setTimeout(() => {
+      try { mind.render(); } catch (e) {}
+      try { injectAttachIcons(); } catch (e) {}
+    }, 120);
   } catch (e) {}
 }
 
