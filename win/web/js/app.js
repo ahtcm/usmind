@@ -1298,11 +1298,35 @@ async function pickProjectDir() {
 }
 
 // ================= 导出 =================
+// 导出前重建"未渲染"的公式节点：旧数据/KaTeX 渲染失败时 text 里存的是 LaTeX 源码（无 katex 标志），
+// 用 mathLatex 重新渲染成 KaTeX HTML（剥 $ 包裹），保证导出 PNG/SVG/JPEG 时公式正常显示
+function rebuildRawMathNodes() {
+  try {
+    const tree = mind.getData();
+    const walk = (t) => {
+      if (t && t.data && t.data.mathLatex && typeof t.data.text === 'string' && t.data.text.indexOf('katex') < 0) {
+        const inst = t.data.uid ? mind.renderer.findNodeByUid(t.data.uid) : null;
+        if (inst) {
+          const html = renderLatex(t.data.mathLatex);
+          // 从旧 text 提取标题：优先取 $ 包裹前的部分，再剥掉含 LaTeX 源码特征（^ _ { } \）的片段
+          let title = String(t.data.text || '');
+          if (title.indexOf('$') >= 0) title = title.split('$')[0];
+          title = title.replace(/\s*[^\s]*[\^_{}\\]{1}[^\s]*\s*/g, ' ').trim();
+          if (!title) title = '公式';
+          mind.renderer.setNodeDataRender(inst, { text: escHtml(title) + ' ' + html, richText: true, mathLatex: t.data.mathLatex });
+        }
+      }
+      (t.children || []).forEach(walk);
+    };
+    walk(tree);
+  } catch (e) {}
+}
 async function doExport(type) {
   if (!mind) return;
   try {
     // 公式/富文本字体（KaTeX）可能仍在异步加载：先等字体就绪再导出，避免导出时公式换行/错位
     try { await document.fonts.ready; } catch (e) {}
+    try { rebuildRawMathNodes(); } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png') await mind.doExport.export('png', true, name);
     else if (type === 'jpeg') await exportJpegSelf(name);
@@ -1342,7 +1366,13 @@ async function exportJpegSelf(name) {
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.drawImage(svgEl, 0, 0, cv.width, cv.height);
+    // SVG 元素位图可能尚未光栅化完成，drawImage 会抛错：重试等待
+    let drew = false;
+    for (let i = 0; i < 12 && !drew; i++) {
+      try { ctx.drawImage(svgEl, 0, 0, cv.width, cv.height); drew = true; }
+      catch (e) { await new Promise(r => setTimeout(r, 200)); }
+    }
+    if (!drew) throw new Error('SVG 绘制失败');
     const data = cv.toDataURL('image/jpeg', 0.92);
     if (holder.parentNode) holder.remove();
     const b64 = data.split(',')[1];
@@ -2421,9 +2451,14 @@ function finishIcon() {
 function renderLatex(latex) {
   if (!window.katex) return '<span style="color:#e74c3c">[公式引擎未加载]</span>';
   try {
-    const inner = window.katex.renderToString(latex, { throwOnError: false, displayMode: true });
-    // 包一层防拆行容器：导出（PNG/SVG）时避免公式内容因字体测量差异被截成两行
-    return '<span style="display:inline-block;white-space:nowrap;vertical-align:middle">' + inner + '</span>';
+    // KaTeX 不接受 $...$ 包裹（那是 Markdown 习惯）：剥掉首尾 $ 再渲染，否则原样显示源码
+    let tex = String(latex || '').trim();
+    tex = tex.replace(/^\$\$?/, '').replace(/\$\$?$/, '');
+    // 用内联模式（displayMode:false）：公式与标题同行显示，
+    // 避免 display 模式的块级元素在导出（PNG/SVG foreignObject）时被拆成两行
+    return '<span class="katex-inline">' +
+      window.katex.renderToString(tex, { throwOnError: false, displayMode: false }) +
+      '</span>';
   } catch (e) {
     return '<span style="color:#e74c3c">[公式错误]</span>';
   }
@@ -3019,6 +3054,10 @@ if (!hasNative && typeof window !== 'undefined') {
 //    普通节点文字编辑完全不受影响。
 function fixAttachNodeTexts() {
   if (!mind || !mind.renderer) return;
+  try {
+    // 自动重建"未渲染"的公式节点（旧数据/KaTeX 失败时 text 存的是 LaTeX 源码）：用 mathLatex 重渲染为内联公式
+    rebuildRawMathNodes();
+  } catch (e) {}
   try {
     const tree = mind.getData();
     const walk = (t) => {

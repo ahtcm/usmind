@@ -553,6 +553,8 @@ body {
 }
 .math-preview .katex-display { margin: 4px 0; }
 .math-preview .katex { font-size: 1.05em; }
+/* 节点内联公式：略微放大避免显小，垂直居中与标题同行 */
+.katex-inline .katex { font-size: 1.18em; vertical-align: middle; }
 
 /* 附件管理弹窗 */
 .attach-info {
