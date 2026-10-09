@@ -1597,7 +1597,7 @@ function nodeAttachData(node) {
   try {
     const nd = nodeDataOf(node);
     const dd = (nd && nd.data) || nd || {};
-    if (dd.attachUrl || dd.attachmentUrl) return { url: dd.attachUrl || dd.attachmentUrl, name: dd.attachName || dd.attachmentName || '附件' };
+    if (dd.attachUrl || dd.attachmentUrl) return { url: dd.attachmentUrl || dd.attachUrl, name: dd.attachmentName || dd.attachName || '附件' };
     return null;
   } catch (e) { return null; }
 }
@@ -1933,9 +1933,12 @@ function renderFileNode(child, file) {
         { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
     } else {
       // 普通文件：文件名（红字虚线框，双击打开/预览）
+      // 用 richText HTML 渲染（与图片/音视频一致）：文字在框内 div 中，框文一体，
+      // 不会出现库 SVG 文字渲染重建时文字残影停在旧坐标的"左移/框文分离"问题
       setNodeMediaAttachment(child, src, name);
-      apply({ text: name, richText: false },
-        { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6, textColor:'#e53935' });
+      const safeName = String(name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      apply({ richText: true, text: '<div style="font-size:13px;color:#e53935;line-height:1.4;white-space:nowrap;padding:0 2px;">📎&nbsp;' + safeName + '</div>' },
+        { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6 });
     }
   } catch (e) {}
 }
@@ -2009,6 +2012,8 @@ async function openTextPreview(node, att) {
       try {
         const newB64 = utf8Encode(cm.getValue());
         setNodeAttachment(node, 'data:text/plain;charset=utf-8;base64,' + newB64, name);
+        // 清除旧的外置文件引用（attachUrl/attachName），确保下次读取走刚保存的内嵌新内容
+        try { const nd = nodeDataOf(node); const dd = (nd && nd.data) || nd; if (dd) { delete dd.attachUrl; delete dd.attachName; } } catch (e2) {}
         close();
         toast('已保存');
         markDirty();
