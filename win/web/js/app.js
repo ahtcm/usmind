@@ -686,6 +686,18 @@ function initMindMap() {
     isLimitMindMapInCanvasWhenHasScrollbar: false,
     enableShortcutOnlyWhenMouseInSvg: false,
     openRealtimeRenderOnNodeTextEdit: true,
+    // 附件节点（文本附件/图片/音视频等）不进入库的文本编辑流程：
+    // 双击附件时我们走自己的预览/编辑弹窗；若让库启动文本编辑，编辑框（textEditNode）
+    // 会残留在画布原点（附件文字"左移"），且关闭时库 SET_NODE_TEXT 写回会破坏
+    // richText 节点的 HTML（图片消失）。返回 false 从根源阻止。
+    beforeTextEdit: (node) => {
+      try {
+        if (!node) return true;
+        const hasAtt = !!(node.getData('attachmentUrl') || node.getData('attachUrl') || node.getData('attachmentName'));
+        if (hasAtt) return false;
+      } catch (e) {}
+      return true;
+    },
     attachmentIcon: { style: { size: 0 }, icon: '' },
     rainbowLinesConfig: { open: true, colorsList: branchColorsOf(doc.theme) },
     iconList: [
@@ -2952,6 +2964,6 @@ function startAttEditGuard() {
       const isAtt = !!(cn && cn.getData && (cn.getData('attachmentUrl') || cn.getData('attachUrl') || cn.getData('attachmentName')));
       if (isAtt) forceHideTextEdit();
     } catch (e) {}
-  }, 400);
+  }, 200);
 }
 try { startAttEditGuard(); } catch (e) {}
