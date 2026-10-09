@@ -1300,9 +1300,25 @@ async function pickProjectDir() {
 // ================= 导出 =================
 // 导出前重建"未渲染"的公式节点：旧数据/KaTeX 渲染失败时 text 里存的是 LaTeX 源码（无 katex 标志），
 // 用 mathLatex 重新渲染成 KaTeX HTML（剥 $ 包裹），保证导出 PNG/SVG/JPEG 时公式正常显示
+// 用渲染树遍历找节点实例（findNodeByUid 在 setData 后可能匹配不到，这里最稳）
+function findRenderInstByUid(uid) {
+  try {
+    const rt = mind.renderer && mind.renderer.renderTree;
+    if (!rt) return null;
+    let found = null;
+    const walk = (t) => {
+      if (found || !t) return;
+      if (t.data && t.data.uid === uid) { found = t._node || t; return; }
+      (t.children || []).forEach(walk);
+    };
+    walk(rt);
+    return found;
+  } catch (e) { return null; }
+}
 function rebuildRawMathNodes() {
   try {
     const tree = mind.getData();
+    const rootNode = (tree && tree.root) || tree; // getData 返回 { root: {...} }，要从 root 开始遍历
     const walk = (t) => {
       if (t && t.data && typeof t.data.text === 'string' && t.data.text.indexOf('katex') < 0) {
         // mathLatex 优先；缺失时从 text 提取 $...$ 包裹部分作为 LaTeX（旧数据兼容）
@@ -1312,8 +1328,7 @@ function rebuildRawMathNodes() {
           if (m) latex = m[1];
         }
         if (!latex) { (t.children || []).forEach(walk); return; }
-        // findNodeByUid 是 mind 实例方法（不是 renderer 的），用错会导致重建静默失败
-        const inst = t.data.uid ? mind.findNodeByUid(t.data.uid) : null;
+        const inst = (mind.findNodeByUid && mind.findNodeByUid(t.data.uid)) || findRenderInstByUid(t.data.uid);
         if (inst) {
           const html = renderLatex(latex);
           // 从旧 text 提取标题：优先取 $ 包裹前的部分，再剥掉含 LaTeX 源码特征（^ _ { } \）的片段
@@ -1326,7 +1341,7 @@ function rebuildRawMathNodes() {
       }
       (t.children || []).forEach(walk);
     };
-    walk(tree);
+    walk(rootNode);
   } catch (e) {}
 }
 async function doExport(type) {
@@ -1337,7 +1352,7 @@ async function doExport(type) {
     try { rebuildRawMathNodes(); } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png' || type === 'jpeg' || type === 'jpg') await exportChunkedImages(type, name);
-    else if (type === 'svg') await mind.doExport.export('svg', true, name);
+    else if (type === 'svg') await exportSvgSelf(name);
     else if (type === 'md') await mind.doExport.export('md', true, name);
     else if (type === 'json') await exportJSONAllTabs(name);
     else if (type === 'xmind') await mind.doExport.export('xmind', true, name);
@@ -1494,6 +1509,66 @@ async function exportChunkedImages(type, name) {
 async function saveBinaryViaNative(b64, filename) {
   const r = await callNative('saveBinary', b64, '', filename);
   if (!r || !r.ok) throw new Error('保存被取消');
+}
+
+function bufToB64(buf) {
+  let s = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    s += String.fromCharCode.apply(null, buf.subarray(i, Math.min(i + chunk, buf.length)));
+  }
+  return btoa(s);
+}
+// 获取 KaTeX CSS 并把字体相对路径转成 base64 内联（导出 SVG 本地打开时公式也正常显示）
+async function getKatexCssForSvg() {
+  try {
+    const cssUrl = new URL('vendor/katex/katex.min.css', location.href);
+    const r = await fetch(cssUrl);
+    if (!r.ok) return '';
+    let css = await r.text();
+    const re = /url\(([^)]+)\)/g;
+    const urls = [];
+    let m;
+    while ((m = re.exec(css))) urls.push(m[1]);
+    for (const u of urls) {
+      if (u.startsWith('data:')) continue;
+      try {
+        const fr = await fetch(new URL(u, cssUrl));
+        const buf = new Uint8Array(await fr.arrayBuffer());
+        if (!buf.length) continue;
+        const mime = u.indexOf('.ttf') >= 0 ? 'font/ttf' : (u.indexOf('.otf') >= 0 ? 'font/otf' : 'font/woff2');
+        css = css.split('url(' + u + ')').join('url(data:' + mime + ';base64,' + bufToB64(buf) + ')');
+      } catch (e) {}
+    }
+    return css;
+  } catch (e) { return ''; }
+}
+// SVG 导出（自实现）：库导出不带 KaTeX CSS，打开时公式无样式/错位/换行；这里注入内联字体的 CSS
+async function exportSvgSelf(name) {
+  const { str: svgStr } = await mind.doExport.getSvgData();
+  let out = svgStr;
+  const kc = await getKatexCssForSvg();
+  if (kc) out = out.replace('</svg>', '<style>' + kc + '</style></svg>');
+  // 富文本里的图片转 base64 内联（本地/他人打开 SVG 图片不裂）
+  try {
+    const imgDoc = new DOMParser().parseFromString(out, 'image/svg+xml');
+    if (!imgDoc.querySelector('parsererror')) {
+      const imgs = imgDoc.querySelectorAll('img');
+      for (const img of imgs) {
+        const src = img.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+          try {
+            const ir = await fetch(new URL(src, location.href));
+            const buf = new Uint8Array(await ir.arrayBuffer());
+            if (buf.length) img.setAttribute('src', 'data:image/png;base64,' + bufToB64(buf));
+          } catch (e) {}
+        }
+      }
+      if (imgs.length) out = new XMLSerializer().serializeToString(imgDoc);
+    }
+  } catch (e) {}
+  const b64 = bufToB64(new TextEncoder().encode(out));
+  saveBinaryViaNative(b64, name + '.svg');
 }
 
 // 导出多标签 JSON（含所有标签页，恢复时一键还原）
@@ -3401,4 +3476,31 @@ if (typeof window !== 'undefined' && location.search.indexOf('autotest=1') >= 0)
       document.title = 'AUTOTEST_ERR:' + e.message;
     }
   }, 2000);
+}
+// ---- 自动化导出测试（?autotest=export，仅测试用）----
+if (typeof window !== 'undefined' && location.search.indexOf('autotest=export') >= 0) {
+  setTimeout(async () => {
+    try {
+      const mock = {
+        data: { text: '中心主题', richText: false, uid: 'r1' },
+        children: [
+          { data: { text: '分支主题', richText: false, uid: 'n1' }, children: [] },
+          { data: { text: '公式 $f(x)=\\begin{cases}x^2, & x\\geq 0 \\\\ -x, & x<0\\end{cases}$', richText: false, mathLatex: 'f(x)=\\begin{cases}x^2, & x\\geq 0 \\\\ -x, & x<0\\end{cases}', uid: 'n2' }, children: [] },
+          { data: { text: '公式 $\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1$', richText: false, mathLatex: '\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1', uid: 'n3' }, children: [] },
+        ]
+      };
+      mind.setData(mock);
+      await new Promise(r => setTimeout(r, 1200));
+      rebuildRawMathNodes();
+      await new Promise(r => setTimeout(r, 800));
+      try { await document.fonts.ready; } catch (e) {}
+      const { str: strRaw } = await mind.doExport.getSvgData();
+      const { W, H, X, Y } = parseSvgSize(strRaw);
+      if (!W || !H) { document.title = 'EXPORT_TEST_ERR:SIZE'; return; }
+      const canvas = await renderChunkByHtml(strRaw, W, H, 0, X, Y, '#ffffff');
+      window.__exportTestData = canvas.toDataURL('image/png');
+      window.__exportTestMeta = JSON.stringify({ W, H, X, Y });
+      document.title = 'EXPORT_TEST_OK';
+    } catch (e) { document.title = 'EXPORT_TEST_ERR:' + String(e && e.message || e).slice(0, 200); }
+  }, 2500);
 }
