@@ -746,7 +746,7 @@ function initMindMap() {
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
   mind.on('scale', () => updateZoom());
   window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
-  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); });
+  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} });
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
@@ -1933,12 +1933,10 @@ function renderFileNode(child, file) {
         { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
     } else {
       // 普通文件：文件名（红字虚线框，双击打开/预览）
-      // 用 richText HTML 渲染（与图片/音视频一致）：文字在框内 div 中，框文一体，
-      // 不会出现库 SVG 文字渲染重建时文字残影停在旧坐标的"左移/框文分离"问题
+      // 纯文本渲染（同原项目），渲染结束后由 fixAttachNodeTexts() 做 DOM 兜底对齐（文字回框内）
       setNodeMediaAttachment(child, src, name);
-      const safeName = String(name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-      apply({ richText: true, text: '<div style="font-size:13px;color:#e53935;line-height:1.4;white-space:nowrap;padding:0 2px;">📎&nbsp;' + safeName + '</div>' },
-        { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6 });
+      apply({ text: name, richText: false },
+        { shape:'roundedRectangle', borderRadius:12, borderWidth:1, borderColor:'#C9CDD6', borderDasharray:'2 4', fillColor:'#F4F5F7', paddingX:6, paddingY:6, textColor:'#e53935' });
     }
   } catch (e) {}
 }
@@ -2989,9 +2987,55 @@ if (!hasNative && typeof window !== 'undefined') {
 }
 
 // ---- 附件偏移终极兜底 ----
-// 库可能在任意时机把文本编辑框（textEditNode）show 出来（双击附件时它与 CodeMirror 并存，
-// 保存后若未隐藏会残留在画布原点=视口左下角，表现为"附件文字偏移/无框文件名"）。
-// 定时器只针对"编辑对象是附件节点"的场景强制隐藏，普通节点文字编辑完全不受影响。
+// 1) fixAttachNodeTexts（移植自原项目）：附件节点文字统一为文件名（纯文本），
+//    并在每次渲染后做 DOM 对齐——文字元素若因样式重建与节点框分离（飘出框外/停旧坐标），
+//    按"文字中心→框中心"差值用 transform 平移回来。
+// 2) 库可能在任意时机把文本编辑框（textEditNode）show 出来（双击附件时它与 CodeMirror 并存，
+//    保存后若未隐藏会残留在画布原点=视口左下角，表现为"附件文字偏移/无框文件名"）。
+//    定时器只针对"编辑对象是附件节点"（含 currentNode 为 null 但内容匹配附件文件名）强制隐藏，
+//    普通节点文字编辑完全不受影响。
+function fixAttachNodeTexts() {
+  if (!mind || !mind.renderer) return;
+  try {
+    const tree = mind.getData();
+    const walk = (t) => {
+      if (t && t.data) {
+        const d = t.data;
+        if (d.attachmentName && (d.text !== d.attachmentName || d.richText)) {
+          const inst = d.uid ? mind.renderer.findNodeByUid(d.uid) : null;
+          if (inst) mind.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false });
+        }
+      }
+      if (t && t.children) t.children.forEach(walk);
+    };
+    walk(tree);
+  } catch (e) {}
+  try {
+    const c = document.querySelector('.smm-container');
+    if (c) {
+      c.querySelectorAll('text.smm-text-node-wrap').forEach(tx => {
+        const tr = tx.getBoundingClientRect();
+        if (!tr || !tr.width) return;
+        let g = tx.parentElement, shape = null, ng = g;
+        for (let i = 0; i < 8 && ng; i++) {
+          const s2 = ng.querySelector(':scope > rect, :scope > [class*=shape]');
+          if (s2 && s2 !== tx) { shape = s2; break; }
+          ng = ng.parentElement;
+        }
+        if (!shape) return;
+        const sr = shape.getBoundingClientRect();
+        if (!sr || !sr.width) return;
+        const tc = tr.x + tr.width / 2, sc = sr.x + sr.width / 2;
+        if (Math.abs(tc - sc) > 2) {
+          const ctm = tx.getScreenCTM && tx.getScreenCTM();
+          const k = ctm && ctm.a ? ctm.a : 1;
+          const dx = (sc - tc) / k;
+          tx.setAttribute('transform', 'translate(' + dx.toFixed(2) + ' 0)');
+        }
+      });
+    }
+  } catch (e) {}
+}
 let _attEditGuardTimer = null;
 function startAttEditGuard() {
   if (_attEditGuardTimer) return;
@@ -3002,7 +3046,22 @@ function startAttEditGuard() {
       if (te.textEditNode.style.display === 'none') return;
       const cn = te.currentNode;
       const isAtt = !!(cn && cn.getData && (cn.getData('attachmentUrl') || cn.getData('attachUrl') || cn.getData('attachmentName')));
-      if (isAtt) forceHideTextEdit();
+      if (isAtt) { forceHideTextEdit(); return; }
+      // currentNode 为 null 时的兜底：编辑框残留内容若匹配任一附件节点文件名 → 强制隐藏
+      if (!cn) {
+        try {
+          const content = String((te.textEditNode.textContent || '').trim());
+          if (!content) return;
+          let hit = false;
+          const walk = (t) => {
+            if (hit || !t) return;
+            if (t.data && t.data.attachmentName === content) hit = true;
+            (t.children || []).forEach(walk);
+          };
+          walk(mind.getData());
+          if (hit) forceHideTextEdit();
+        } catch (e2) {}
+      }
     } catch (e) {}
   }, 200);
 }
