@@ -1304,16 +1304,24 @@ function rebuildRawMathNodes() {
   try {
     const tree = mind.getData();
     const walk = (t) => {
-      if (t && t.data && t.data.mathLatex && typeof t.data.text === 'string' && t.data.text.indexOf('katex') < 0) {
-        const inst = t.data.uid ? mind.renderer.findNodeByUid(t.data.uid) : null;
+      if (t && t.data && typeof t.data.text === 'string' && t.data.text.indexOf('katex') < 0) {
+        // mathLatex 优先；缺失时从 text 提取 $...$ 包裹部分作为 LaTeX（旧数据兼容）
+        let latex = t.data.mathLatex;
+        if (!latex) {
+          const m = String(t.data.text).match(/\$([^$]+)\$/);
+          if (m) latex = m[1];
+        }
+        if (!latex) { (t.children || []).forEach(walk); return; }
+        // findNodeByUid 是 mind 实例方法（不是 renderer 的），用错会导致重建静默失败
+        const inst = t.data.uid ? mind.findNodeByUid(t.data.uid) : null;
         if (inst) {
-          const html = renderLatex(t.data.mathLatex);
+          const html = renderLatex(latex);
           // 从旧 text 提取标题：优先取 $ 包裹前的部分，再剥掉含 LaTeX 源码特征（^ _ { } \）的片段
           let title = String(t.data.text || '');
           if (title.indexOf('$') >= 0) title = title.split('$')[0];
           title = title.replace(/\s*[^\s]*[\^_{}\\]{1}[^\s]*\s*/g, ' ').trim();
           if (!title) title = '公式';
-          mind.renderer.setNodeDataRender(inst, { text: escHtml(title) + ' ' + html, richText: true, mathLatex: t.data.mathLatex });
+          mind.renderer.setNodeDataRender(inst, { text: escHtml(title) + ' ' + html, richText: true, mathLatex: latex });
         }
       }
       (t.children || []).forEach(walk);
