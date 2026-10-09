@@ -3319,9 +3319,13 @@ function fixAttachNodeTexts() {
           if (inst) mind.renderer.setNodeDataRender(inst, { text: d.attachmentName, richText: false });
         }
         // 图片节点（text 含 <img>）：强制背景透明+零内边距+无边框，图片即节点，不留背景露边
+        // 必须"渲染树实例+数据树"双写（只写 getData 树不生效，render 读渲染树实例数据）
         if (typeof d.text === 'string' && d.text.indexOf('<img') !== -1) {
           if (d.fillColor !== 'transparent' || d.paddingX || d.paddingY || d.borderWidth) {
-            d.fillColor = 'transparent'; d.paddingX = 0; d.paddingY = 0; d.borderWidth = 0; d.borderColor = 'transparent';
+            const patch = { fillColor: 'transparent', paddingX: 0, paddingY: 0, borderWidth: 0, borderColor: 'transparent' };
+            const inst = d.uid ? mind.renderer.findNodeByUid(d.uid) : null;
+            if (inst) setNodeDataPersist(inst, patch, true);
+            else { for (const k in patch) d[k] = patch[k]; }
             needRender = true;
           }
         }
