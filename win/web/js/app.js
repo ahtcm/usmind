@@ -2659,14 +2659,14 @@ function bindUi() {
     attachNode = null;
   });
 
-  // Ctrl+V 粘贴接管：非编辑态一律拦截库自带的 ctrl+v（keydown 里 clipboardData 为 null，
-  // 无法在 keydown 判断剪贴板内容；不拦则库会插一张小图+我们 paste 事件再插大图 → 一大一小双图）
-  // 库节点粘贴（Ctrl+C 复制节点后 Ctrl+V）前，强制当前节点为选中节点，避免库兜底粘贴到根
+  // Ctrl+V 粘贴接管：非编辑态只 stopPropagation 拦住库的 keyCommand 快捷键（window keydown），
+  // 不 preventDefault（否则浏览器粘贴流程被取消、paste 事件不再触发 → 粘贴完全失效）。
+  // 图片/文件/纯文本统一由下方 paste 事件处理；库的 SET_NODE_IMAGE 小图不再触发 → 解决一大一小双图。
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
       const tag = document.activeElement && document.activeElement.tagName;
       const editing = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
-      if (!editing) { e.preventDefault(); e.stopPropagation(); }
+      if (!editing) { e.stopPropagation(); }
       const act = (mind.renderer && mind.renderer.activeNodeList && mind.renderer.activeNodeList[0]) || null;
       if (act) { try { mind.renderer.currentNode = act; } catch (e2) {} }
     }
@@ -2696,12 +2696,25 @@ function bindUi() {
         return;
       }
     }
-    // 纯文本粘贴（无图无文件）：新建子节点（保持原库行为；keydown 已拦截库的 ctrl+v）
+    // 纯文本/节点粘贴（无图无文件；keydown 已拦截库的 ctrl+v）
     const text = e.clipboardData.getData('text/plain');
     if (text && text.trim()) {
       e.preventDefault();
       e.stopPropagation();
-      insertTextAsNode(text.trim().slice(0, 200));
+      // 内部节点复制（Ctrl+C 复制节点）粘贴：识别 smm 节点树 JSON → 交给库命令（与原库行为一致）
+      let handled = false;
+      try {
+        const t = text.trim();
+        if (t.startsWith('{') || t.startsWith('[')) {
+          const parsed = JSON.parse(t);
+          const arr = Array.isArray(parsed) ? parsed : (parsed && parsed.data && parsed.children ? [parsed] : null);
+          if (arr) {
+            mind.execCommand('INSERT_MULTI_CHILD_NODE', [], arr);
+            handled = true;
+          }
+        }
+      } catch (eJ) {}
+      if (!handled) insertTextAsNode(text.trim().slice(0, 200));
     }
   }, true);
 
