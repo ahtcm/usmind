@@ -433,7 +433,7 @@ function updateStatus() {
   $('nodeCount').textContent = '节点 ' + (nodes || 1);
 }
 function updateZoom() {
-  try { $('zoomLevel').textContent = Math.round(mind.view.getScale() * 100) + '%'; } catch (e) {}
+  try { $('zoomLevel').textContent = Math.round((mind.view.scale || 1) * 100) + '%'; } catch (e) {}
 }
 function markDirty() {
   if (Date.now() < suppressDirtyUntil || booting) return;
@@ -3194,8 +3194,8 @@ function bindUi() {
   $('tabScrollLeft').addEventListener('click', () => { $('tabStrip').scrollBy({ left: -120, behavior: 'smooth' }); });
   $('tabScrollRight').addEventListener('click', () => { $('tabStrip').scrollBy({ left: 120, behavior: 'smooth' }); });
   initLayoutDrop();
-  $('btnZoomIn').addEventListener('click', () => { try { mind.view.zoomIn(); } catch (e) {} setTimeout(updateZoom, 50); });
-  $('btnZoomOut').addEventListener('click', () => { try { mind.view.zoomOut(); } catch (e) {} setTimeout(updateZoom, 50); });
+  $('btnZoomIn').addEventListener('click', () => { try { mind.view.enlarge(); } catch (e) {} setTimeout(updateZoom, 50); });
+  $('btnZoomOut').addEventListener('click', () => { try { mind.view.narrow(); } catch (e) {} setTimeout(updateZoom, 50); });
   $('btnFit').addEventListener('click', () => { try { mind.view.fit(); } catch (e) {} setTimeout(updateZoom, 50); });
   // 导出下拉
   $('btnExport').addEventListener('click', (e) => {
