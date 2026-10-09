@@ -1328,60 +1328,164 @@ async function doExport(type) {
     try { await document.fonts.ready; } catch (e) {}
     try { rebuildRawMathNodes(); } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
-    if (type === 'png') await mind.doExport.export('png', true, name);
-    else if (type === 'jpeg') await exportJpegSelf(name);
+    if (type === 'png' || type === 'jpeg' || type === 'jpg') await exportChunkedImages(type, name);
     else if (type === 'svg') await mind.doExport.export('svg', true, name);
     else if (type === 'md') await mind.doExport.export('md', true, name);
     else if (type === 'json') await exportJSONAllTabs(name);
     else if (type === 'xmind') await mind.doExport.export('xmind', true, name);
     else if (type === 'zip') await exportSelfContained();
-    toast('导出已启动，请选择保存位置');
+    toast('导出完成，请选择保存位置');
   } catch (e) {
     toast('导出失败：' + e.message, 'error');
   }
 }
 
-// JPEG 导出（库不支持 jpeg）：用 getSvgData 生成完整 SVG DOM，挂到文档渲染 foreignObject
-// （公式/图片等 richText 内容在文档内可渲染），再 drawImage 到 canvas 转 JPEG，saveBinary 弹框保存
-async function exportJpegSelf(name) {
-  try {
-    const sd = mind.getSvgData({ paddingX: 24, paddingY: 24 });
-    const svgEl = sd && sd.svg && sd.svg.node;
-    if (!svgEl) throw new Error('SVG 生成失败');
-    const holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed;left:-9999px;top:0;overflow:hidden;pointer-events:none';
-    holder.appendChild(svgEl);
-    document.body.appendChild(holder);
-    await new Promise(r => setTimeout(r, 400)); // 等 foreignObject 内 HTML 渲染
-    let w = sd.rect && sd.rect.width, h = sd.rect && sd.rect.height;
-    try {
-      const r = svgEl.getBoundingClientRect();
-      if (r && r.width > 0) { w = r.width; h = r.height; }
-    } catch (e2) {}
-    if (!w || !h) throw new Error('SVG 尺寸无效');
-    const scale = 2;
-    const cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round(w * scale));
-    cv.height = Math.max(1, Math.round(h * scale));
-    const ctx = cv.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    // SVG 元素位图可能尚未光栅化完成，drawImage 会抛错：重试等待
-    let drew = false;
-    for (let i = 0; i < 12 && !drew; i++) {
-      try { ctx.drawImage(svgEl, 0, 0, cv.width, cv.height); drew = true; }
-      catch (e) { await new Promise(r => setTimeout(r, 200)); }
+// ===== 图片导出（PNG/JPEG）—— 同原项目机制 =====
+// 不用 canvas 直接绘制含 foreignObject 的 SVG（Chrome 判定 Tainted canvas 导致 toDataURL 失败、
+// 且 foreignObject 内公式/富文本内容无法渲染）。
+// 改为：拆出 foreignObject 的 HTML 内容 → 纯 SVG 图形层 + HTML 富文本层分开放入 DOM → html2canvas 整页截图
+function parseSvgSize(svgStr) {
+  const mv = svgStr.match(/viewBox="([^"]*)"/);
+  if (mv) {
+    const parts = mv[1].trim().split(/[\s,]+/).map(Number);
+    if (parts.length >= 4 && isFinite(parts[2]) && isFinite(parts[3]) && parts[2] > 0 && parts[3] > 0) {
+      return { W: parts[2], H: parts[3], X: isFinite(parts[0]) ? parts[0] : 0, Y: isFinite(parts[1]) ? parts[1] : 0 };
     }
-    if (!drew) throw new Error('SVG 绘制失败');
-    const data = cv.toDataURL('image/jpeg', 0.92);
-    if (holder.parentNode) holder.remove();
-    const b64 = data.split(',')[1];
-    const r2 = await callNative('saveBinary', b64, '', (name || '思维导图') + '.jpg');
-    if (!r2 || !r2.ok) throw new Error('保存被取消');
-  } catch (e) {
-    if (e && e.message && e.message.indexOf('保存被取消') >= 0) return;
-    toast('JPEG 导出失败：' + (e && e.message ? e.message : String(e)), 'error');
   }
+  const mw = svgStr.match(/width="([\d.]+)"/);
+  const mh = svgStr.match(/height="([\d.]+)"/);
+  return { W: mw ? parseFloat(mw[1]) : 0, H: mh ? parseFloat(mh[1]) : 0, X: 0, Y: 0 };
+}
+function makeChunkSvg(svgStr, W, ch, y0, X, Y) {
+  const vx = X || 0;
+  const vy = (Y || 0) + y0;
+  return svgStr
+    .replace(/width="[\d.]+"/, 'width="' + W + '"')
+    .replace(/height="[\d.]+"/, 'height="' + ch + '"')
+    .replace(/viewBox="[^"]*"/, 'viewBox="' + vx + ' ' + vy + ' ' + W + ' ' + ch + '"');
+}
+function collectFoItems(svgStr) {
+  const doc = new DOMParser().parseFromString(svgStr, 'image/svg+xml');
+  if (doc.querySelector('parsererror')) return { svg: svgStr, items: [] };
+  const fos = Array.from(doc.querySelectorAll('foreignObject'));
+  const items = [];
+  fos.forEach((fo) => {
+    const x = parseFloat(fo.getAttribute('x') || '0');
+    const y = parseFloat(fo.getAttribute('y') || '0');
+    const ancestors = [];
+    let el = fo.parentNode;
+    while (el && el.nodeName !== 'svg') {
+      const at = el.getAttribute('transform');
+      if (at) ancestors.push(at);
+      el = el.parentNode;
+    }
+    let px = x, py = y;
+    ancestors.forEach((t) => {
+      const i = t.indexOf('matrix(');
+      if (i >= 0) {
+        const j = t.indexOf(')', i);
+        const pp = t.slice(i + 7, j).split(',').map(Number);
+        const nx = pp[0] * px + pp[2] * py + pp[4];
+        const ny = pp[1] * px + pp[3] * py + pp[5];
+        px = nx; py = ny;
+      }
+    });
+    items.push({ x: px, y: py, fo });
+    fo.remove();
+  });
+  const svg = new XMLSerializer().serializeToString(doc);
+  return { svg, items };
+}
+// 渲染一块：HTML 容器（纯 SVG 层 + fo 内容层）→ html2canvas → canvas
+async function renderChunkByHtml(svgStr, W, ch, y0, X, Y, bg) {
+  const { svg: svgNoFo, items } = collectFoItems(svgStr);
+  const chunkSvg = makeChunkSvg(svgNoFo, W, ch, y0, X, Y);
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-99999px;top:0;z-index:-1000;overflow:hidden;';
+  wrap.style.width = W + 'px';
+  wrap.style.height = ch + 'px';
+  wrap.style.background = bg || '#ffffff';
+  const svgBox = document.createElement('div');
+  svgBox.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + ch + 'px;';
+  svgBox.innerHTML = chunkSvg;
+  wrap.appendChild(svgBox);
+  items.forEach((it) => {
+    const left = it.x - (X || 0);
+    const top = it.y - (Y || 0) - y0;
+    if (top + 20 < 0 || top > ch) return;
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute;left:' + left + 'px;top:' + top + 'px;';
+    it.fo.childNodes.forEach((c) => holder.appendChild(c.cloneNode(true)));
+    // 视频/音频：贴链接占位（html2canvas 无法稳定绘制媒体画面）
+    holder.querySelectorAll('video, audio').forEach((m) => {
+      const label = m.nodeName === 'VIDEO' ? '▶ 视频' : '♪ 音频';
+      const src = m.getAttribute('src') || '';
+      const nm = decodeURIComponent((src.split('/').pop() || '').replace(/\?.*$/, ''));
+      const d = document.createElement('div');
+      d.textContent = label + (nm ? '：' + nm : '');
+      d.style.cssText = 'font-size:13px;color:#555;padding:2px 8px;border:1px dashed #bbb;border-radius:6px;background:#fafafa;';
+      if (m.parentNode) m.parentNode.replaceChild(d, m);
+    });
+    wrap.appendChild(holder);
+  });
+  document.body.appendChild(wrap);
+  try {
+    if (typeof html2canvas !== 'function') throw new Error('缺少 html2canvas 组件');
+    const canvas = await html2canvas(wrap, {
+      backgroundColor: bg || '#ffffff',
+      scale: 1,
+      useCORS: true,
+      logging: false,
+      width: W,
+      height: ch,
+      windowWidth: W,
+      windowHeight: ch,
+      imageTimeout: 20000
+    });
+    return canvas;
+  } finally {
+    wrap.remove();
+  }
+}
+// 分块导出 PNG/JPEG：超大画布自动分块，避免 canvas 超限
+async function exportChunkedImages(type, name) {
+  const ext = (type === 'jpeg' || type === 'jpg') ? 'jpg' : 'png';
+  const { str: strRaw } = await mind.doExport.getSvgData();
+  const { W, H, X, Y } = parseSvgSize(strRaw);
+  if (!W || !H) { toast('画布尺寸解析失败', 'error'); return; }
+  const bg = (mind.themeConfig && mind.themeConfig.backgroundColor) || '#ffffff';
+  const CHUNK = 5000;
+  const chunks = Math.max(1, Math.ceil(H / CHUNK));
+  const isJpg = ext === 'jpg';
+  const parts = [];
+  for (let i = 0; i < chunks; i++) {
+    const y0 = i * CHUNK;
+    const ch = Math.min(CHUNK, H - y0);
+    toast('正在导出第 ' + (i + 1) + '/' + chunks + ' 块...');
+    const canvas = await renderChunkByHtml(strRaw, W, ch, y0, X, Y, bg);
+    parts.push(canvas.toDataURL(isJpg ? 'image/jpeg' : 'image/png', isJpg ? 0.92 : undefined));
+  }
+  if (chunks === 1) {
+    const b64 = parts[0].split(',')[1];
+    await saveBinaryViaNative(b64, name + '.' + ext);
+  } else {
+    toast('正在打包分块压缩包...');
+    const zip = new JSZip();
+    parts.forEach((d, i) => zip.file(name + '_' + (i + 1) + '.' + ext, d.split(',')[1], { base64: true }));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const ab = await blob.arrayBuffer();
+    let b64 = '';
+    const bytes = new Uint8Array(ab);
+    for (let i2 = 0; i2 < bytes.length; i2 += 0x8000) {
+      b64 += String.fromCharCode.apply(null, bytes.subarray(i2, i2 + 0x8000));
+    }
+    b64 = btoa(b64);
+    await saveBinaryViaNative(b64, name + '_分块导出.zip');
+  }
+}
+async function saveBinaryViaNative(b64, filename) {
+  const r = await callNative('saveBinary', b64, '', filename);
+  if (!r || !r.ok) throw new Error('保存被取消');
 }
 
 // 导出多标签 JSON（含所有标签页，恢复时一键还原）
