@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261009o">
+<link rel="stylesheet" href="css/app.css?v=20261009p">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
@@ -167,10 +167,10 @@
         <label class="switch-line"><input type="checkbox" id="setRainbow" checked><span>按主题配色渲染分支线</span></label>
       </div>
       <div class="setting-row">
-        <label>自动保存</label>
+        <label>自动保存（秒，停顿后自动保存）</label>
         <div class="row-inline">
           <label class="switch-line"><input type="checkbox" id="setAutoSave" checked></label>
-          <input type="number" id="setAutoSaveSec" min="1" max="600" value="3" style="width:74px;"> <span class="muted-text">秒（停顿后自动保存）</span>
+          <input type="number" id="setAutoSaveSec" min="1" max="600" value="3" style="width:74px;">
         </div>
       </div>
       <div class="setting-row">
@@ -185,8 +185,8 @@
         </select>
       </div>
       <div class="setting-row">
-        <label>附件大小上限</label>
-        <div class="row-inline"><input type="number" id="setMaxAttach" min="1" max="102400" value="200" style="width:94px;"> <span class="muted-text">MB</span></div>
+        <label>附件大小上限（MB）</label>
+        <div class="row-inline"><input type="number" id="setMaxAttach" min="1" max="102400" value="200" style="width:94px;"></div>
       </div>
       <div class="setting-row">
         <label>允许附件类型</label>
