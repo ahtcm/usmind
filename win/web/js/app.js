@@ -1101,7 +1101,7 @@ function localSetting(k, d) { const s = getLocalSettings(); return s[k] != null 
 
 function loadCustomThemes() {
   getCustomThemes().forEach(t => {
-    if (!t || !t.name || THEMES.some(x => x.name === t.name)) return;
+    if (!t || !t.name) return;
     const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
@@ -1124,7 +1124,9 @@ function loadCustomThemes() {
       if (t.rootFont) config.root.fontFamily = t.rootFont;
     }
     const entry = { name: t.name, key: t.key || '', branchColors: colors.length ? colors : (base.branchColors || []), config };
-    THEMES.push(entry);
+    // 同名（含内置主题被编辑后）用自定义版替换，保证重启后仍生效
+    const idx = THEMES.findIndex(x => x.name === t.name);
+    if (idx >= 0) THEMES[idx] = entry; else THEMES.push(entry);
     try { MindMap.defineTheme(t.name, config); } catch (e) {}
   });
 }
