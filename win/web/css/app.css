@@ -669,3 +669,23 @@ body {
 .doc-md img { max-width: 100%; border-radius: 6px; }
 .doc-md a { color: #2b7de9; }
 .doc-md hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }
+
+/* 自定义浅色 tooltip（替代原生黑色 title 提示条） */
+[data-tip] { position: relative; }
+[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 7px); left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,.97); color: #2a2e3d;
+  font-size: 11px; line-height: 1.4;
+  padding: 4px 9px; border-radius: 6px; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(20,30,60,.16);
+  border: 1px solid rgba(20,30,60,.1);
+  z-index: 9999; pointer-events: none;
+}
+[data-tip]:hover::before {
+  content: ''; position: absolute; top: calc(100% + 1px); left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent; border-bottom-color: #fff;
+  z-index: 9999;
+}

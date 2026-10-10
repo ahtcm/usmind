@@ -389,7 +389,7 @@ function showInputDialog(title, initial, onOk) {
 }
 function updateTitle() {
   const name = doc.name || '未命名导图';
-  const dt = $('docTitle'); if (dt) { dt.textContent = name; dt.title = doc.path || name; }
+  const dt = $('docTitle'); if (dt) { dt.textContent = name; dt.setAttribute('data-tip', doc.path || name); }
   const st = $('saveState');
   if (st) {
     if (dirty) { st.textContent = '● 未保存'; st.className = 'save-state saving'; }
@@ -3331,6 +3331,37 @@ function toggleDiagPanel() {
 // ================= 启动 =================
 async function boot() {
   try {
+    // 原生 title 提示会显示黑色小条且截图截不到：统一转为浅色自定义提示
+    function convertTitles(root) {
+      (root || document).querySelectorAll('[title]:not([data-tip])').forEach(el => {
+        el.setAttribute('data-tip', el.getAttribute('title'));
+        el.removeAttribute('title');
+      });
+    }
+    convertTitles(document);
+    if (!window._tipObs) {
+      window._tipObs = new MutationObserver(muts => {
+        for (const m of muts) {
+          if (m.type === 'attributes' && m.attributeName === 'title' && m.target.hasAttribute && m.target.hasAttribute('title') && !m.target.hasAttribute('data-tip')) {
+            m.target.setAttribute('data-tip', m.target.getAttribute('title'));
+            m.target.removeAttribute('title');
+            continue;
+          }
+          for (const n of m.addedNodes) {
+            if (n.nodeType !== 1 || !n.querySelectorAll) continue;
+            if (n.hasAttribute && n.hasAttribute('title') && !n.hasAttribute('data-tip')) {
+              n.setAttribute('data-tip', n.getAttribute('title'));
+              n.removeAttribute('title');
+            }
+            n.querySelectorAll('[title]:not([data-tip])').forEach(el => {
+              el.setAttribute('data-tip', el.getAttribute('title'));
+              el.removeAttribute('title');
+            });
+          }
+        }
+      });
+      window._tipObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['title'] });
+    }
     bindUi();
     // 应用设置（默认主题）
     const s = await callNative('getSettings');
