@@ -421,8 +421,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     saveSettings(st);
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-    // WebView2 默认背景设为全透明（启动特效镂空悬浮桌面；主界面由页面背景覆盖）
-    SetEnvironmentVariableW(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"00000000");
 
     WNDCLASSEXW wc = { sizeof(wc) };
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -434,15 +432,15 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     wc.lpszClassName = L"UsmindMainWnd";
     RegisterClassExW(&wc);
 
-    // 启动：先显示悬浮特效小窗（无边框、居中、深色），前端 2 秒后通知恢复主窗口大小
+    // 启动：直接以主窗口大小显示，前端在窗口内展示开机画面特效
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-    int ww = 480, wh = 560;
+    int ww = 1440, wh = 900;
+    if (sw < ww) ww = sw - 40;
+    if (sh < wh) wh = sh - 60;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
-    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP, L"UsmindMainWnd", L"USMIND 思维导图",
+    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
     if (!g_hMainWnd) return 1;
-    // 启动特效阶段：逐像素透明，特效镂空悬浮在桌面上（无窗体感）
-    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 
     // Win11 圆角
     {
@@ -473,7 +471,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     return (int)msg.wParam;
 }
 
-// 启动特效结束（前端 JS 通知）：把悬浮小窗恢复为主窗口大小并居中
+// 启动特效结束（前端 JS 通知）：确保主窗口大小与居中（与初始一致）
 void restoreMainWindow() {
     if (!g_hMainWnd) return;
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
@@ -482,6 +480,4 @@ void restoreMainWindow() {
     if (sh < wh) wh = sh - 60;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
     SetWindowPos(g_hMainWnd, NULL, x, y, ww, wh, SWP_SHOWWINDOW);
-    // 恢复不透明（主界面正常显示）
-    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 }

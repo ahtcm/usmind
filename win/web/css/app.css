@@ -693,7 +693,7 @@ body {
 /* 启动特效（仿迅雷：电光 + 光环 + 粒子 + logo 渐入） */
 #bootSplash {
   position: fixed; inset: 0; z-index: 99999;
-  background: transparent;
+  background: radial-gradient(1600px 900px at 50% 42%, #182642 0%, #0a0f1e 62%, #070b16 100%);
   display: flex; align-items: center; justify-content: center;
   transition: opacity .55s ease; opacity: 1;
 }
