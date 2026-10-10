@@ -57,7 +57,9 @@ const FALLBACK_EMOJI = ['😀','😄','😂','😍','🤔','😎','🤩','😭',
 function numSvg(n) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><rect x="1" y="1" width="30" height="30" rx="7" fill="#eef2ff"/><text x="16" y="23" font-size="17" font-weight="bold" text-anchor="middle" fill="#4A5CF7">'+n+'</text></svg>'; }
 function emojiSvg(e) { return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32"><text x="16" y="26" font-size="26" text-anchor="middle">'+e+'</text></svg>'; }
 const FALLBACK_COLORS = ['#5B8FF9','#2FB36B','#F6A609','#9270CA','#E8684A','#22A7C9','#F08BB4','#8C9B6F'];
-const DEFAULT_THEME = '晨曦';
+const DEFAULT_THEME = '晨光熹微';
+// 内置主题旧名 → 新诗意名映射（兼容已保存导图/自定义主题引用的旧名）
+const LEGACY_THEME_NAMES = { '晨曦':'晨光熹微', '彩虹':'虹霓织锦', '活力':'春山新雨', '舞动':'蝶舞翩跹', '代码':'墨韵星轨', '和风':'和风细雨', '岛屿':'碧海岛屿', '玫瑰':'玫瑰晨露', '薄荷':'薄荷微凉', '晨曦白':'月白清风', '深空黑':'星河永夜', '极简白':'素雪留白', '暮色紫':'暮色烟霞', '森林绿':'森林秘境', '暖阳橙':'暖阳初照', '黑曜石':'墨玉流辉' };
 let userDefaultTheme = DEFAULT_THEME;  // 用户在设置里选的默认主题，新建时用
 
 // ================= 状态 =================
@@ -345,7 +347,7 @@ function restoreAllTabs(tabArr) {
 }
 
 function themeBy(name) {
-  return THEMES.find(t => t.name === name) || THEMES[0];
+  return THEMES.find(t => t.name === name) || THEMES.find(t => t.name === (LEGACY_THEME_NAMES[name] || '')) || THEMES[0];
 }
 function branchColorsOf(name) {
   const t = themeBy(name);
@@ -792,9 +794,9 @@ function initMindMap() {
 function applyTheme(name) {
   const t = themeBy(name);
   if (!t) return;
-  doc.theme = name;
-  try { mind.setTheme(name); } catch (e) {}
-  try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(name) }); } catch (e) {}
+  doc.theme = t.name;
+  try { mind.setTheme(t.name); } catch (e) {}
+  try { mind.setRainbowLinesConfig && mind.setRainbowLinesConfig({ open: true, colorsList: branchColorsOf(t.name) }); } catch (e) {}
   scheduleBranchRainbow();
   applyCanvasBg();
   dirty = true;
@@ -1027,12 +1029,13 @@ async function fillSettings() {
   const themeMenu = $('themeMenu');
   themeMenu.innerHTML = '';
   const curTheme = s.defaultTheme || DEFAULT_THEME;
-  $('themeBtn').textContent = curTheme + ' ▾';
+  const curThemeName = THEMES.some(t => t.name === curTheme) ? curTheme : (LEGACY_THEME_NAMES[curTheme] || curTheme);
+  $('themeBtn').textContent = curThemeName + ' ▾';
   THEMES.forEach(t => {
     const it = document.createElement('div');
     it.className = 'dm-item';
     it.textContent = t.name;
-    if (t.name === curTheme) it.classList.add('active');
+    if (t.name === curThemeName) it.classList.add('active');
     it.addEventListener('click', () => {
       $('themeBtn').textContent = t.name + ' ▾';
       themeMenu.querySelectorAll('.dm-item').forEach(x => x.classList.remove('active'));
@@ -1104,7 +1107,7 @@ function localSetting(k, d) { const s = getLocalSettings(); return s[k] != null 
 function loadCustomThemes() {
   getCustomThemes().forEach(t => {
     if (!t || !t.name) return;
-    const base = THEMES.find(x => x.name === (t.base || THEMES[0].name)) || THEMES[0];
+    const base = themeBy(t.base || THEMES[0].name);
     const config = JSON.parse(JSON.stringify(base.config || {}));
     const colors = (t.colors || []).filter(Boolean);
     if (colors.length) { config.branchColors = colors; if (t.lineColor) config.lineColor = t.lineColor; }
@@ -1177,7 +1180,7 @@ function openThemeEdit(name) {
   const sel = $('teBase');
   sel.innerHTML = '';
   THEMES.forEach(t => { const o = document.createElement('option'); o.value = t.name; o.textContent = t.name; sel.appendChild(o); });
-  sel.value = editing ? (editing.base || THEMES[0].name) : (builtin ? builtin.name : THEMES[0].name);
+  sel.value = editing ? themeBy(editing.base || THEMES[0].name).name : (builtin ? builtin.name : THEMES[0].name);
   $('teBaseRow').style.display = (editing || builtin) ? 'none' : '';
   renderTeColors(editing ? (editing.colors || []) : (builtin ? (builtin.branchColors || []) : []));
   $('teCanvasBg').value = editing ? (editing.canvasBg || (cfg && cfg.backgroundColor) || '#fafbff') : (cfg ? (cfg.backgroundColor || '#fafbff') : '#fafbff');
