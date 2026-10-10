@@ -3331,6 +3331,11 @@ function toggleDiagPanel() {
 // ================= 启动 =================
 async function boot() {
   try {
+    // 启动特效：短暂展示后淡出移除（仿迅雷启动画面）
+    setTimeout(() => {
+      const sp = document.getElementById('bootSplash');
+      if (sp) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 650); }
+    }, 2100);
     // 原生 title 提示会显示黑色小条且截图截不到：统一转为浅色自定义提示
     function convertTitles(root) {
       (root || document).querySelectorAll('[title]:not([data-tip])').forEach(el => {

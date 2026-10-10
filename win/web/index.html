@@ -4,10 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>USMIND 思维导图</title>
-<link rel="stylesheet" href="css/app.css?v=20261010a">
+<link rel="stylesheet" href="css/app.css?v=20261010b">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 </head>
 <body>
+<!-- 启动特效（仿迅雷：电光 + 光环 + 粒子 + logo 渐入） -->
+<div id="bootSplash">
+  <div class="bs-inner">
+    <div class="bs-logo-wrap">
+      <div class="bs-ray"></div>
+      <div class="bs-ring bs-ring1"></div>
+      <div class="bs-ring bs-ring2"></div>
+      <img class="bs-logo" src="logo.png" alt="USMIND">
+      <div class="bs-spark bs-s1"></div>
+      <div class="bs-spark bs-s2"></div>
+      <div class="bs-spark bs-s3"></div>
+      <div class="bs-spark bs-s4"></div>
+    </div>
+    <div class="bs-title">USMIND</div>
+    <div class="bs-sub">思维导图 · 本地版</div>
+    <div class="bs-bar"><i></i></div>
+  </div>
+</div>
 <div id="app">
 
   <!-- 顶部浮动工具栏（一条毛玻璃 pill） -->
@@ -436,6 +454,6 @@
 <script src="vendor/docpreview/marked.min.js"></script>
 <script src="vendor/jszip/jszip.min.js"></script>
 <script src="vendor/html2canvas/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261010c"></script>
+<script type="module" src="js/app.js?v=20261010d"></script>
 </body>
 </html>

@@ -689,3 +689,54 @@ body {
   border: 5px solid transparent; border-bottom-color: #fff;
   z-index: 9999;
 }
+
+/* 启动特效（仿迅雷：电光 + 光环 + 粒子 + logo 渐入） */
+#bootSplash {
+  position: fixed; inset: 0; z-index: 99999;
+  background: radial-gradient(1200px 700px at 50% 42%, #16223f 0%, #0a0f1e 62%, #070b16 100%);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity .55s ease; opacity: 1;
+}
+#bootSplash.hide { opacity: 0; pointer-events: none; }
+.bs-inner { text-align: center; }
+.bs-logo-wrap { position: relative; width: 150px; height: 150px; margin: 0 auto 20px; }
+.bs-logo {
+  width: 150px; height: 150px; border-radius: 50%; position: relative; z-index: 3;
+  animation: bsLogoIn .85s cubic-bezier(.2,1.4,.4,1) both;
+  box-shadow: 0 0 26px rgba(64,180,255,.4), 0 0 80px rgba(64,180,255,.22);
+}
+.bs-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform: translate(-50%,-50%); z-index: 1; }
+.bs-ring1 { width: 196px; height: 196px; border: 2px solid transparent; border-top-color: rgba(120,200,255,.6); border-right-color: rgba(120,200,255,.15); animation: bsRing 2.4s linear infinite; }
+.bs-ring2 { width: 240px; height: 240px; border: 1px dashed rgba(120,200,255,.22); animation: bsRing 3.8s linear infinite reverse; }
+@keyframes bsRing { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+.bs-ray {
+  position: absolute; left: 50%; top: 50%; width: 420px; height: 420px;
+  transform: translate(-50%,-50%); border-radius: 50%; z-index: 0;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, rgba(90,180,255,.14) 8deg, transparent 16deg,
+    transparent 88deg, rgba(90,180,255,.14) 96deg, transparent 104deg,
+    transparent 178deg, rgba(90,180,255,.14) 186deg, transparent 194deg,
+    transparent 268deg, rgba(90,180,255,.14) 276deg, transparent 284deg);
+  animation: bsRing 9s linear infinite;
+}
+.bs-spark { position: absolute; border-radius: 50%; background: #9fe0ff; z-index: 2; box-shadow: 0 0 8px #6cc3ff; animation: bsSpark 2.2s ease-in-out infinite; }
+.bs-s1 { width: 9px; height: 9px; left: 4%; top: 26%; animation-delay: 0s; }
+.bs-s2 { width: 5px; height: 5px; left: 82%; top: 14%; animation-delay: .45s; }
+.bs-s3 { width: 6px; height: 6px; left: 12%; top: 78%; animation-delay: .9s; }
+.bs-s4 { width: 4px; height: 4px; left: 76%; top: 84%; animation-delay: 1.35s; }
+@keyframes bsSpark {
+  0% { transform: translateY(10px) scale(.5); opacity: 0; }
+  45% { opacity: 1; }
+  100% { transform: translateY(-16px) scale(1.25); opacity: 0; }
+}
+.bs-title {
+  font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #fff; padding-left: 10px;
+  text-shadow: 0 0 12px rgba(100,190,255,.85), 0 0 34px rgba(100,190,255,.4);
+  animation: bsTextIn 1s .35s ease both;
+}
+.bs-sub { margin-top: 9px; font-size: 13px; letter-spacing: 4px; color: rgba(205,222,255,.68); animation: bsTextIn 1s .6s ease both; }
+.bs-bar { width: 210px; height: 2px; margin: 28px auto 0; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.bs-bar i { display: block; width: 42%; height: 100%; border-radius: 2px; background: linear-gradient(90deg, rgba(90,180,255,0), #6cc3ff, rgba(90,180,255,0)); animation: bsBar 1.15s ease-in-out infinite; }
+@keyframes bsBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+@keyframes bsLogoIn { from { opacity: 0; transform: scale(.55); } to { opacity: 1; transform: scale(1); } }
+@keyframes bsTextIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
