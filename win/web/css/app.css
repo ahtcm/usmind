@@ -693,7 +693,7 @@ body {
 /* 启动特效（仿迅雷：电光 + 光环 + 粒子 + logo 渐入） */
 #bootSplash {
   position: fixed; inset: 0; z-index: 99999;
-  background: #000;
+  background: transparent;
   display: flex; align-items: center; justify-content: center;
   transition: opacity .55s ease; opacity: 1;
 }
@@ -704,13 +704,29 @@ body.splash-mode #app { display: none; }
 .bs-logo-wrap { position: relative; width: 150px; height: 150px; margin: 0 auto 20px; }
 .bs-logo {
   width: 150px; height: 150px; border-radius: 50%; position: relative; z-index: 3;
-  animation: bsLogoIn .85s cubic-bezier(.2,1.4,.4,1) both;
   box-shadow: 0 0 26px rgba(64,180,255,.4), 0 0 80px rgba(64,180,255,.22);
 }
 .bs-ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; transform: translate(-50%,-50%); z-index: 1; }
-.bs-ring1 { width: 196px; height: 196px; border: 2px solid transparent; border-top-color: rgba(120,200,255,.6); border-right-color: rgba(120,200,255,.15); animation: bsRing 2.4s linear infinite; }
-.bs-ring2 { width: 240px; height: 240px; border: 1px dashed rgba(120,200,255,.22); animation: bsRing 3.8s linear infinite reverse; }
+.bs-ring1 { width: 196px; height: 196px; border: 2px solid transparent; border-top-color: rgba(120,200,255,.6); border-right-color: rgba(120,200,255,.15); }
+.bs-ring2 { width: 240px; height: 240px; border: 1px dashed rgba(120,200,255,.22); }
 @keyframes bsRing { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+/* 粒子环：绕 logo 旋转（logo 本身保持静止） */
+.bs-orbit { position: absolute; left: 50%; top: 50%; width: 232px; height: 232px; transform: translate(-50%,-50%); z-index: 2; animation: bsOrbit 6.5s linear infinite; }
+.bs-orbit i { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #8fd8ff; box-shadow: 0 0 8px #6cc3ff, 0 0 16px rgba(108,195,255,.55); }
+.bs-orbit i:nth-child(1) { top: 0; left: 50%; margin-left: -2px; }
+.bs-orbit i:nth-child(2) { top: 10%; right: 2%; }
+.bs-orbit i:nth-child(3) { top: 30%; right: 0; }
+.bs-orbit i:nth-child(4) { bottom: 30%; right: 0; }
+.bs-orbit i:nth-child(5) { bottom: 10%; right: 2%; }
+.bs-orbit i:nth-child(6) { bottom: 0; left: 50%; margin-left: -2px; }
+.bs-orbit i:nth-child(7) { bottom: 10%; left: 2%; }
+.bs-orbit i:nth-child(8) { top: 30%; left: 0; }
+@keyframes bsOrbit { to { transform: translate(-50%,-50%) rotate(360deg); } }
+/* 水波纹：从 logo 中心向外荡漾 */
+.bs-wave { position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border: 2px solid rgba(120,200,255,.5); border-radius: 50%; z-index: 1; box-shadow: 0 0 12px rgba(108,195,255,.22); animation: bsWave 3s ease-out infinite; }
+.bs-w2 { animation-delay: 1s; }
+.bs-w3 { animation-delay: 2s; }
+@keyframes bsWave { 0% { transform: scale(.32); opacity: .9; } 100% { transform: scale(2.9); opacity: 0; } }
 .bs-ray {
   position: absolute; left: 50%; top: 50%; width: 420px; height: 420px;
   transform: translate(-50%,-50%); border-radius: 50%; z-index: 0;

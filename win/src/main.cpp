@@ -421,6 +421,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     saveSettings(st);
 
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    // WebView2 默认背景设为全透明（启动特效镂空悬浮桌面；主界面由页面背景覆盖）
+    SetEnvironmentVariableW(L"WEBVIEW2_DEFAULT_BACKGROUND_COLOR", L"00000000");
 
     WNDCLASSEXW wc = { sizeof(wc) };
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -436,11 +438,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
     int ww = 480, wh = 560;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
-    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED, L"UsmindMainWnd", L"USMIND 思维导图",
+    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
     if (!g_hMainWnd) return 1;
-    // 启动特效阶段：窗口纯黑像素透明（悬浮在桌面上，无窗体感）
-    SetLayeredWindowAttributes(g_hMainWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    // 启动特效阶段：逐像素透明，特效镂空悬浮在桌面上（无窗体感）
+    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 
     // Win11 圆角
     {
