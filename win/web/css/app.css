@@ -287,18 +287,21 @@ body {
 }
 .theme-preview .bar {
   flex: 1; display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; transition: opacity .15s;
 }
 .theme-preview .node-dot {
   width: 22px; height: 12px; border-radius: 3px; margin: 0 2px;
   box-shadow: 0 2px 4px rgba(0,0,0,.28);
+  opacity: 0; transition: opacity .15s;
 }
 .theme-preview .node-dot.root { height: 18px; border-radius: 4px; }
+.theme-card:hover .bar, .theme-card:hover .node-dot { opacity: 1; }
 .theme-card .tc-name {
-  position: absolute; left: 0; right: 0; bottom: 8px;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 34px; display: flex; align-items: center; justify-content: center;
   padding: 0 8px; font-size: 13px; font-weight: 600; color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  text-shadow: 0 1px 4px rgba(0,0,0,.5), 0 0 8px rgba(0,0,0,.25);
+  background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0));
 }
 .theme-card.active .tc-name { color: #fff; font-weight: 700; }
 
