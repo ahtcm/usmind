@@ -2640,11 +2640,21 @@ function openStyleBar(node) {
 function syncStyleBar() {
   if (!styleNode) return;
   try {
-    const st = styleNode.getStyle && styleNode.getStyle() || {};
+    let st = null;
+    try { st = styleNode.getStyle && styleNode.getStyle(); } catch (e) { st = null; }
+    if (!st) {
+      // 兜底：从数据树读节点样式
+      try {
+        const nd = nodeDataOf(styleNode);
+        const dd = (nd && nd.data) || nd || {};
+        st = { fontSize: dd.fontSize, color: dd.color, fillColor: dd.fillColor, bold: dd.bold, italic: dd.italic, underline: dd.underline, strikeThrough: dd.strikeThrough };
+      } catch (e) { st = {}; }
+    }
+    st = st || {};
     const fs = st.fontSize || 14;
     $('sbFontSize').textContent = fs;
     try { $('sbColor').value = st.color || '#000000'; } catch (e) {}
-    try { $('sbBgColor').value = st.background || '#ffffff'; } catch (e) {}
+    try { $('sbBgColor').value = st.fillColor || '#ffffff'; } catch (e) {}
     ['bold', 'italic', 'underline', 'strikeThrough'].forEach(k => {
       const b = $('styleBar').querySelector('[data-style="' + k + '"]');
       if (b) b.classList.toggle('on', !!st[k]);
@@ -2653,15 +2663,39 @@ function syncStyleBar() {
 }
 function setNodeStyle(styleObj) {
   if (!styleNode) return;
-  try { mind.execCommand('SET_NODE_STYLE', styleNode, styleObj); } catch (e) { return; }
+  // 库单数命令 SET_NODE_STYLE 对 bold/fontSize 等不生效（实测数据不写），复数 SET_NODE_STYLES 才生效
+  try { mind.execCommand('SET_NODE_STYLES', styleNode, styleObj); } catch (e) { return; }
   markDirty();
   syncStyleBar();
   setTimeout(() => { try { mind.render(); } catch (e) {} }, 30);
 }
+function currentStyleFontSize() {
+  try {
+    let st = null;
+    try { st = styleNode.getStyle && styleNode.getStyle(); } catch (e) { st = null; }
+    if (!st) {
+      try {
+        const nd = nodeDataOf(styleNode);
+        const dd = (nd && nd.data) || nd || {};
+        st = { fontSize: dd.fontSize };
+      } catch (e) { st = {}; }
+    }
+    return (st && st.fontSize) || 14;
+  } catch (e) { return 14; }
+}
 function toggleStyle(k) {
   if (!styleNode) return;
   try {
-    const st = styleNode.getStyle && styleNode.getStyle() || {};
+    let st = null;
+    try { st = styleNode.getStyle && styleNode.getStyle(); } catch (e) { st = null; }
+    if (!st) {
+      try {
+        const nd = nodeDataOf(styleNode);
+        const dd = (nd && nd.data) || nd || {};
+        st = { bold: dd.bold, italic: dd.italic, underline: dd.underline, strikeThrough: dd.strikeThrough };
+      } catch (e) { st = {}; }
+    }
+    st = st || {};
     const next = {};
     next[k] = !st[k];
     setNodeStyle(next);
@@ -2893,13 +2927,13 @@ function initNodeEdit() {
     b.addEventListener('click', () => toggleStyle(b.dataset.style));
   });
   $('sbFontPlus').addEventListener('click', () => {
-    try { const st = styleNode.getStyle() || {}; setNodeStyle({ fontSize: (st.fontSize || 14) + 2 }); } catch (e) {}
+    try { setNodeStyle({ fontSize: (currentStyleFontSize() || 14) + 2 }); } catch (e) {}
   });
   $('sbFontMinus').addEventListener('click', () => {
-    try { const st = styleNode.getStyle() || {}; setNodeStyle({ fontSize: Math.max(8, (st.fontSize || 14) - 2) }); } catch (e) {}
+    try { setNodeStyle({ fontSize: Math.max(8, (currentStyleFontSize() || 14) - 2) }); } catch (e) {}
   });
   $('sbColor').addEventListener('input', (e) => { try { setNodeStyle({ color: e.target.value }); } catch (e2) {} });
-  $('sbBgColor').addEventListener('input', (e) => { try { setNodeStyle({ background: e.target.value }); } catch (e2) {} });
+  $('sbBgColor').addEventListener('input', (e) => { try { setNodeStyle({ fillColor: e.target.value }); } catch (e2) {} });
   $('sbClose').addEventListener('click', () => { $('styleBar').style.display = 'none'; styleNode = null; });
   // 图标弹窗
   $('iconClear').addEventListener('click', () => {
