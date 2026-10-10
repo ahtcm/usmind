@@ -141,7 +141,7 @@ function renderTabStrip() {
     }
     const el = document.createElement('div');
     el.className = 'tab-item' + (i === activeTab ? ' active' : '');
-    el.title = labelText;
+    // el.title = labelText; // 不再显示 tag hover 原生提示
     // 标签可按住拖动排序
     el.draggable = true;
     el.dataset.tabIndex = String(i);
@@ -168,7 +168,7 @@ function renderTabStrip() {
     const close = document.createElement('span');
     close.className = 'tab-close';
     close.textContent = '×';
-    close.title = '关闭画布';
+    // close.title = '关闭画布'; // 不再显示关闭按钮 hover 提示
     close.addEventListener('click', (e) => {
       e.stopPropagation();
       closeTab(i);
