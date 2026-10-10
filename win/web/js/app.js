@@ -298,6 +298,9 @@ function openInTab(path, name, parsed) {
           try { mind.render(); } catch (e) {}
           setTimeout(() => { try { mind.view.fit(); } catch (e) {} }, 60);
         }
+        // 图片节点布局居中修复：库对含图片的富文本节点测量偏小，图片加载后
+        // 子节点组中心会相对父节点偏移（上下不对齐）；图片加载完成的此刻强制重排一次恢复垂直居中
+        try { mind.setLayout(doc.layout || 'logicalStructure'); } catch (eL) {}
       } catch (e) {}
     }, 350);
   }, 40);
@@ -332,6 +335,8 @@ function restoreAllTabs(tabArr) {
         const tree = mind.renderer.renderTree;
         const hasNode = !!(tree && (tree._node || tree.node || tree.shapeNode));
         if (!hasNode) { try { mind.render(); } catch (e) {} }
+        // 图片节点布局居中修复（同上）：图片加载后强制重排一次，子节点组与父节点垂直居中
+        try { mind.setLayout(t.layout || 'logicalStructure'); } catch (eL) {}
       } catch (e) {}
     }, 350);
   }, 40);
@@ -2213,6 +2218,8 @@ function renderFileNode(child, file) {
             '<div style="position:relative;width:'+w+'px;height:'+h+'px;overflow:hidden;border-radius:12px;line-height:0">'+
             '<img src="'+objUrl+'" style="width:100%;height:100%;object-fit:cover;display:block;margin:0"></div>' },
             { shape:'roundedRectangle', borderRadius:12, borderWidth:0, borderColor:'transparent', fillColor:'transparent', paddingX:0, paddingY:0 });
+          // 图片节点尺寸由小变大后强制重排一次，保证子节点组与父节点垂直居中（不上下偏移）
+          setTimeout(() => { try { mind.setLayout(doc.layout || 'logicalStructure'); } catch (eL) {} }, 180);
         } catch (e3) {}
       });
     } else if (type.indexOf('audio/') === 0) {
