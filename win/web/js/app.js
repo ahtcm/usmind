@@ -1055,7 +1055,7 @@ async function fillSettings() {
   themeMenu.style.display = 'none';
   // 项目文件保存位置
   const app = await callNative('getAppInfo');
-  $('setHistoryDir').value = s.historyDir || '（默认：用户目录 \\usmind）';
+  $('setHistoryDir').value = s.historyDir || (app && app.projectDir ? app.projectDir : '（默认：C:\\Users\\<用户名>\\usmind）');
   $('assocState').textContent = s.registerAssoc ? '已注册，双击 .usmind 文件即可打开' : '未注册';
   // 本地偏好（localStorage）
   $('setRainbow').checked = localSetting('rainbow', true);
