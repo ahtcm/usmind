@@ -2641,15 +2641,13 @@ function syncStyleBar() {
   if (!styleNode) return;
   try {
     let st = null;
-    try { st = styleNode.getStyle && styleNode.getStyle(); } catch (e) { st = null; }
-    if (!st) {
-      // 兜底：从数据树读节点样式
-      try {
-        const nd = nodeDataOf(styleNode);
-        const dd = (nd && nd.data) || nd || {};
-        st = { fontSize: dd.fontSize, color: dd.color, fillColor: dd.fillColor, bold: dd.bold, italic: dd.italic, underline: dd.underline, strikeThrough: dd.strikeThrough };
-      } catch (e) { st = {}; }
-    }
+    // 优先读数据树（各环境 getStyle 返回内容不一致，数据树最可靠）
+    try {
+      const nd = nodeDataOf(styleNode);
+      const dd = (nd && nd.data) || nd || {};
+      st = { fontSize: dd.fontSize, color: dd.color, fillColor: dd.fillColor, bold: dd.bold, italic: dd.italic, underline: dd.underline, strikeThrough: dd.strikeThrough };
+    } catch (e) { st = null; }
+    if (!st) { try { st = styleNode.getStyle && styleNode.getStyle() || {}; } catch (e) { st = {}; } }
     st = st || {};
     const fs = st.fontSize || 14;
     $('sbFontSize').textContent = fs;
@@ -2686,18 +2684,11 @@ function currentStyleFontSize() {
 function toggleStyle(k) {
   if (!styleNode) return;
   try {
-    let st = null;
-    try { st = styleNode.getStyle && styleNode.getStyle(); } catch (e) { st = null; }
-    if (!st) {
-      try {
-        const nd = nodeDataOf(styleNode);
-        const dd = (nd && nd.data) || nd || {};
-        st = { bold: dd.bold, italic: dd.italic, underline: dd.underline, strikeThrough: dd.strikeThrough };
-      } catch (e) { st = {}; }
-    }
-    st = st || {};
+    // 直接读数据树当前值取反（getStyle 在各环境返回不一致，弃用）
+    const nd = nodeDataOf(styleNode);
+    const dd = (nd && nd.data) || nd || {};
     const next = {};
-    next[k] = !st[k];
+    next[k] = !dd[k];
     setNodeStyle(next);
   } catch (e) {}
 }
