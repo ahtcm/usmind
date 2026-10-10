@@ -1057,7 +1057,6 @@ async function fillSettings() {
   $('setRainbow').checked = localSetting('rainbow', true);
   $('setAutoSave').checked = localSetting('autoSave', true);
   $('setAutoSaveSec').value = localSetting('autoSaveSec', 3);
-  $('setDefLayout').value = localSetting('defLayout', 'logicalStructure');
   $('setMaxAttach').value = localSetting('maxAttach', 200);
   $('setAllowTypes').value = localSetting('allowTypes', '*');
 }
@@ -1073,7 +1072,6 @@ async function saveSettingsFromUi(newThemeName) {
   ls.rainbow = $('setRainbow').checked;
   ls.autoSave = $('setAutoSave').checked;
   ls.autoSaveSec = parseInt($('setAutoSaveSec').value) || 3;
-  ls.defLayout = $('setDefLayout').value;
   ls.maxAttach = parseInt($('setMaxAttach').value) || 200;
   ls.allowTypes = $('setAllowTypes').value.trim() || '*';
   setLocalSettings(ls);
@@ -3215,7 +3213,7 @@ function bindUi() {
     if (r && r.ok) { toast('文件关联已注册'); fillSettings(); }
   });
   // 修改即保存：设置里任何控件变化立即生效
-  ['setRainbow', 'setAutoSave', 'setAutoSaveSec', 'setDefLayout', 'setMaxAttach', 'setAllowTypes'].forEach(id => {
+  ['setRainbow', 'setAutoSave', 'setAutoSaveSec', 'setMaxAttach', 'setAllowTypes'].forEach(id => {
     const el = $(id);
     if (el) el.addEventListener('change', () => saveSettingsFromUi());
   });
