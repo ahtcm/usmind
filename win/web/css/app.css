@@ -441,16 +441,16 @@ body {
   cursor: pointer;
 }
 /* 主题编辑表单 */
-#themeEditDialog .te-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-#themeEditDialog .te-grid .setting-row { min-width: 0; }
-#themeEditDialog .te-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+#themeEditDialog .te-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,.6); border: 1px solid rgba(20,30,60,.07); border-radius: 14px; padding: 12px; }
+#themeEditDialog .te-grid .setting-row { min-width: 0; margin-bottom: 0; }
+#themeEditDialog .te-colors { display: flex; flex-wrap: wrap; gap: 8px; background: rgba(255,255,255,.6); border: 1px solid rgba(20,30,60,.07); border-radius: 14px; padding: 12px; }
 #themeEditDialog .te-colors .tc { position: relative; width: 62px; height: 52px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0,0,0,.12); box-shadow: 0 2px 6px rgba(0,0,0,.06); flex: 0 0 auto; }
 #themeEditDialog .te-colors .tc .tc-swatch { height: 32px; }
 #themeEditDialog .te-colors .tc .tc-swatch input[type=color] { width: 70px; height: 40px; margin: -4px; border: none; padding: 0; cursor: pointer; }
 #themeEditDialog .te-colors .tc .tc-hex { font-size: 10px; color: #555; text-align: center; line-height: 18px; background: rgba(255,255,255,.92); }
 #themeEditDialog .te-colors .tc .tc-x { position: absolute; top: 2px; right: 3px; font-size: 9px; color: #fff; background: rgba(0,0,0,.55); border-radius: 50%; width: 15px; height: 15px; line-height: 15px; text-align: center; cursor: pointer; z-index: 2; }
 #themeEditDialog .te-colors .tc .tc-x:hover { background: #c0392b; }
-#themeEditDialog .te-preview { display: flex; gap: 16px; align-items: center; padding: 14px; background: linear-gradient(135deg, rgba(90,110,200,.06), rgba(255,255,255,.5)); border: 1px solid rgba(90,110,200,.12); border-radius: 14px; }
+#themeEditDialog .te-preview { display: flex; gap: 16px; align-items: center; padding: 14px; background: linear-gradient(135deg, rgba(90,110,200,.08), rgba(255,255,255,.65)); border: 1px solid rgba(90,110,200,.14); border-radius: 14px; box-shadow: 0 2px 10px rgba(90,110,200,.08); }
 #themeEditDialog .tp-root { width: 56px; height: 40px; border-radius: 12px; color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; box-shadow: 0 3px 8px rgba(0,0,0,.2); }
 #themeEditDialog .tp-branches { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 #themeEditDialog .tp-branch { display: flex; align-items: center; gap: 6px; }
