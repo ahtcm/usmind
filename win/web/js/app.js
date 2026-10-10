@@ -3350,6 +3350,22 @@ function fixAttachNodeTexts() {
   try {
     const c = document.querySelector('.smm-container');
     if (c) {
+      // 图片节点：图片 div 强制撑满节点 foreignObject（图片即节点，不留空隙/不露白边）。
+      // 库对含 <img> 的富文本节点测量可能比图片 div 略大（含 1px 取整/边距），
+      // 直接把 div 拉成与节点区域一致，img 的 object-fit:cover 会跟随铺满。
+      c.querySelectorAll('foreignObject').forEach(fo => {
+        const html = fo.innerHTML || '';
+        if (html.indexOf('<img') === -1) return;
+        const div = fo.querySelector('div');
+        if (!div) return;
+        const fr = fo.getBoundingClientRect();
+        const dr = div.getBoundingClientRect();
+        if (!fr.width || !dr.width) return;
+        if (Math.abs(fr.width - dr.width) > 2 || Math.abs(fr.height - dr.height) > 2) {
+          div.style.width = fr.width + 'px';
+          div.style.height = fr.height + 'px';
+        }
+      });
       c.querySelectorAll('text.smm-text-node-wrap').forEach(tx => {
         const tr = tx.getBoundingClientRect();
         if (!tr || !tr.width) return;
