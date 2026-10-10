@@ -301,7 +301,8 @@ body {
   height: 34px; display: flex; align-items: center; justify-content: center;
   padding: 0 8px; font-size: 13px; font-weight: 600; color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0));
+  background: rgba(15,20,35,.5);
+  border-top: 1px solid rgba(255,255,255,.14);
 }
 .theme-card.active .tc-name { color: #fff; font-weight: 700; }
 
