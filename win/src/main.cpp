@@ -428,13 +428,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     wc.hInstance = hInst;
     wc.hIcon = LoadIconW(hInst, MAKEINTRESOURCEW(IDI_APP));
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = CreateSolidBrush(RGB(8, 12, 24));
     wc.lpszClassName = L"UsmindMainWnd";
     RegisterClassExW(&wc);
 
+    // 启动：先显示悬浮特效小窗（无边框、居中、深色），前端 2 秒后通知恢复主窗口大小
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-    int ww = 1440, wh = 900;
-    if (sw < ww) ww = sw - 40;
-    if (sh < wh) wh = sh - 60;
+    int ww = 480, wh = 560;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
     g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
@@ -467,4 +467,15 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
 
     CoUninitialize();
     return (int)msg.wParam;
+}
+
+// 启动特效结束（前端 JS 通知）：把悬浮小窗恢复为主窗口大小并居中
+void restoreMainWindow() {
+    if (!g_hMainWnd) return;
+    int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
+    int ww = 1440, wh = 900;
+    if (sw < ww) ww = sw - 40;
+    if (sh < wh) wh = sh - 60;
+    int x = (sw - ww) / 2, y = (sh - wh) / 2;
+    SetWindowPos(g_hMainWnd, NULL, x, y, ww, wh, SWP_SHOWWINDOW);
 }

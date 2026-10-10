@@ -3331,8 +3331,9 @@ function toggleDiagPanel() {
 // ================= 启动 =================
 async function boot() {
   try {
-    // 启动特效：短暂展示后淡出移除（仿迅雷启动画面）
+    // 启动特效：小窗展示 2 秒后通知原生恢复主窗口大小，再淡出移除
     setTimeout(() => {
+      callNative('restoreMainWindow').catch(() => {});
       const sp = document.getElementById('bootSplash');
       if (sp) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 650); }
     }, 2100);
