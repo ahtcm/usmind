@@ -2694,6 +2694,17 @@ function toggleStyle(k) {
 }
 
 // ---- 图标 ----
+function setNodeIconData(node, icons) {
+  try {
+    const nd = nodeDataOf(node);
+    const dd = (nd && nd.data) || nd || {};
+    if (icons && icons.length) dd.icon = icons; else delete dd.icon;
+    // 清渲染缓存强制全量重建（同附件逻辑，确保图标按最新布局渲染）
+    try { if (mind && mind.renderer) { mind.renderer.nodeCache = {}; mind.renderer.lastNodeCache = {}; } } catch (eC) {}
+    try { mind.render(); } catch (e) {}
+    markDirty();
+  } catch (e) {}
+}
 function openIconDialog(node) {
   iconTarget = node;
   const gn = $('iconGridNum');
@@ -2702,10 +2713,7 @@ function openIconDialog(node) {
     const c = document.createElement('div');
     c.className = 'icon-cell';
     c.innerHTML = numSvg(i);
-    c.addEventListener('click', () => {
-      try { mind.execCommand('SET_NODE_ICON', iconTarget, [String(i)]); } catch (e) {}
-      finishIcon();
-    });
+    c.addEventListener('click', () => { setNodeIconData(iconTarget, [String(i)]); finishIcon(); });
     gn.appendChild(c);
   }
   const ge = $('iconGridEmoji');
@@ -2714,10 +2722,7 @@ function openIconDialog(node) {
     const c = document.createElement('div');
     c.className = 'icon-cell';
     c.innerHTML = emojiSvg(em);
-    c.addEventListener('click', () => {
-      try { mind.execCommand('SET_NODE_ICON', iconTarget, [em]); } catch (e) {}
-      finishIcon();
-    });
+    c.addEventListener('click', () => { setNodeIconData(iconTarget, [em]); finishIcon(); });
     ge.appendChild(c);
   });
   $('iconDialog').style.display = 'flex';
@@ -2913,9 +2918,10 @@ function initNodeEdit() {
   document.addEventListener('mousedown', (e) => {
     if (e.target.closest && !e.target.closest('#ctxMenu')) hideCtxMenu();
   });
-  // 样式条按钮
-  $('styleBar').querySelectorAll('[data-style]').forEach(b => {
-    b.addEventListener('click', () => toggleStyle(b.dataset.style));
+  // 样式条按钮（mousedown 事件委托：个别环境 click 不冒泡/被吞，按下即生效最稳）
+  document.addEventListener('mousedown', (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('#styleBar [data-style]') : null;
+    if (b) { toggleStyle(b.dataset.style); }
   });
   $('sbFontPlus').addEventListener('click', () => {
     try { setNodeStyle({ fontSize: (currentStyleFontSize() || 14) + 2 }); } catch (e) {}
@@ -2930,7 +2936,7 @@ function initNodeEdit() {
   $('sbClose').addEventListener('click', () => { $('styleBar').style.display = 'none'; styleNode = null; });
   // 图标弹窗
   $('iconClear').addEventListener('click', () => {
-    try { mind.execCommand('SET_NODE_ICON', iconTarget, []); } catch (e) {}
+    setNodeIconData(iconTarget, null);
     finishIcon();
   });
   $('iconCancel').addEventListener('click', () => { $('iconDialog').style.display = 'none'; iconTarget = null; });
