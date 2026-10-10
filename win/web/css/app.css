@@ -361,6 +361,20 @@ body {
 .row-desc { font-size: 11px; color: #565c6e; margin-top: 6px; }
 .muted-text { font-size: 12px; color: #444a5a; line-height: 28px; }
 
+#themeEditDialog .dialog-foot .btn {
+  height: 38px; padding: 0 28px; border-radius: 12px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(20,30,60,.14); background: #fff;
+  color: #3a3f4e; transition: all .15s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#themeEditDialog .dialog-foot .btn:hover { background: #f3f5fa; border-color: rgba(20,30,60,.24); transform: translateY(-1px); }
+#themeEditDialog .dialog-foot .btn-primary {
+  background: linear-gradient(135deg, #6C8CFF, #8B5CF6);
+  color: #fff; border: none;
+  box-shadow: 0 5px 16px rgba(107,124,255,.38);
+}
+#themeEditDialog .dialog-foot .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .btn-primary {
   height: 36px; border: none; border-radius: 10px;
   background: linear-gradient(135deg, #6C8CFF, #8B5CF6);
