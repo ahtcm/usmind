@@ -987,6 +987,7 @@ if (_bif) _bif.addEventListener('change', () => {
       const data = cv.toDataURL('image/jpeg', 0.85);
       $('teBgImage').dataset.data = data;
       $('teBgImage').value = '已选择：' + f.name;
+      updateTePreview();
       toast('背景图已选择');
     };
     img.onerror = () => toast('图片读取失败', 'error');
@@ -1009,6 +1010,7 @@ if (_bvf) _bvf.addEventListener('change', async () => {
   }
   $('teBgVideo').dataset.data = stored || f.name;
   $('teBgVideo').value = '已选择：' + f.name;
+  updateTePreview();
   _bvf.value = '';
 });
 // 面板滚动：拦截滚轮冒泡，防止被导图缩放逻辑抢走
@@ -1190,9 +1192,9 @@ function openThemeEdit(name) {
   $('teRootFont').value = editing ? (editing.rootFont || 'SimHei, Microsoft YaHei, sans-serif') : (cfg ? (cfg.root.fontFamily || 'SimHei, Microsoft YaHei, sans-serif') : 'SimHei, Microsoft YaHei, sans-serif');
   $('teAttachColor').value = editing ? (editing.attachText || '#e53935') : (cfg ? (cfg.attachTextColor || '#e53935') : '#e53935');
   $('teBgImage').dataset.data = editing ? (editing.bgImage || '') : (cfg && cfg.backgroundImage && cfg.backgroundImage !== 'none' ? cfg.backgroundImage : '');
-  $('teBgImage').value = $('teBgImage').dataset.data ? '已选择' : '';
+  $('teBgImage').value = $('teBgImage').dataset.data ? '已选择：' + bgFileName($('teBgImage').dataset.data) : '';
   $('teBgVideo').dataset.data = editing ? (editing.bgVideo || '') : (cfg && cfg.backgroundVideo && cfg.backgroundVideo !== 'none' ? cfg.backgroundVideo : '');
-  $('teBgVideo').value = $('teBgVideo').dataset.data ? '已选择' : '';
+  $('teBgVideo').value = $('teBgVideo').dataset.data ? '已选择：' + bgFileName($('teBgVideo').dataset.data) : '';
   $('teBgOpacity').value = editing ? (editing.bgOpacity != null ? Math.round(editing.bgOpacity * 100) : 80) : (cfg && cfg.backgroundOpacity != null ? Math.round(cfg.backgroundOpacity * 100) : 80);
   $('teBgZoom').value = editing ? (editing.bgZoom != null ? editing.bgZoom : 1.4) : (cfg ? (cfg.backgroundZoom || 1.4) : 1.4);
   updateTePreview();
@@ -1223,6 +1225,7 @@ function renderTeColors(colors) {
   });
 }
 function currentTeColors() { return Array.from($('teColors').querySelectorAll('input[type=color]')).map(i => i.value); }
+function bgFileName(u) { try { return decodeURIComponent(String(u).split(/[\\/]/).pop() || ''); } catch (e) { return ''; } }
 function updateTePreview() {
   const colors = currentTeColors();
   const root = $('tpRoot');
@@ -1239,6 +1242,33 @@ function updateTePreview() {
     row.appendChild(sw); row.appendChild(sp);
     br.appendChild(row);
   });
+  // 背景：画布颜色 + 背景图片/视频 实时预览
+  const pv = document.querySelector('.te-preview');
+  if (!pv) return;
+  pv.querySelectorAll('.tp-bg-media').forEach(x => x.remove());
+  const bgColor = $('teCanvasBg').value || '#fafbff';
+  const bgImg = $('teBgImage').dataset.data || '';
+  const bgVid = $('teBgVideo').dataset.data || '';
+  pv.style.background = bgColor;
+  if (bgImg) {
+    pv.style.backgroundImage = 'url("' + bgImg.replace(/"/g, '\\"') + '")';
+    pv.style.backgroundSize = 'cover';
+    pv.style.backgroundPosition = 'center';
+  } else {
+    pv.style.backgroundImage = 'none';
+    pv.style.backgroundSize = 'auto';
+    pv.style.backgroundPosition = '0 0';
+  }
+  if (bgVid) {
+    const v = document.createElement('video');
+    v.className = 'tp-bg-media';
+    v.src = bgVid;
+    v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
+    v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;border-radius:12px;pointer-events:none;';
+    pv.appendChild(v);
+  }
+  root.style.position = 'relative'; root.style.zIndex = '1';
+  br.style.position = 'relative'; br.style.zIndex = '1';
 }
 function saveThemeFromDialog() {
   const name = $('teName').value.trim();
