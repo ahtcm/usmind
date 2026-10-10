@@ -224,6 +224,17 @@ std::wstring dirOf(const std::wstring& path) {
 }
 
 // ---------------- 项目文件保存位置 ----------------
+// 默认：C:\Users\<用户名>\usmind（没有则自动创建）
+std::wstring defaultProjectDir() {
+    wchar_t buf[32768];
+    DWORD n = GetEnvironmentVariableW(L"USERPROFILE", buf, 32768);
+    if (n > 0 && n < 32768) {
+        std::wstring d = std::wstring(buf) + L"\\usmind";
+        CreateDirectoryW(d.c_str(), NULL);
+        return d;
+    }
+    return appDir() + L"\\history";
+}
 std::wstring projectDir() {
     Settings s = loadSettings();
     if (!s.historyDir.empty()) {
@@ -232,7 +243,7 @@ std::wstring projectDir() {
             return appDir() + L"\\" + s.historyDir;
         return s.historyDir;
     }
-    return appDir() + L"\\history";
+    return defaultProjectDir();
 }
 
 bool ensureProjectDir() {

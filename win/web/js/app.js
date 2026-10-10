@@ -1055,8 +1055,7 @@ async function fillSettings() {
   themeMenu.style.display = 'none';
   // 项目文件保存位置
   const app = await callNative('getAppInfo');
-  $('setHistoryDir').value = s.historyDir || '（默认：程序目录 \\history）';
-  $('historyDirDesc').textContent = (app && app.projectDir) ? '当前实际目录：' + app.projectDir + '　·　新文档保存时目录已有同名文件才弹出确认' : '';
+  $('setHistoryDir').value = s.historyDir || '（默认：用户目录 \\usmind）';
   $('assocState').textContent = s.registerAssoc ? '已注册，双击 .usmind 文件即可打开' : '未注册';
   // 本地偏好（localStorage）
   $('setRainbow').checked = localSetting('rainbow', true);
