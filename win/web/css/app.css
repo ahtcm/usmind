@@ -697,8 +697,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   transition: opacity .55s ease; opacity: 1;
 }
-/* 启动特效阶段：主界面完全隐藏，特效才能透明悬浮在桌面上 */
-body.splash-mode #app { display: none; }
+/* 启动特效阶段：splash 全屏覆盖，主界面在其下正常初始化（不隐藏，避免容器宽高为0报错） */
 #bootSplash.hide { opacity: 0; pointer-events: none; }
 .bs-inner { text-align: center; }
 .bs-logo-wrap { position: relative; width: 150px; height: 150px; margin: 0 auto 20px; }
