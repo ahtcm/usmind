@@ -263,7 +263,7 @@ body {
 /* ---------- 主题网格 ---------- */
 .theme-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  max-height: 440px; overflow-y: auto; overflow-x: hidden;
+  max-height: 470px; overflow-y: auto; overflow-x: hidden;
   align-content: start; padding-right: 6px;
 }
 /* 主题网格滚动条（细透明统一） */
@@ -272,7 +272,7 @@ body {
 .theme-grid::-webkit-scrollbar-thumb:hover { background: rgba(110,120,150,.4); }
 .theme-grid::-webkit-scrollbar-track { background: transparent; }
 .theme-card {
-  height: 116px; display: flex; flex-direction: column;
+  height: 140px; display: flex; flex-direction: column;
   border: 1px solid var(--border-soft); border-radius: 12px;
   background: var(--bg2); cursor: pointer; overflow: hidden;
   box-shadow: 0 2px 8px rgba(30,40,70,.05);
@@ -281,8 +281,8 @@ body {
 .theme-card:hover { border-color: #3d4466; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(30,40,70,.12); }
 .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .theme-preview {
-  height: 80px; display: flex; align-items: flex-end; justify-content: center;
-  padding: 0 8px 6px;
+  flex: 1; display: flex; align-items: flex-end; justify-content: center;
+  padding: 0 8px 30px; position: relative;
   /* 背景由 JS 设置渐变 */
 }
 .theme-preview .bar {
@@ -294,12 +294,13 @@ body {
 }
 .theme-preview .node-dot.root { height: 18px; border-radius: 4px; }
 .theme-card .tc-name {
-  height: 36px; display: flex; align-items: center; justify-content: center;
-  padding: 0 8px; font-size: 13px; font-weight: 600; color: #3a3f4e;
+  position: absolute; left: 0; right: 0; bottom: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 8px; font-size: 13px; font-weight: 600; color: #fff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  border-top: 1px solid rgba(0,0,0,.05);
+  text-shadow: 0 1px 4px rgba(0,0,0,.5), 0 0 8px rgba(0,0,0,.25);
 }
-.theme-card.active .tc-name { color: var(--accent); }
+.theme-card.active .tc-name { color: #fff; font-weight: 700; }
 
 /* ---------- 历史列表 ---------- */
 .history-list { display: flex; flex-direction: column; gap: 8px; }
