@@ -1111,8 +1111,8 @@ function loadCustomThemes() {
     // 节点背景与原项目一致：second/node 不按配色染色（白底），branchColors 仅用于彩虹分支线
     if (t.canvasBg) config.backgroundColor = t.canvasBg;
     if (t.lineWidth != null) config.lineWidth = t.lineWidth;
-    if (t.bgImage) config.backgroundImage = t.bgImage;
-    if (t.bgVideo) config.backgroundVideo = t.bgVideo;
+    if (t.bgImage) config.backgroundImage = t.bgImage; else delete config.backgroundImage;
+    if (t.bgVideo) config.backgroundVideo = t.bgVideo; else delete config.backgroundVideo;
     if (t.bgOpacity != null) config.backgroundOpacity = t.bgOpacity;
     if (t.bgZoom != null) config.backgroundZoom = t.bgZoom;
     if (t.attachText) config.attachTextColor = t.attachText;
