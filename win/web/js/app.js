@@ -2933,7 +2933,9 @@ function initNodeEdit() {
     try { setNodeStyle({ fontSize: Math.max(8, (currentStyleFontSize() || 14) - 2) }); } catch (e) {}
   });
   $('sbColor').addEventListener('input', (e) => { try { setNodeStyle({ color: e.target.value }); } catch (e2) {} });
+  $('sbColor').addEventListener('change', (e) => { try { setNodeStyle({ color: e.target.value }); } catch (e2) {} });
   $('sbBgColor').addEventListener('input', (e) => { try { setNodeStyle({ fillColor: e.target.value }); } catch (e2) {} });
+  $('sbBgColor').addEventListener('change', (e) => { try { setNodeStyle({ fillColor: e.target.value }); } catch (e2) {} });
   $('sbClose').addEventListener('click', () => { $('styleBar').style.display = 'none'; styleNode = null; });
   // 图标弹窗
   $('iconClear').addEventListener('click', () => {
