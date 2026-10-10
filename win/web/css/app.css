@@ -346,12 +346,16 @@ body {
 .setting-row > label {
   display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 7px;
 }
-.setting-row select, .setting-row input[type="text"] {
-  width: 100%; height: 34px; border-radius: 10px;
+.setting-row select, .setting-row input[type="text"], .setting-row input[type="number"] {
+  height: 34px; border-radius: 10px;
   border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.7);
   color: #2a2e3d; padding: 0 12px; font-size: 13px; outline: none;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.03);
+  transition: border-color .15s, box-shadow .15s;
 }
-.setting-row select:focus, .setting-row input[type="text"]:focus { border-color: var(--accent); }
+.setting-row select, .setting-row input[type="text"] { width: 100%; }
+.setting-row input[type="number"] { width: 74px; }
+.setting-row select:focus, .setting-row input[type="text"]:focus, .setting-row input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,108,247,.12); }
 .row-inline { display: flex; gap: 8px; }
 .row-inline input { flex: 1; }
 .row-desc { font-size: 11px; color: #8a8f9e; margin-top: 6px; }
