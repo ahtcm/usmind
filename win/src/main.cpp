@@ -436,9 +436,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
     int ww = 480, wh = 560;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
-    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW, L"UsmindMainWnd", L"USMIND 思维导图",
+    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
     if (!g_hMainWnd) return 1;
+    // 启动特效阶段：窗口纯黑像素透明（悬浮在桌面上，无窗体感）
+    SetLayeredWindowAttributes(g_hMainWnd, RGB(0, 0, 0), 0, LWA_COLORKEY);
 
     // Win11 圆角
     {
@@ -478,4 +480,6 @@ void restoreMainWindow() {
     if (sh < wh) wh = sh - 60;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
     SetWindowPos(g_hMainWnd, NULL, x, y, ww, wh, SWP_SHOWWINDOW);
+    // 恢复不透明（主界面正常显示）
+    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 }

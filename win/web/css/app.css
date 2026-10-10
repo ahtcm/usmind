@@ -693,10 +693,12 @@ body {
 /* 启动特效（仿迅雷：电光 + 光环 + 粒子 + logo 渐入） */
 #bootSplash {
   position: fixed; inset: 0; z-index: 99999;
-  background: radial-gradient(1200px 700px at 50% 42%, #16223f 0%, #0a0f1e 62%, #070b16 100%);
+  background: #000;
   display: flex; align-items: center; justify-content: center;
   transition: opacity .55s ease; opacity: 1;
 }
+/* 启动特效阶段：主界面完全隐藏，特效才能透明悬浮在桌面上 */
+body.splash-mode #app { display: none; }
 #bootSplash.hide { opacity: 0; pointer-events: none; }
 .bs-inner { text-align: center; }
 .bs-logo-wrap { position: relative; width: 150px; height: 150px; margin: 0 auto 20px; }

@@ -3331,9 +3331,12 @@ function toggleDiagPanel() {
 // ================= 启动 =================
 async function boot() {
   try {
+    // 启动特效阶段：隐藏主界面，仅显示透明悬浮特效
+    document.body.classList.add('splash-mode');
     // 启动特效：小窗展示 2 秒后通知原生恢复主窗口大小，再淡出移除
     setTimeout(() => {
       callNative('restoreMainWindow').catch(() => {});
+      document.body.classList.remove('splash-mode');
       const sp = document.getElementById('bootSplash');
       if (sp) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 650); }
     }, 2100);
