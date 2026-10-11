@@ -729,8 +729,11 @@ function initMindMap() {
     beforeTextEdit: (node) => {
       try {
         if (!node) return true;
-        const hasAtt = !!(node.getData('attachmentUrl') || node.getData('attachUrl') || node.getData('attachmentName'));
+        const dd = node.getData ? (node.getData() || {}) : {};
+        const hasAtt = !!(dd.attachmentUrl || dd.attachUrl || dd.attachmentName);
         if (hasAtt) return false;
+        // 公式节点不进入库的文本编辑（richText 序列化会把 text 实体化累积，双击公式走公式弹窗）
+        if (dd.mathLatex || /katex|mjx/.test(dd.text || '')) return false;
       } catch (e) {}
       return true;
     },
@@ -782,7 +785,7 @@ function initMindMap() {
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
   mind.on('scale', () => updateZoom());
   window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
-  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} });
+  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); });
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
@@ -1385,29 +1388,34 @@ function rebuildRawMathNodes() {
   try {
     const tree = mind.getData();
     const rootNode = (tree && tree.root) || tree; // getData 返回 { root: {...} }，要从 root 开始遍历
+    let changed = false;
     const walk = (t) => {
-      if (t && t.data && typeof t.data.text === 'string' && t.data.text.indexOf('katex') < 0) {
-        // mathLatex 优先；缺失时从 text 提取 $...$ 包裹部分作为 LaTeX（旧数据兼容）
+      if (t && t.data && typeof t.data.text === 'string') {
+        const text = t.data.text;
+        // 已是占位格式（标题 + [公式]）：无需重建
+        if (text.indexOf('[公式]') >= 0) { (t.children || []).forEach(walk); return; }
         let latex = t.data.mathLatex;
         if (!latex) {
-          const m = String(t.data.text).match(/\$([^$]+)\$/);
+          const m = text.match(/\$([^$]+)\$/);
           if (m) latex = m[1];
         }
-        if (!latex) { (t.children || []).forEach(walk); return; }
-        const inst = (mind.findNodeByUid && mind.findNodeByUid(t.data.uid)) || findRenderInstByUid(t.data.uid);
-        if (inst) {
-          const html = renderLatex(latex);
-          // 从旧 text 提取标题：优先取 $ 包裹前的部分，再剥掉含 LaTeX 源码特征（^ _ { } \）的片段
-          let title = String(t.data.text || '');
-          if (title.indexOf('$') >= 0) title = title.split('$')[0];
-          title = title.replace(/\s*[^\s]*[\^_{}\\]{1}[^\s]*\s*/g, ' ').trim();
-          if (!title) title = '公式';
-          mind.renderer.setNodeDataRender(inst, { text: escHtml(title) + ' ' + html, richText: true, mathLatex: latex });
+        // 有 LaTeX 但 text 不是占位格式（旧数据：纯源码 $..$、已渲染 KaTeX HTML、多层转义污染）
+        // → 统一重建为占位格式，避免库序列化把公式 HTML 打散累积
+        if (latex) {
+          const title = extractPlainTitle(text);
+          const inst = (mind.findNodeByUid && mind.findNodeByUid(t.data.uid)) || findRenderInstByUid(t.data.uid);
+          if (inst) {
+            mind.renderer.setNodeDataRender(inst, { text: mathPlaceholderText(title), richText: true, mathLatex: latex });
+          } else {
+            t.data.text = mathPlaceholderText(title);
+          }
+          changed = true;
         }
       }
       (t.children || []).forEach(walk);
     };
     walk(rootNode);
+    if (changed) scheduleMathInject();
   } catch (e) {}
 }
 function clearSelectionForExport() {
@@ -1440,6 +1448,8 @@ async function doExport(type) {
     try { rebuildRawMathNodes(); await new Promise(r => setTimeout(r, 300)); } catch (e) {} // 重建后等布局重排完成，导出布局才与屏幕一致
     // 字体就绪后强制全量重渲染，节点尺寸按已加载字体重新测量（避免导出节点被撑大/留白过多）
     try { mind.render(); await new Promise(r => setTimeout(r, 500)); } catch (e) {}
+    // 渲染完成后把公式占位注入为 KaTeX（foreignObject 在导出序列化时携带真实公式 HTML）
+    try { injectMathIntoFo(); await new Promise(r => setTimeout(r, 120)); } catch (e) {}
     const name = doc.name.replace(/\.usmind$/i, '');
     if (type === 'png' || type === 'jpeg' || type === 'jpg') await exportChunkedImages(type, name);
     else if (type === 'svg') await exportSvgSelf(name);
@@ -1889,6 +1899,84 @@ let noteTarget = null;     // 备注弹窗目标节点
 let mathOrigText = null;   // 公式编辑缓存（取消时恢复）
 let mathOrigLatex = '';
 let mathConfirmed = false;
+let mathCleanTitle = null; // 打开弹窗时从节点提取的干净标题（取消重建用）
+
+function htmlUnescape(s) {
+  return String(s || '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+// 迭代反转义直到稳定（兼容历史版本累积的 &lt;p&gt; / &amp;lt;p&amp;gt; 多层污染）
+function htmlUnescapeAll(s) {
+  let prev = String(s || ''), cur = prev, guard = 0;
+  do { prev = cur; cur = htmlUnescape(prev); guard++; } while (cur !== prev && guard < 8);
+  return cur;
+}
+// 迭代剥标签直到稳定（含未闭合标签兜底）
+function stripTagsAll(s) {
+  let prev = String(s || ''), cur = prev, guard = 0;
+  do { prev = cur; cur = prev.replace(/<[^>]*>/g, ' '); guard++; } while (cur !== prev && guard < 8);
+  cur = cur.replace(/<[^>]*/g, ' ').replace(/\s+/g, ' ').trim();
+  return cur;
+}
+// 从节点 text（richText HTML，可能含历史转义污染）提取纯文本标题：
+// 库渲染会把「标题 + 公式 span」规范化为多段 <p><span>…</span></p>（公式内容单列一段），
+// 所以先反转义成真标签，按 <p> 切段取第一个有内容的段作为标题，再剥标签压缩空白
+function extractPlainTitle(text) {
+  let s = htmlUnescapeAll(String(text || ''));
+  const parts = s.split(/<p[^>]*>/i);
+  for (const part of parts) {
+    let seg = stripTagsAll(part);
+    seg = seg.replace(/\[公式\d*\]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (seg) return seg;
+  }
+  return stripTagsAll(s).replace(/\[公式\d*\]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// 公式节点文本存储格式：纯文本「标题 + [公式]」（不含任何 HTML/实体）。
+// 库的 Quill 规范化对纯文本只包 <p>，不会把公式 HTML 打散成文本、也不会产生转义累积；
+// 真实 KaTeX 公式 HTML 由 injectMathIntoFo 在渲染完成后注入 foreignObject（显示层，不写入数据）。
+function mathPlaceholderText(title) { return escHtml(title || '公式') + ' [公式]'; }
+let _mathInjectTimer = null;
+function scheduleMathInject() {
+  clearTimeout(_mathInjectTimer);
+  _mathInjectTimer = setTimeout(() => { try { injectMathIntoFo(); } catch (e) {} }, 60);
+}
+// 渲染完成后把 foreignObject 内的 [公式] 占位文本替换为真实 KaTeX 渲染 HTML。
+// foreignObject 的文档顺序与数据树 DFS 顺序一致（折叠隐藏节点会减少 foreignObject，
+// 展开后 node_tree_render_end 会再次注入恢复），故用顺序映射取 latex。
+function injectMathIntoFo() {
+  try {
+    if (!mind || !mind.renderer) return;
+    const tree = mind.getData();
+    const rootNode = (tree && tree.root) || tree;
+    const flat = [];
+    const walk = (t) => { if (t && t.data) { flat.push(t.data); (t.children || []).forEach(walk); } };
+    walk(rootNode);
+    const fos = Array.from(document.querySelectorAll('.smm-container foreignObject'));
+    fos.forEach((fo, idx) => {
+      const dd = flat[idx];
+      if (!dd || !dd.mathLatex) return;
+      const div = fo.querySelector('div');
+      if (!div || !/\[公式\]/.test(div.textContent)) return;
+      const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const txt = node.textContent;
+        const idx = txt.indexOf('[公式]');
+        if (idx === -1) continue;
+        // 只替换 [公式] 占位片段，保留前后的标题文本（否则标题一并被公式吃掉，无法双击定位/编辑）
+        const span = document.createElement('span');
+        span.className = 'katex-inline';
+        span.innerHTML = renderLatex(dd.mathLatex);
+        const before = document.createTextNode(txt.slice(0, idx));
+        const after = document.createTextNode(txt.slice(idx + '[公式]'.length));
+        node.replaceWith(before, span, after);
+      }
+    });
+  } catch (e) {}
+}
 
 function escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function isRootNode(n) { try { return !!(n && (n.isRoot || (n.nodeData && n.nodeData.data && n.nodeData.data.isRoot))); } catch (e) { return false; } }
@@ -2801,14 +2889,15 @@ function openMathDialog(node, isEdit, preText) {
     try {
       const nd = nodeDataOf(node);
       mathOrigText = (preText !== undefined) ? preText : (((nd && nd.data) || nd || {}).text || '');
-      const m = mathOrigText.match(/^([^<]*)/);
-      title = m ? m[1].replace(/&nbsp;/g, ' ').trim() : '';
+      mathCleanTitle = extractPlainTitle(mathOrigText);
+      title = mathCleanTitle;
     } catch (e) {}
     $('mathTitle').value = title || '公式';
     $('mathInput').value = latex;
   } else {
     mathOrigText = null;
     mathOrigLatex = '';
+    mathCleanTitle = null;
     $('mathTitle').value = '公式';
     $('mathInput').value = '';
   }
@@ -2819,25 +2908,37 @@ function openMathDialog(node, isEdit, preText) {
 function closeMathDialog() {
   $('mathDialog').style.display = 'none';
   if (mathEditNode && !mathConfirmed && mathOrigText !== null) {
-    // 取消编辑：恢复节点原文，避免 TextEdit 写回破坏 KaTeX
-    try { mind.renderer.setNodeDataRender(mathEditNode, { text: mathOrigText, richText: true, mathLatex: mathOrigLatex }); } catch (e) {}
+    try {
+      const cur = $('mathTitle').value.trim();
+      if (mathOrigLatex && (cur === '' || cur === mathCleanTitle)) {
+        // 标题未修改（或清空）：写回打开时看到的干净版本（纯文本标题 + [公式] 占位），
+        // 顺带修复历史版本累积的 &lt;p&gt; 转义污染，避免再次编辑时多一层
+        const title = mathCleanTitle || '公式';
+        mind.renderer.setNodeDataRender(mathEditNode, { text: mathPlaceholderText(title), richText: true, mathLatex: mathOrigLatex });
+        scheduleMathInject();
+      } else {
+        // 用户已修改标题却取消：恢复原始 text，不破坏
+        mind.renderer.setNodeDataRender(mathEditNode, { text: mathOrigText, richText: true, mathLatex: mathOrigLatex });
+      }
+    } catch (e) {}
   }
   mathTarget = null;
   mathEditNode = null;
   mathOrigText = null;
   mathOrigLatex = '';
+  mathCleanTitle = null;
   mathConfirmed = false;
 }
 function mathConfirm() {
   const raw = $('mathInput').value.trim();
   if (!raw) { closeMathDialog(); return; }
   mathConfirmed = true;
-  const html = renderLatex(raw);
   const title = ($('mathTitle').value.trim() || '公式');
-  const full = escHtml(title) + ' ' + html;
+  const full = mathPlaceholderText(title);
   try {
     if (mathEditNode) {
       mind.renderer.setNodeDataRender(mathEditNode, { text: full, richText: true, mathLatex: raw });
+      scheduleMathInject();
     } else {
       // 插入模式：写到选中节点本身（同原项目 setNodeDataRender 整体替换），而不是新建子节点
       let target = null;
@@ -2895,6 +2996,23 @@ function noteConfirm() {
 }
 
 function initNodeEdit() {
+  // 公式节点拦截：阻止库 TextEdit 打开文本编辑（其 richText 序列化会把节点 text 包成
+  // <p><span> 并实体化，每次双击保存就多一层转义污染）；公式节点一律走公式弹窗
+  try {
+    const te = mind.renderer && mind.renderer.textEdit;
+    if (te && !te.__formulaGuard) {
+      te.__formulaGuard = true;
+      const origShow = te.show.bind(te);
+      te.show = function (opts) {
+        try {
+          const n = opts && opts.node;
+          const dd = n && n.getData ? (n.getData() || {}) : {};
+          if (dd.mathLatex || /katex/.test(dd.text || '')) return; // 公式节点：不进入文本编辑
+        } catch (e) {}
+        return origShow(opts);
+      };
+    }
+  } catch (e) {}
   // 右键菜单（平时隐藏样式条，仅点"节点样式"才显示）
   try {
     mind.on('node_contextmenu', (a, b) => {
@@ -3420,6 +3538,7 @@ function fixAttachNodeTexts() {
     // 自动重建"未渲染"的公式节点（旧数据/KaTeX 失败时 text 存的是 LaTeX 源码）：用 mathLatex 重渲染为内联公式
     rebuildRawMathNodes();
   } catch (e) {}
+  try { injectMathIntoFo(); } catch (e) {}
   try {
     const tree = mind.getData();
     let needRender = false;
