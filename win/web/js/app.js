@@ -1943,6 +1943,29 @@ function scheduleMathInject() {
   clearTimeout(_mathInjectTimer);
   _mathInjectTimer = setTimeout(() => { try { injectMathIntoFo(); } catch (e) {} }, 60);
 }
+// KaTeX 是行高塌陷结构（inline 行框只有一行高，上标/分式等视觉内容溢出容器），
+// 节点尺寸按占位文本测量会偏小 → 注入后按内容实测把 foreignObject 撑到真实宽高，
+// 公式才完整显示（导出 SVG 时这些尺寸属性也会被序列化携带）。
+function resizeMathFos() {
+  try {
+    const fos = Array.from(document.querySelectorAll('.smm-container foreignObject'));
+    fos.forEach(fo => {
+      const inner = fo.firstElementChild;
+      if (!inner) return;
+      const aw = parseInt(fo.getAttribute('width')) || 0;
+      const ah = parseInt(fo.getAttribute('height')) || 0;
+      const nw = Math.max(aw, Math.ceil(inner.scrollWidth) + 2);
+      const nh = Math.max(ah, Math.ceil(inner.scrollHeight) + 2);
+      if (nw !== aw || nh !== ah) {
+        fo.setAttribute('width', nw);
+        fo.setAttribute('height', nh);
+        fo.style.width = nw + 'px';
+        fo.style.height = nh + 'px';
+      }
+    });
+  } catch (e) {}
+}
+let _mathResizeTimer = null;
 // 渲染完成后把 foreignObject 内的 [公式] 占位文本替换为真实 KaTeX 渲染 HTML。
 // foreignObject 的文档顺序与数据树 DFS 顺序一致（折叠隐藏节点会减少 foreignObject，
 // 展开后 node_tree_render_end 会再次注入恢复），故用顺序映射取 latex。
@@ -1964,17 +1987,22 @@ function injectMathIntoFo() {
       let node;
       while ((node = walker.nextNode())) {
         const txt = node.textContent;
-        const idx = txt.indexOf('[公式]');
-        if (idx === -1) continue;
+        const idx2 = txt.indexOf('[公式]');
+        if (idx2 === -1) continue;
         // 只替换 [公式] 占位片段，保留前后的标题文本（否则标题一并被公式吃掉，无法双击定位/编辑）
         const span = document.createElement('span');
         span.className = 'katex-inline';
         span.innerHTML = renderLatex(dd.mathLatex);
-        const before = document.createTextNode(txt.slice(0, idx));
-        const after = document.createTextNode(txt.slice(idx + '[公式]'.length));
+        const before = document.createTextNode(txt.slice(0, idx2));
+        const after = document.createTextNode(txt.slice(idx2 + '[公式]'.length));
         node.replaceWith(before, span, after);
       }
     });
+    // 注入后按内容实测撑高/撑宽 foreignObject（KaTeX 行高塌陷，节点测量高度不足）
+    resizeMathFos();
+    clearTimeout(_mathResizeTimer);
+    // 延迟一次再修正：KaTeX 布局/字体渲染完成后高度才稳定，重试一次保证收敛
+    _mathResizeTimer = setTimeout(() => { try { resizeMathFos(); } catch (e) {} }, 200);
   } catch (e) {}
 }
 
