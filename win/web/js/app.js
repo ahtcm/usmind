@@ -2677,22 +2677,16 @@ async function openMarkdownPreview(node, att) {
   try {
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     nameEl.textContent = att.name;
-    // 头部固定"编辑"按钮（不随内容滚动，用户可直接进入编辑保存）
-    let headBtn = $('mdHeadEditBtn');
-    if (!headBtn) {
-      headBtn = document.createElement('button');
-      headBtn.id = 'mdHeadEditBtn';
-      headBtn.textContent = '编辑';
-      headBtn.style.cssText = 'margin-left:12px;padding:5px 14px;border:1px solid #d0d3d6;border-radius:8px;background:#0e7c86;color:#fff;cursor:pointer;font-size:12px;';
-      const closeBtn = $('docPreviewClose');
-      closeBtn.parentNode.insertBefore(headBtn, closeBtn);
+    // 头部右上角固定"编辑"按钮（× 左侧，不随内容滚动，用户可直接进入编辑保存）
+    const headBtn = $('mdHeadEditBtn');
+    if (headBtn) {
+      headBtn.style.display = '';
+      headBtn.onclick = () => {
+        $('docPreview').style.display = 'none';
+        $('docPreviewBody').innerHTML = '';
+        openTextPreview(node, att, true); // 直接进入可编辑+保存
+      };
     }
-    headBtn.style.display = '';
-    headBtn.onclick = () => {
-      $('docPreview').style.display = 'none';
-      $('docPreviewBody').innerHTML = '';
-      openTextPreview(node, att, true); // 直接进入可编辑+保存
-    };
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在渲染…</div>';
     $('docPreview').style.display = 'flex';
     let text = '';

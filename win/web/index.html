@@ -301,7 +301,10 @@
     <div style="background:#fff; border-radius:14px; width:86%; max-width:1000px; height:86%; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.4); overflow:hidden;">
       <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid #e8eaed; flex:0 0 auto;">
         <span id="docPreviewName" style="font-size:14px; font-weight:600; color:#333; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
-        <button id="docPreviewClose" style="border:none; background:#f1f3f5; border-radius:8px; width:28px; height:28px; font-size:14px; cursor:pointer; color:#555;">✕</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button id="mdHeadEditBtn" style="display:none; padding:5px 14px; border:1px solid #d0d3d6; border-radius:8px; background:#0e7c86; color:#fff; cursor:pointer; font-size:12px;">编辑</button>
+          <button id="docPreviewClose" style="border:none; background:#f1f3f5; border-radius:8px; width:28px; height:28px; font-size:14px; cursor:pointer; color:#555;">✕</button>
+        </div>
       </div>
       <div id="docPreviewBody" style="flex:1 1 auto; overflow:auto; padding:14px 18px; background:#fff;"></div>
     </div>
@@ -458,6 +461,6 @@
 <script src="vendor/docpreview/marked.min.js"></script>
 <script src="vendor/jszip/jszip.min.js"></script>
 <script src="vendor/html2canvas/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261011d"></script>
+<script type="module" src="js/app.js?v=20261011e"></script>
 </body>
 </html>
