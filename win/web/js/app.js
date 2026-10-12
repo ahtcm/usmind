@@ -2396,7 +2396,8 @@ function renderFileNode(child, file) {
 }
 
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
-async function openTextPreview(node, att) {
+// startEditable=true 时（markdown 入口）直接进入可编辑+保存，无需再点一次"编辑"
+async function openTextPreview(node, att, startEditable) {
   try {
     // 兜底：打开 CodeMirror 前强制隐藏库文本编辑框（库的 show 晚于双击监听，需状态+DOM 双重复位）
     forceHideTextEdit();
@@ -2448,6 +2449,13 @@ async function openTextPreview(node, att) {
     saveBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none';
     bar.appendChild(cancelEdit); bar.appendChild(saveBtn); bar.appendChild(editBtn);
     body.appendChild(bar);
+    // markdown 入口直接进入可编辑+保存
+    if (startEditable) {
+      cm.setOption('readOnly', false);
+      editBtn.style.display = 'none';
+      cancelEdit.style.display = ''; saveBtn.style.display = '';
+      cm.focus();
+    }
     editBtn.addEventListener('click', () => {
       cm.setOption('readOnly', false);
       editBtn.style.display = 'none';
@@ -2634,6 +2642,8 @@ async function openDocPreview(att) {
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在加载…</div>';
     nameEl.textContent = att.name;
+    // 非 markdown 预览隐藏头部"编辑"按钮
+    const hb = $('mdHeadEditBtn'); if (hb) hb.style.display = 'none';
     $('docPreview').style.display = 'flex';
     const buf = await loadAttachmentBuffer(att);
     if (ext === 'pdf') {
@@ -2662,11 +2672,27 @@ async function openDocPreview(att) {
   }
 }
 
-// markdown 附件：渲染预览（marked + KaTeX 公式），可切换 CodeMirror 编辑
+// markdown 附件：渲染预览（marked + KaTeX 公式），头部固定"编辑"按钮一键切换到 CodeMirror 编辑+保存
 async function openMarkdownPreview(node, att) {
   try {
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     nameEl.textContent = att.name;
+    // 头部固定"编辑"按钮（不随内容滚动，用户可直接进入编辑保存）
+    let headBtn = $('mdHeadEditBtn');
+    if (!headBtn) {
+      headBtn = document.createElement('button');
+      headBtn.id = 'mdHeadEditBtn';
+      headBtn.textContent = '编辑';
+      headBtn.style.cssText = 'margin-left:12px;padding:5px 14px;border:1px solid #d0d3d6;border-radius:8px;background:#0e7c86;color:#fff;cursor:pointer;font-size:12px;';
+      const closeBtn = $('docPreviewClose');
+      closeBtn.parentNode.insertBefore(headBtn, closeBtn);
+    }
+    headBtn.style.display = '';
+    headBtn.onclick = () => {
+      $('docPreview').style.display = 'none';
+      $('docPreviewBody').innerHTML = '';
+      openTextPreview(node, att, true); // 直接进入可编辑+保存
+    };
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在渲染…</div>';
     $('docPreview').style.display = 'flex';
     let text = '';
@@ -2689,15 +2715,7 @@ async function openMarkdownPreview(node, att) {
         });
       }
     } catch (eK) {}
-    body.innerHTML = '<div class="doc-md">' + html + '</div>'
-      + '<div style="margin-top:12px;text-align:right;"><button id="mdEditBtn" style="padding:6px 14px;border:1px solid #d0d3d6;border-radius:8px;background:#f6f8fa;cursor:pointer;font-size:13px;color:#333;">用编辑器打开</button></div>';
-    try {
-      $('mdEditBtn').addEventListener('click', () => {
-        $('docPreview').style.display = 'none';
-        $('docPreviewBody').innerHTML = '';
-        openTextPreview(node, att);
-      });
-    } catch (eE) {}
+    body.innerHTML = '<div class="doc-md">' + html + '</div>';
   } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
 }
 
@@ -3318,6 +3336,7 @@ function bindUi() {
   $('docPreviewClose').addEventListener('click', () => {
     $('docPreviewBody').innerHTML = '';
     $('docPreview').style.display = 'none';
+    const hb = $('mdHeadEditBtn'); if (hb) hb.style.display = 'none';
   });
   $('imgFileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
