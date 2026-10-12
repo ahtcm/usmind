@@ -2416,6 +2416,7 @@ function exitFullscreen() {
 // startEditable=true 时（markdown 入口）直接进入可编辑+保存，无需再点一次"编辑"
 async function openTextPreview(node, att, startEditable) {
   try {
+    exitFullscreen(); // 打开新附件前清理可能残留的全屏状态
     // 兜底：打开 CodeMirror 前强制隐藏库文本编辑框（库的 show 晚于双击监听，需状态+DOM 双重复位）
     forceHideTextEdit();
     if (typeof CodeMirror === 'undefined') { toast('预览组件缺失', 'error'); return; }
@@ -2431,7 +2432,7 @@ async function openTextPreview(node, att, startEditable) {
     wrap.innerHTML = '<div class="attp-mask"></div><div class="attp-box"><div class="attp-head"><span class="attp-title"></span><button class="attp-close">×</button></div><div class="attp-body"></div></div>';
     document.body.appendChild(wrap);
     wrap.querySelector('.attp-title').textContent = name;
-    const close = () => { if (wrap && wrap.parentNode) wrap.remove(); forceHideTextEdit(); };
+    const close = () => { if (wrap && wrap.parentNode) wrap.remove(); forceHideTextEdit(); exitFullscreen(); };
     wrap.querySelector('.attp-close').addEventListener('click', close);
     wrap.querySelector('.attp-mask').addEventListener('click', close);
     const body = wrap.querySelector('.attp-body');
@@ -2789,6 +2790,7 @@ function enterDocxEdit(node, att, html) {
       $('docPreview').style.display = 'none';
       $('docPreviewBody').innerHTML = '';
       sb.style.display = 'none';
+      exitFullscreen();
       toast('已保存: ' + att.name);
     } catch (eS) { toast('保存失败: ' + (eS && eS.message || eS), 'error'); }
   };
@@ -2870,6 +2872,7 @@ async function htmlToDocx(html) {
 // docx/xlsx/pdf 内置预览（离线：mammoth / SheetJS / Chromium 原生 PDF）
 async function openDocPreview(node, att) {
   try {
+    exitFullscreen(); // 打开新附件前清理可能残留的全屏状态
     const ext = (att.name.split('.').pop() || '').toLowerCase();
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
     body.innerHTML = '<div style="padding:40px;text-align:center;color:#999;">正在加载…</div>';
@@ -2989,6 +2992,7 @@ async function openDocPreview(node, att) {
         saveBtn.style.display = 'none';
         state.__done = true;
         _xlsxState = null;
+        exitFullscreen();
         toast('已保存: ' + att.name);
       } catch (eS) { toast('保存失败: ' + (eS && eS.message || eS), 'error'); }
     };
@@ -3012,6 +3016,7 @@ async function openMarkdownPreview(node, att) {
       headBtn.onclick = () => {
         $('docPreview').style.display = 'none';
         $('docPreviewBody').innerHTML = '';
+        exitFullscreen();
         openTextPreview(node, att, true); // 直接进入可编辑+保存
       };
     }
@@ -3691,6 +3696,7 @@ function bindUi() {
     $('docPreviewBody').innerHTML = '';
     $('docPreview').style.display = 'none';
     const hb = $('mdHeadEditBtn'); if (hb) hb.style.display = 'none';
+    exitFullscreen(); // 全屏残留清理：防磨砂 ✕ 覆盖自绘标题栏最大化按钮
   });
   $('imgFileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
