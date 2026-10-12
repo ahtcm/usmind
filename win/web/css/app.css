@@ -666,6 +666,15 @@ body {
 .doc-md table { border-collapse: collapse; margin: 10px 0; }
 .doc-md table td, .doc-md table th { border: 1px solid #c9cdd6; padding: 5px 10px; }
 .doc-md table th { background: #f1f3f5; font-weight: 600; }
+/* markdown 预览双栏：左目录 + 右内容 */
+#docPreview .md-layout { display: flex; align-items: stretch; height: 100%; }
+#docPreview .md-toc { flex: 0 0 190px; border-right: 1px solid #e8eaed; background: #fafbfc; overflow: auto; padding: 10px 8px; box-sizing: border-box; }
+#docPreview .md-toc-title { font-size: 12px; font-weight: 700; color: #57606a; padding: 2px 6px 8px; letter-spacing: 1px; border-bottom: 1px solid #e8eaed; margin-bottom: 6px; }
+#docPreview .md-toc-item { display: block; padding: 3px 6px; margin: 1px 0; color: #57606a; font-size: 12.5px; line-height: 1.5; text-decoration: none; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+#docPreview .md-toc-item:hover { background: #eef1f4; color: #0e7c86; }
+#docPreview .md-toc-item.lv2 { font-size: 12px; }
+#docPreview .md-toc-item.lv3, #docPreview .md-toc-item.lv4 { font-size: 11.5px; color: #8b949e; }
+#docPreview .md-content { flex: 1 1 auto; overflow: auto; padding: 14px 18px; background: #fff; box-sizing: border-box; }
 .doc-md img { max-width: 100%; border-radius: 6px; }
 .doc-md a { color: #2b7de9; }
 .doc-md hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }

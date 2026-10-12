@@ -2711,7 +2711,30 @@ async function openMarkdownPreview(node, att) {
         });
       }
     } catch (eK) {}
-    body.innerHTML = '<div class="doc-md">' + html + '</div>';
+    // 双栏：左侧目录（按标题层级缩进，点击平滑滚动）+ 右侧渲染内容
+    body.innerHTML = '<div class="md-layout">'
+      + '<div class="md-toc"><div class="md-toc-title">目录</div><div class="md-toc-list"></div></div>'
+      + '<div class="md-content"><div class="doc-md">' + html + '</div></div></div>';
+    try {
+      const content = body.querySelector('.md-content');
+      const tocList = body.querySelector('.md-toc-list');
+      const heads = Array.from(content.querySelectorAll('h1,h2,h3,h4'));
+      if (heads.length === 0) { tocList.innerHTML = '<span style="color:#bbb;font-size:12px;">（无标题）</span>'; }
+      heads.forEach((h, i) => {
+        h.id = 'mdh' + i;
+        const lv = parseInt(h.tagName[1], 10) || 1;
+        const a = document.createElement('a');
+        a.href = 'javascript:void(0)';
+        a.className = 'md-toc-item lv' + lv;
+        a.textContent = h.textContent || ('标题' + lv);
+        a.style.paddingLeft = ((lv - 1) * 12 + 4) + 'px';
+        a.addEventListener('click', () => {
+          const top = h.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop;
+          try { content.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' }); } catch (e) { content.scrollTop = Math.max(0, top - 8); }
+        });
+        tocList.appendChild(a);
+      });
+    } catch (eT) {}
   } catch (e) { try { $('docPreview').style.display = 'none'; } catch (e2) {} }
 }
 
