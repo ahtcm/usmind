@@ -2795,12 +2795,45 @@ function enterDocxEdit(node, att, html) {
     } catch (eS) { toast('保存失败: ' + (eS && eS.message || eS), 'error'); }
   };
 }
-// 简化 HTML → docx：段落/标题/列表/引用 + 行内粗体/斜体/下划线/删除线/代码
+// 简化 HTML → docx：段落/标题/列表/引用 + 行内粗体/斜体/下划线/删除线/代码 + 图片（ImageRun）
 async function htmlToDocx(html) {
   const D = window.docx;
   if (!D) return null;
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
+  // 图片归一化：blob/http → data URL；gif/webp → canvas 转 png；统一尺寸上限
+  const imgEls = Array.from(tmp.querySelectorAll('img'));
+  for (const img of imgEls) {
+    let src = img.getAttribute('src') || '';
+    const w = img.naturalWidth || parseInt(img.getAttribute('width') || '', 10) || 0;
+    const h = img.naturalHeight || parseInt(img.getAttribute('height') || '', 10) || 0;
+    try {
+      if (!/^data:/i.test(src)) {
+        const blob = await (await fetch(src)).blob();
+        src = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+      }
+      let m = src.match(/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/i);
+      if (!m) continue;
+      if (m[1] !== 'png' && m[1] !== 'jpeg') {
+        const blob = await (await fetch(src)).blob();
+        const url = URL.createObjectURL(blob);
+        const im = new Image();
+        await new Promise((res, rej) => { im.onload = res; im.onerror = rej; im.src = url; });
+        const cv = document.createElement('canvas');
+        cv.width = im.naturalWidth || w || 300; cv.height = im.naturalHeight || h || 200;
+        cv.getContext('2d').drawImage(im, 0, 0);
+        src = cv.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+        m = src.match(/^data:image\/(png|jpe?g);base64,(.+)$/i);
+        if (!m) continue;
+      }
+      const type = m[1] === 'jpeg' ? 'jpg' : 'png';
+      let tw = w || 300, th = h || 200;
+      const maxW = 540;
+      if (tw > maxW) { th = Math.round(th * maxW / tw); tw = maxW; }
+      img.dataset.ink = JSON.stringify({ type, b64: m[2], w: tw, h: th });
+    } catch (eImg) { /* 无法转换的图片跳过 */ }
+  }
   const paraList = [];
   function inlineRuns(el) {
     const runs = [];
@@ -2808,6 +2841,19 @@ async function htmlToDocx(html) {
       if (node.nodeType === 3) { if (node.textContent) runs.push({ t: node.textContent }); }
       else if (node.nodeType === 1) {
         const tag = node.tagName.toLowerCase();
+        if (tag === 'img') {
+          const ink = node.dataset && node.dataset.ink;
+          if (ink) {
+            try {
+              const k = JSON.parse(ink);
+              const bytes = atob(k.b64);
+              const u8 = new Uint8Array(bytes.length);
+              for (let i = 0; i < bytes.length; i++) u8[i] = bytes.charCodeAt(i);
+              runs.push({ img: { type: k.type, data: u8, w: k.w, h: k.h } });
+            } catch (eI) {}
+          }
+          return;
+        }
         const sub = [];
         walkChildren(node, sub);
         if (!sub.length) sub.push({ t: '' });
@@ -2856,7 +2902,9 @@ async function htmlToDocx(html) {
     color: k.code ? 'C7254E' : undefined
   });
   const children = paraList.map(p => {
-    const runs = (p.runs || []).map(mkRun);
+    const runs = (p.runs || []).map(k => k.img
+      ? new D.ImageRun({ type: k.img.type, data: k.img.data, transformation: { width: k.img.w, height: k.img.h } })
+      : mkRun(k));
     if (p.type === 'h1') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: runs });
     if (p.type === 'h2') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_2, children: runs });
     if (p.type === 'h3') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_3, children: runs });
@@ -2918,7 +2966,10 @@ async function openDocPreview(node, att) {
             if (!rid || !relMap[rid]) continue;
             let target = relMap[rid];
             while (target.indexOf('../') === 0) target = target.slice(3);
-            const f = zip.file(target);
+            target = target.replace(/^\/+/, '');
+            let f = zip.file(target);
+            if (!f && target.indexOf('ppt/') !== 0) f = zip.file('ppt/' + target);
+            if (!f && target.indexOf('ppt/') === 0) f = zip.file(target.slice(4));
             if (f) {
               const b64 = await f.async('base64');
               const ext2 = (target.split('.').pop() || 'png').toLowerCase();
