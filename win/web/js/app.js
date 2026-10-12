@@ -2435,20 +2435,22 @@ async function openTextPreview(node, att, startEditable) {
       scrollbarStyle: 'null'
     });
     cm.setSize('100%', '50vh');
+    // 操作按钮（编辑/取消编辑/保存）放到弹窗头部右上角（标题右侧、× 左侧），与 markdown 预览弹窗一致
     const bar = document.createElement('div');
-    bar.style.cssText = 'text-align:right;margin-top:10px;display:flex;justify-content:flex-end;gap:8px';
+    bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto';
     const editBtn = document.createElement('button');
     editBtn.textContent = '编辑';
     editBtn.className = 'attp-dl-btn';
-    editBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px';
+    editBtn.style.cssText = 'padding:5px 14px;background:#0e7c86;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:12px';
     const cancelEdit = document.createElement('button');
     cancelEdit.textContent = '取消编辑';
-    cancelEdit.style.cssText = 'padding:6px 18px;background:#555;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none';
+    cancelEdit.style.cssText = 'padding:5px 14px;background:#555;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:12px;display:none';
     const saveBtn = document.createElement('button');
     saveBtn.textContent = '保存';
-    saveBtn.style.cssText = 'padding:6px 18px;background:#0e7c86;color:#fff;border:0;border-radius:6px;cursor:pointer;font-size:13px;display:none';
+    saveBtn.style.cssText = 'padding:5px 14px;background:#0e7c86;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:12px;display:none';
     bar.appendChild(cancelEdit); bar.appendChild(saveBtn); bar.appendChild(editBtn);
-    body.appendChild(bar);
+    const closeBtn = wrap.querySelector('.attp-close');
+    closeBtn.insertAdjacentElement('beforebegin', bar);
     // markdown 入口直接进入可编辑+保存
     if (startEditable) {
       cm.setOption('readOnly', false);
