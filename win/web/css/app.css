@@ -675,6 +675,51 @@ body {
 #docPreview .md-toc-item.lv2 { font-size: 12px; }
 #docPreview .md-toc-item.lv3, #docPreview .md-toc-item.lv4 { font-size: 11.5px; color: #8b949e; }
 #docPreview .md-content { flex: 1 1 auto; overflow: auto; padding: 14px 18px; background: #fff; box-sizing: border-box; }
+/* 附件弹窗全屏模式 */
+.att-fullscreen { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; border-radius: 0 !important; z-index: 9995 !important; box-shadow: none !important; }
+.att-fullscreen .attp-body, .att-fullscreen #docPreviewBody { flex: 1 1 auto !important; height: auto !important; }
+.att-fullscreen .attp-box { border-radius: 0 !important; }
+#fsExit:hover { background: rgba(220,53,69,.75) !important; transform: scale(1.06); }
+#fsExit { transition: background .15s ease, transform .15s ease; }
+/* xlsx 网格编辑器 */
+.xlsx-wrap { display: flex; flex-direction: column; height: 100%; }
+.xlsx-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e8eaed; background: #fafbfc; flex-wrap: wrap; }
+.xlsx-label { font-size: 12px; color: #57606a; font-weight: 600; }
+.xlsx-sheets { padding: 4px 8px; border: 1px solid #d0d3d6; border-radius: 7px; font-size: 12px; color: #333; background: #fff; outline: none; }
+.xlsx-sheets:focus { border-color: #0e7c86; }
+.xlsx-tbtn { padding: 4px 11px; border: 1px solid #d0d3d6; background: #fff; border-radius: 7px; cursor: pointer; font-size: 12px; color: #333; transition: all .15s ease; }
+.xlsx-tbtn:hover { background: #0e7c86; color: #fff; border-color: #0e7c86; }
+.xlsx-hint { font-size: 11px; color: #8b949e; margin-left: auto; }
+.xlsx-gridwrap { flex: 1 1 auto; overflow: auto; background: #fff; }
+.xlsx-grid { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.xlsx-grid th.xlsx-corner, .xlsx-grid th.xlsx-rh { background: #f1f3f5; color: #57606a; font-weight: 600; padding: 3px 8px; border: 1px solid #e3e6ea; text-align: center; position: sticky; z-index: 2; }
+.xlsx-grid th.xlsx-rh { left: 0; }
+.xlsx-grid th.xlsx-hd { background: #e8f4f7; color: #0e7c86; font-weight: 700; padding: 4px 10px; border: 1px solid #dce9ee; text-align: center; position: sticky; top: 0; z-index: 3; }
+.xlsx-grid th.xlsx-corner { z-index: 4; }
+.xlsx-grid td { border: 1px solid #e8eaed; padding: 0; }
+.xlsx-grid .xlsx-cell { width: 110px; border: 0; outline: none; padding: 4px 8px; font-size: 13px; color: #24292f; background: transparent; box-sizing: border-box; }
+.xlsx-grid .xlsx-cell:focus { background: #e8f4f7; box-shadow: inset 0 0 0 2px #0e7c86; }
+/* docx 富文本编辑器 */
+.docx-edit { display: flex; flex-direction: column; height: 100%; }
+.docx-tb { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid #e8eaed; background: #fafbfc; flex-wrap: wrap; }
+.docx-tb button { min-width: 30px; height: 28px; padding: 0 8px; border: 1px solid #d0d3d6; background: #fff; border-radius: 7px; cursor: pointer; font-size: 12.5px; color: #333; transition: all .15s ease; }
+.docx-tb button:hover { background: #0e7c86; color: #fff; border-color: #0e7c86; }
+.docx-tb .docx-sep { width: 1px; height: 18px; background: #e0e3e6; margin: 0 4px; }
+.docx-tb .docx-hint { font-size: 11px; color: #8b949e; margin-left: auto; }
+.docx-editable { flex: 1 1 auto; overflow: auto; padding: 16px 20px; background: #fff; outline: none; line-height: 1.75; font-size: 14px; color: #24292f; }
+.docx-editable h1 { font-size: 24px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin: 14px 0 8px; }
+.docx-editable h2 { font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 4px; margin: 14px 0 8px; }
+.docx-editable h3 { font-size: 17px; margin: 12px 0 6px; }
+.docx-editable p { margin: 6px 0; }
+.docx-editable ul, .docx-editable ol { padding-left: 28px; margin: 8px 0; }
+.docx-editable blockquote { border-left: 4px solid #dfe2e5; color: #6a737d; margin: 10px 0; padding: 2px 14px; background: #f8f9fa; }
+/* pptx 预览 */
+.pptx-wrap { padding: 16px; background: #f2f4f7; }
+.pptx-page { background: #fff; border: 1px solid #e3e6ea; border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,.06); margin-bottom: 16px; overflow: hidden; }
+.pptx-page-head { padding: 9px 14px; font-size: 12px; color: #57606a; background: #fafbfc; border-bottom: 1px solid #eee; font-weight: 700; letter-spacing: .5px; }
+.pptx-page-body { padding: 14px 16px; }
+.pptx-page-body img { max-width: 100%; max-height: 420px; border-radius: 8px; display: block; margin: 6px 0; box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+.pptx-txt { font-size: 14px; color: #24292f; margin: 4px 0; line-height: 1.6; }
 .doc-md img { max-width: 100%; border-radius: 6px; }
 .doc-md a { color: #2b7de9; }
 .doc-md hr { border: none; border-top: 1px solid #eee; margin: 16px 0; }

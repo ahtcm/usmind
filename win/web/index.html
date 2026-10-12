@@ -303,12 +303,16 @@
         <span id="docPreviewName" style="font-size:14px; font-weight:600; color:#333; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
         <div style="display:flex; align-items:center; gap:10px;">
           <button id="mdHeadEditBtn" style="display:none; padding:5px 14px; border:1px solid #d0d3d6; border-radius:8px; background:#0e7c86; color:#fff; cursor:pointer; font-size:12px;">编辑</button>
+          <button id="docFsBtn" style="border:none; background:#f1f3f5; border-radius:8px; width:28px; height:28px; font-size:15px; cursor:pointer; color:#555; line-height:1;" title="全屏">⛶</button>
           <button id="docPreviewClose" style="border:none; background:#f1f3f5; border-radius:8px; width:28px; height:28px; font-size:14px; cursor:pointer; color:#555;">✕</button>
         </div>
       </div>
       <div id="docPreviewBody" style="flex:1 1 auto; overflow:auto; padding:14px 18px; background:#fff;"></div>
     </div>
   </div>
+
+  <!-- 全屏模式磨砂悬浮退出按钮 -->
+  <div id="fsExit" style="display:none; position:fixed; top:18px; right:18px; z-index:10001; width:44px; height:44px; border-radius:12px; background:rgba(20,22,26,.5); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); color:#fff; font-size:22px; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 6px 24px rgba(0,0,0,.35);" title="退出全屏 (Esc)">✕</div>
 
   <!-- Toast -->
   <div id="toast"></div>
@@ -459,8 +463,9 @@
 <script src="vendor/docpreview/mammoth.browser.min.js"></script>
 <script src="vendor/docpreview/xlsx.full.min.js"></script>
 <script src="vendor/docpreview/marked.min.js"></script>
+<script src="vendor/docpreview/docx.iife.js"></script>
 <script src="vendor/jszip/jszip.min.js"></script>
 <script src="vendor/html2canvas/html2canvas.min.js"></script>
-<script type="module" src="js/app.js?v=20261011g"></script>
+<script type="module" src="js/app.js?v=20261011h"></script>
 </body>
 </html>

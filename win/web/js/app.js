@@ -2396,6 +2396,23 @@ function renderFileNode(child, file) {
 }
 
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
+// ---- 附件弹窗全屏模式（全屏按钮进入；ESC / 磨砂悬浮 × 退出） ----
+let _fsEl = null;
+function fsEscHandler(e) { if (e.key === 'Escape') exitFullscreen(); }
+function enterFullscreen(el) {
+  _fsEl = el;
+  el.classList.add('att-fullscreen');
+  const ex = document.getElementById('fsExit');
+  if (ex) { ex.style.display = 'flex'; }
+  document.addEventListener('keydown', fsEscHandler);
+}
+function exitFullscreen() {
+  if (_fsEl) { _fsEl.classList.remove('att-fullscreen'); _fsEl = null; }
+  const ex = document.getElementById('fsExit');
+  if (ex) ex.style.display = 'none';
+  document.removeEventListener('keydown', fsEscHandler);
+}
+
 // startEditable=true 时（markdown 入口）直接进入可编辑+保存，无需再点一次"编辑"
 async function openTextPreview(node, att, startEditable) {
   try {
@@ -2451,6 +2468,20 @@ async function openTextPreview(node, att, startEditable) {
     bar.appendChild(cancelEdit); bar.appendChild(saveBtn); bar.appendChild(editBtn);
     const closeBtn = wrap.querySelector('.attp-close');
     closeBtn.insertAdjacentElement('beforebegin', bar);
+    // 全屏按钮（头部右上角 × 左侧）
+    const fsBtn = document.createElement('button');
+    fsBtn.textContent = '⛶';
+    fsBtn.title = '全屏';
+    fsBtn.style.cssText = 'width:28px;height:28px;border:0;background:#f1f3f5;border-radius:8px;font-size:15px;cursor:pointer;color:#555;line-height:1';
+    fsBtn.addEventListener('click', () => {
+      const box = wrap.querySelector('.attp-box');
+      if (box.classList.contains('att-fullscreen')) { exitFullscreen(); }
+      else {
+        enterFullscreen(box);
+        try { const cmEl = wrap.querySelector('.CodeMirror'); if (cmEl) cmEl.style.height = 'calc(100vh - 76px)'; } catch (e) {}
+      }
+    });
+    closeBtn.insertAdjacentElement('beforebegin', fsBtn);
     // markdown 入口直接进入可编辑+保存
     if (startEditable) {
       cm.setOption('readOnly', false);
@@ -2637,8 +2668,207 @@ function restoreTreeMediaSrc(root) {
   });
 }
 
+// xlsx 网格编辑器（SheetJS 读写）：多表切换、单元格直接输入（数字自动转 number、= 开头识别为公式）、行列增删
+let _xlsxState = null;
+function buildXlsxEditor(wb, body) {
+  const sheets = wb.SheetNames;
+  const aoaMap = {};
+  sheets.forEach(sn => { aoaMap[sn] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' }); });
+  const state = { sheets, cur: 0, aoaMap };
+  _xlsxState = state;
+  body.innerHTML = '<div class="xlsx-wrap">'
+    + '<div class="xlsx-toolbar">'
+    + '<span class="xlsx-label">工作表：</span><select class="xlsx-sheets"></select>'
+    + '<button class="xlsx-tbtn" data-op="addRow">＋ 行</button>'
+    + '<button class="xlsx-tbtn" data-op="delRow">－ 行</button>'
+    + '<button class="xlsx-tbtn" data-op="addCol">＋ 列</button>'
+    + '<button class="xlsx-tbtn" data-op="delCol">－ 列</button>'
+    + '<span class="xlsx-hint">单元格直接输入，以 = 开头为公式</span>'
+    + '</div><div class="xlsx-gridwrap"><table class="xlsx-grid"></table></div></div>';
+  const sel = body.querySelector('.xlsx-sheets');
+  sheets.forEach((sn, i) => { const o = document.createElement('option'); o.textContent = sn; o.value = i; sel.appendChild(o); });
+  sel.onchange = () => { state.cur = +sel.value; renderGrid(); };
+  body.querySelectorAll('.xlsx-tbtn').forEach(b => b.onclick = () => {
+    const op = b.dataset.op;
+    const sn = state.sheets[state.cur];
+    const aoa = state.aoaMap[sn];
+    if (op === 'addRow') aoa.push(Array(aoa[0] ? aoa[0].length : 1).fill(''));
+    if (op === 'delRow') { if (aoa.length > 1) aoa.pop(); else aoa.length = 1; }
+    if (op === 'addCol') aoa.forEach(r => r.push(''));
+    if (op === 'delCol') { const max = Math.max.apply(null, aoa.map(r => r.length)); if (max > 1) aoa.forEach(r => r.pop()); }
+    renderGrid();
+  });
+  function colName(i) {
+    let s = ''; i = i + 1;
+    while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); }
+    return s;
+  }
+  function renderGrid() {
+    const sn = state.sheets[state.cur];
+    const aoa = state.aoaMap[sn];
+    const grid = body.querySelector('.xlsx-grid');
+    const rows = Math.max(aoa.length, 1);
+    const cols = Math.max(aoa[0] ? aoa[0].length : 1, 1);
+    let html = '<thead><tr><th class="xlsx-corner"></th>';
+    for (let c = 0; c < cols; c++) html += '<th class="xlsx-hd">' + colName(c) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (let r = 0; r < rows; r++) {
+      html += '<tr><th class="xlsx-rh">' + (r + 1) + '</th>';
+      for (let c = 0; c < cols; c++) {
+        let v = (aoa[r] && aoa[r][c] !== undefined && aoa[r][c] !== null) ? String(aoa[r][c]) : '';
+        html += '<td><input class="xlsx-cell" data-r="' + r + '" data-c="' + c + '" value="' + v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') + '"></td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    grid.innerHTML = html;
+    grid.addEventListener('input', (e) => {
+      const t = e.target;
+      if (t.classList && t.classList.contains('xlsx-cell')) {
+        const r = +t.dataset.r, c = +t.dataset.c;
+        if (!state.aoaMap[sn][r]) state.aoaMap[sn][r] = [];
+        let v = t.value;
+        const tv = v.trim();
+        if (/^[+-]?\d+(\.\d+)?$/.test(tv)) v = Number(tv);
+        state.aoaMap[sn][r][c] = v;
+      }
+    });
+  }
+  renderGrid();
+  return state;
+}
+
+// docx 富文本编辑态：工具条（execCommand）+ contenteditable，保存时 HTML → docx（docx.js 重建写回节点）
+function enterDocxEdit(node, att, html) {
+  const body = $('docPreviewBody');
+  body.innerHTML = '<div class="docx-edit">'
+    + '<div class="docx-tb">'
+    + '<button data-cmd="bold" title="加粗"><b>B</b></button>'
+    + '<button data-cmd="italic" title="斜体"><i>I</i></button>'
+    + '<button data-cmd="underline" title="下划线"><u>U</u></button>'
+    + '<button data-cmd="strikeThrough" title="删除线"><s>S</s></button>'
+    + '<span class="docx-sep"></span>'
+    + '<button data-cmd="formatBlock" data-val="H1" title="一级标题">H1</button>'
+    + '<button data-cmd="formatBlock" data-val="H2" title="二级标题">H2</button>'
+    + '<button data-cmd="formatBlock" data-val="H3" title="三级标题">H3</button>'
+    + '<span class="docx-sep"></span>'
+    + '<button data-cmd="insertUnorderedList" title="无序列表">• 列表</button>'
+    + '<button data-cmd="insertOrderedList" title="有序列表">1. 列表</button>'
+    + '<span class="docx-sep"></span>'
+    + '<button data-cmd="justifyLeft" title="左对齐">左</button>'
+    + '<button data-cmd="justifyCenter" title="居中">中</button>'
+    + '<span class="docx-hint">直接编辑，工具栏即时生效</span>'
+    + '</div>'
+    + '<div class="docx-editable" contenteditable="true"></div></div>';
+  body.querySelector('.docx-editable').innerHTML = html || '';
+  body.querySelectorAll('.docx-tb button').forEach(b => b.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const cmd = b.dataset.cmd;
+    const val = b.dataset.val || null;
+    const ed = body.querySelector('.docx-editable');
+    try { ed.focus(); } catch (eF) {}
+    try { document.execCommand(cmd, false, val); } catch (eC) {}
+  }));
+  let sb = document.getElementById('docDocxSaveBtn');
+  if (!sb) {
+    sb = document.createElement('button');
+    sb.id = 'docDocxSaveBtn';
+    sb.textContent = '保存';
+    sb.style.cssText = 'padding:5px 14px;background:#0e7c86;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:12px;display:none';
+    const anchor = document.getElementById('docFsBtn') || document.getElementById('docPreviewClose');
+    if (anchor) anchor.insertAdjacentElement('beforebegin', sb);
+  }
+  sb.style.display = '';
+  sb.onclick = async () => {
+    try {
+      const html2 = body.querySelector('.docx-editable').innerHTML;
+      if (!window.docx) { toast('缺少 docx 生成库', 'error'); return; }
+      const b64 = await htmlToDocx(html2);
+      if (!b64) { toast('docx 生成失败', 'error'); return; }
+      setNodeAttachment(node, 'data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,' + b64, att.name);
+      $('docPreview').style.display = 'none';
+      $('docPreviewBody').innerHTML = '';
+      sb.style.display = 'none';
+      toast('已保存: ' + att.name);
+    } catch (eS) { toast('保存失败: ' + (eS && eS.message || eS), 'error'); }
+  };
+}
+// 简化 HTML → docx：段落/标题/列表/引用 + 行内粗体/斜体/下划线/删除线/代码
+async function htmlToDocx(html) {
+  const D = window.docx;
+  if (!D) return null;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const paraList = [];
+  function inlineRuns(el) {
+    const runs = [];
+    const walk = (node) => {
+      if (node.nodeType === 3) { if (node.textContent) runs.push({ t: node.textContent }); }
+      else if (node.nodeType === 1) {
+        const tag = node.tagName.toLowerCase();
+        const sub = [];
+        walkChildren(node, sub);
+        if (!sub.length) sub.push({ t: '' });
+        const a = {};
+        if (tag === 'strong' || tag === 'b') a.b = true;
+        if (tag === 'em' || tag === 'i') a.i = true;
+        if (tag === 'u') a.u = true;
+        if (tag === 's' || tag === 'strike' || tag === 'del') a.s = true;
+        if (tag === 'code') a.code = true;
+        if (tag === 'span' && node.style) {
+          if (node.style.fontWeight === 'bold') a.b = true;
+          if (node.style.fontStyle === 'italic') a.i = true;
+          if (node.style.textDecorationLine && node.style.textDecorationLine.indexOf('underline') >= 0) a.u = true;
+        }
+        sub.forEach(k => Object.assign(k, a));
+        runs.push(...sub);
+      }
+    };
+    function walkChildren(node, out) {
+      Array.from(node.childNodes).forEach(c => {
+        if (c.nodeType === 3) { if (c.textContent) out.push({ t: c.textContent }); }
+        else if (c.nodeType === 1) walk(c);
+      });
+    }
+    walk(el);
+    return runs;
+  }
+  Array.from(tmp.childNodes).forEach(n => {
+    if (n.nodeType !== 1) return;
+    const tag = n.tagName.toLowerCase();
+    if (tag === 'p' || tag === 'div' || tag === 'section') paraList.push({ type: 'p', runs: inlineRuns(n) });
+    else if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4') paraList.push({ type: 'h' + tag[1], runs: inlineRuns(n) });
+    else if (tag === 'ul' || tag === 'ol') Array.from(n.children).forEach(li => paraList.push({ type: 'li', list: tag, runs: inlineRuns(li) }));
+    else if (tag === 'blockquote') paraList.push({ type: 'quote', runs: inlineRuns(n) });
+    else if (tag === 'br') paraList.push({ type: 'p', runs: [] });
+    else paraList.push({ type: 'p', runs: inlineRuns(n) });
+  });
+  const mkRun = (k) => new D.TextRun({
+    text: k.t || '',
+    bold: !!k.b,
+    italics: !!k.i,
+    underline: k.u ? {} : undefined,
+    strike: !!k.s,
+    font: k.code ? 'Consolas' : undefined,
+    size: k.code ? 22 : undefined,
+    color: k.code ? 'C7254E' : undefined
+  });
+  const children = paraList.map(p => {
+    const runs = (p.runs || []).map(mkRun);
+    if (p.type === 'h1') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children: runs });
+    if (p.type === 'h2') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_2, children: runs });
+    if (p.type === 'h3') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_3, children: runs });
+    if (p.type === 'h4') return new D.Paragraph({ heading: D.HeadingLevel.HEADING_4, children: runs });
+    if (p.type === 'li') return new D.Paragraph({ bullet: { level: 0 }, children: runs });
+    if (p.type === 'quote') return new D.Paragraph({ children: runs, indent: { left: 360 }, style: 'Quote' });
+    return new D.Paragraph({ children: runs.length ? runs : [new D.TextRun('')] });
+  });
+  const doc = new D.Document({ sections: [{ children }] });
+  try { return await D.Packer.toBase64String(doc); } catch (e) { return null; }
+}
+
 // docx/xlsx/pdf 内置预览（离线：mammoth / SheetJS / Chromium 原生 PDF）
-async function openDocPreview(att) {
+async function openDocPreview(node, att) {
   try {
     const ext = (att.name.split('.').pop() || '').toLowerCase();
     const body = $('docPreviewBody'), nameEl = $('docPreviewName');
@@ -2648,6 +2878,69 @@ async function openDocPreview(att) {
     const hb = $('mdHeadEditBtn'); if (hb) hb.style.display = 'none';
     $('docPreview').style.display = 'flex';
     const buf = await loadAttachmentBuffer(att);
+    if (ext === 'pptx') {
+      // PPT 预览：jszip 解析逐页文本+图片（离线只读，不做编辑）
+      try {
+        const zip = await JSZip.loadAsync(buf);
+        const slideFiles = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a, b) => {
+          const na = parseInt(a.match(/slide(\d+)\.xml$/)[1], 10), nb = parseInt(b.match(/slide(\d+)\.xml$/)[1], 10);
+          return na - nb;
+        });
+        const ML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+        const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+        const pages = [];
+        for (const sf of slideFiles) {
+          const num = parseInt(sf.match(/slide(\d+)\.xml$/)[1], 10);
+          const xml = await zip.file(sf).async('string');
+          const doc = new DOMParser().parseFromString(xml, 'application/xml');
+          const texts = [];
+          Array.from(doc.getElementsByTagNameNS(ML, 't')).forEach(t => {
+            const v = (t.textContent || '').trim();
+            if (v) texts.push(v);
+          });
+          const imgs = [];
+          const blips = Array.from(doc.getElementsByTagNameNS(ML, 'blip'));
+          const relsFile = sf.replace(/slides\/(slide\d+\.xml)$/, 'slides/_rels/$1.rels');
+          let relMap = {};
+          const relsZip = zip.file(relsFile);
+          if (relsZip) {
+            try {
+              const relsDoc = new DOMParser().parseFromString(await relsZip.async('string'), 'application/xml');
+              relMap = {};
+              Array.from(relsDoc.getElementsByTagName('Relationship')).forEach(r => { relMap[r.getAttribute('Id')] = r.getAttribute('Target'); });
+            } catch (eR) {}
+          }
+          for (const b of blips) {
+            const rid = b.getAttribute('r:embed') || b.getAttributeNS(REL, 'embed');
+            if (!rid || !relMap[rid]) continue;
+            let target = relMap[rid];
+            while (target.indexOf('../') === 0) target = target.slice(3);
+            const f = zip.file(target);
+            if (f) {
+              const b64 = await f.async('base64');
+              const ext2 = (target.split('.').pop() || 'png').toLowerCase();
+              imgs.push('data:image/' + (ext2 === 'jpg' ? 'jpeg' : ext2) + ';base64,' + b64);
+            }
+          }
+          pages.push({ num, texts, imgs });
+        }
+        const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let html = '<div class="pptx-wrap">';
+        if (!pages.length) html += '<div style="padding:40px;text-align:center;color:#999;">未找到幻灯片内容（空演示文稿）</div>';
+        pages.forEach(p => {
+          html += '<div class="pptx-page"><div class="pptx-page-head">第 ' + p.num + ' 页</div><div class="pptx-page-body">';
+          if (!p.imgs.length && !p.texts.length) html += '<div class="pptx-txt" style="color:#bbb;">（空白页）</div>';
+          p.imgs.forEach(i => { html += '<img src="' + i + '" alt="图片">'; });
+          p.texts.forEach(t => { html += '<div class="pptx-txt">' + esc(t) + '</div>'; });
+          html += '</div></div>';
+        });
+        html += '</div>';
+        body.innerHTML = html;
+      } catch (eP) {
+        body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">PPT 预览失败：' + (eP && eP.message || eP) + '</div>';
+      }
+      return;
+    }
     if (ext === 'pdf') {
       const url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }));
       body.innerHTML = '<iframe class="doc-pdf-frame" src="' + url + '"></iframe>';
@@ -2657,15 +2950,48 @@ async function openDocPreview(att) {
       if (!window.mammoth) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 mammoth 库</div>'; return; }
       mammoth.convertToHtml({ arrayBuffer: buf }).then(res => {
         body.innerHTML = '<div class="doc-docx">' + (res.value || '<em>（空文档）</em>') + '</div>';
+        // docx：头部"编辑"按钮 → 富文本编辑态（工具条 + contenteditable，保存用 docx.js 重建写回）
+        const hb = $('mdHeadEditBtn');
+        if (hb) {
+          hb.style.display = '';
+          hb.onclick = () => enterDocxEdit(node, att, res.value || '');
+        }
       }).catch(e => { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">docx 解析失败：' + (e && e.message || e) + '</div>'; });
       return;
     }
     if (!window.XLSX) { body.innerHTML = '<div style="padding:40px;text-align:center;color:#d33;">缺少 SheetJS 库</div>'; return; }
     const wb = XLSX.read(buf, { type: 'array' });
-    const html = wb.SheetNames.map(sn => {
-      return '<h4 style="margin:8px 0;color:#333;">' + sn + '</h4>' + XLSX.utils.sheet_to_html(wb.Sheets[sn]);
-    }).join('<hr style="border:none;border-top:1px solid #eee;">');
-    body.innerHTML = '<div class="doc-xlsx">' + html + '</div>';
+    // 网格编辑器：直接可编辑（单元格输入、公式、行列增删、多表切换），保存写回节点
+    const state = buildXlsxEditor(wb, body);
+    let saveBtn = document.getElementById('docXlsxSaveBtn');
+    if (!saveBtn) {
+      saveBtn = document.createElement('button');
+      saveBtn.id = 'docXlsxSaveBtn';
+      saveBtn.textContent = '保存';
+      saveBtn.style.cssText = 'padding:5px 14px;background:#0e7c86;color:#fff;border:0;border-radius:8px;cursor:pointer;font-size:12px;display:none';
+      const anchor = document.getElementById('docFsBtn') || document.getElementById('docPreviewClose');
+      if (anchor) anchor.insertAdjacentElement('beforebegin', saveBtn);
+    }
+    saveBtn.style.display = '';
+    saveBtn.onclick = () => {
+      try {
+        if (!state) { toast('没有可保存的内容', 'error'); return; }
+        const nwb = XLSX.utils.book_new();
+        state.sheets.forEach(sn => {
+          const aoa = state.aoaMap[sn];
+          const ws = XLSX.utils.aoa_to_sheet(aoa.map(row => row.slice()));
+          XLSX.utils.book_append_sheet(nwb, ws, sn);
+        });
+        const b64 = XLSX.write(nwb, { bookType: 'xlsx', type: 'base64' });
+        setNodeAttachment(node, 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64, att.name);
+        $('docPreview').style.display = 'none';
+        $('docPreviewBody').innerHTML = '';
+        saveBtn.style.display = 'none';
+        state.__done = true;
+        _xlsxState = null;
+        toast('已保存: ' + att.name);
+      } catch (eS) { toast('保存失败: ' + (eS && eS.message || eS), 'error'); }
+    };
   } catch (e) {
     try {
       const body = $('docPreviewBody');
@@ -2784,7 +3110,7 @@ function openNodeAttachment(node) {
     // 文本/代码 → 内置 CodeMirror 预览编辑
     if (isTextExt(ext)) { openTextPreview(node, att); return; }
     // docx/xlsx/pdf → 内置预览（mammoth/SheetJS/Chromium PDF）
-    if (ext === 'pdf' || ext === 'docx' || ext === 'doc' || ext === 'xlsx' || ext === 'xls') { openDocPreview(att); return; }
+    if (ext === 'pdf' || ext === 'pptx' || ext === 'docx' || ext === 'doc' || ext === 'xlsx' || ext === 'xls') { openDocPreview(node, att); return; }
     // 其他文件：C++ 打开（外置相对路径直接打开；内嵌 base64 写临时文件）；浏览器环境降级为下载
     if (hasNative) {
       const relLike = String(att.url || '').indexOf('attachments/') === 0;
@@ -3262,6 +3588,15 @@ function bindUi() {
     attachNode = null;
   });
 
+  // 附件弹窗全屏：docPreview 内层框（docFsBtn）+ 磨砂悬浮退出按钮
+  const docBox = document.querySelector('#docPreview > div');
+  const docFs = $('docFsBtn'), fsExit = $('fsExit');
+  if (docFs && docBox) docFs.addEventListener('click', () => {
+    if (docBox.classList.contains('att-fullscreen')) exitFullscreen();
+    else enterFullscreen(docBox);
+  });
+  if (fsExit) fsExit.addEventListener('click', exitFullscreen);
+
   // Ctrl+V 粘贴接管：非编辑态只 stopPropagation 拦住库的 keyCommand 快捷键（window keydown），
   // 不 preventDefault（否则浏览器粘贴流程被取消、paste 事件不再触发 → 粘贴完全失效）。
   // 图片/文件/纯文本统一由下方 paste 事件处理；库的 SET_NODE_IMAGE 小图不再触发 → 解决一大一小双图。
@@ -3693,7 +4028,7 @@ function injectAttachIcons() {
     const walk = (t) => {
       if (t && t.data) {
         if (t.data.uid) uidMap[t.data.uid] = t.data;
-        if (t.data.attachmentUrl && t.data.attachmentName) nameMap[t.data.attachmentName] = t.data;
+        if ((t.data.attachmentUrl || t.data.attachUrl) && t.data.attachmentName) nameMap[t.data.attachmentName] = t.data;
       }
       if (t && t.children) t.children.forEach(walk);
     };
@@ -3720,7 +4055,7 @@ function injectAttachIcons() {
     fo.setAttribute('height', '24');
     const div = document.createElement('div');
     div.style.cssText = 'width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;background:rgba(20,22,26,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:7px;color:#fff;line-height:1;transition:transform .15s ease,background .15s ease';
-    div.title = d.attachmentName || '附件';
+    div.title = d.attachmentName || d.attachName || '附件';
     div.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
     div.addEventListener('mouseenter', () => { div.style.transform = 'scale(1.15)'; div.style.background = 'rgba(14,124,134,.85)'; });
     div.addEventListener('mouseleave', () => { div.style.transform = 'scale(1)'; div.style.background = 'rgba(20,22,26,.55)'; });
@@ -3738,7 +4073,7 @@ function injectAttachIcons() {
       const gEl = (n && n.group && n.group.node) ? n.group.node : (n && n.group ? n.group : null);
       if (!gEl || gEl.querySelector('.smm-att-icon')) return;
       const d = (uidMap && uidMap[uid]) || (n && n.data) || {};
-      if (!d.attachmentUrl) return;
+      if (!(d.attachmentUrl || d.attachUrl)) return;
       injectIntoGroup(gEl, d);
     });
   } catch (e) {}
