@@ -785,7 +785,7 @@ function initMindMap() {
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
   mind.on('scale', () => updateZoom());
   window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
-  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); });
+  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); try { fixExpandDrift(); setTimeout(fixExpandDrift, 400); setTimeout(fixExpandDrift, 1000); } catch (e) {} });
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
@@ -4406,4 +4406,68 @@ if (typeof window !== 'undefined' && location.search.indexOf('autotest=export') 
       document.title = 'EXPORT_TEST_OK';
     } catch (e) { document.title = 'EXPORT_TEST_ERR:' + String(e && e.message || e).slice(0, 200); }
   }, 2500);
+}
+// ================= 收放漂移兜底 =================
+// 库在节点折叠/展开的增量渲染中会逐轮把 foreignObject 宽度放大、文本定位偏移，
+// 导致文字跑出节点框。处理：
+//  - fo 宽按公式还原：data-width + 18 + (有子节点 ? 28 : 0)；
+//  - 文本定位 gx：以「连续两次渲染一致」的值为基准（无漂移稳定值），漂移则还原；
+//    结构增删（数据树层数量变化）自动重建基准。
+let __branchSig = '';
+let __gxBase = {};
+let __gxPrev = {};
+function fixExpandDrift() {
+  try {
+    if (!mind || !mind.renderer || !mind.renderer.root) return;
+    // 结构签名基于「数据树」（收起/展开不影响数据树 children，避免每次收放误清基准）
+    const sigParts = [];
+    const countData = (d, dep) => {
+      if (!d || !d.children) return;
+      sigParts.push(dep + ':' + d.children.length);
+      d.children.forEach(c => countData(c, dep + 1));
+    };
+    countData(mind.getData(), 1);
+    const sig = sigParts.join('|');
+    if (sig !== __branchSig) { __gxBase = {}; __gxPrev = {}; __branchSig = sig; }
+    const walk = (node, path) => {
+      try {
+        if (!node || !node.group || !node.group.node) return;
+        const g = node.group.node;
+        const fo = g.querySelector('foreignObject');
+        if (!fo) return;
+        const inner = fo.parentNode;
+        if (!inner || !inner.getAttribute) return;
+        const dw = parseInt(inner.getAttribute('data-width'), 10);
+        const parentG = inner.parentNode;
+        const t = parentG ? (parentG.getAttribute('transform') || '') : '';
+        const m = t.match(/matrix\([^)]*,[^)]*,[^)]*,[^)]*,([-\d.]+),([-\d.]+)\)/);
+        const gx = m ? parseFloat(m[1]) : NaN;
+        const gy = m ? parseFloat(m[2]) : NaN;
+        const fw = parseFloat(fo.getAttribute('width'));
+        if (isNaN(dw) || isNaN(fw) || isNaN(gx)) return;
+        const hasChildren = !!(node.children && node.children.length > 0);
+        const correctFw = dw + 18 + (hasChildren ? 28 : 0);
+        if (Math.abs(fw - correctFw) > 1) {
+          fo.setAttribute('width', correctFw);
+          fo.style.width = correctFw + 'px';
+        }
+        const key = path.join('.');
+        const b = __gxBase[key];
+        if (b !== undefined) {
+          if (Math.abs(gx - b) > 0.5) {
+            parentG.setAttribute('transform', 'matrix(1,0,0,1,' + b + ',' + gy + ')');
+          }
+        } else {
+          const p = __gxPrev[key];
+          if (p !== undefined && Math.abs(p - gx) < 1) {
+            __gxBase[key] = gx;
+          } else {
+            __gxPrev[key] = gx;
+          }
+        }
+      } catch (e) {}
+      if (node.children) node.children.forEach((c, i) => walk(c, path.concat(i)));
+    };
+    walk(mind.renderer.root, [0]);
+  } catch (e) {}
 }
