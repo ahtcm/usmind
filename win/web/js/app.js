@@ -2396,20 +2396,16 @@ function renderFileNode(child, file) {
 }
 
 // 文本/代码附件：CodeMirror 高亮只读 → 编辑 → 保存（base64 写回节点，无需联网）
-// ---- 附件弹窗全屏模式（全屏按钮进入；ESC / 磨砂悬浮 × 退出） ----
+// ---- 附件弹窗全屏模式（弹窗 ⛶ 进入；ESC 或再次 ⛶ / 弹窗 × 退出） ----
 let _fsEl = null;
 function fsEscHandler(e) { if (e.key === 'Escape') exitFullscreen(); }
 function enterFullscreen(el) {
   _fsEl = el;
   el.classList.add('att-fullscreen');
-  const ex = document.getElementById('fsExit');
-  if (ex) { ex.style.display = 'flex'; }
   document.addEventListener('keydown', fsEscHandler);
 }
 function exitFullscreen() {
   if (_fsEl) { _fsEl.classList.remove('att-fullscreen'); _fsEl = null; }
-  const ex = document.getElementById('fsExit');
-  if (ex) ex.style.display = 'none';
   document.removeEventListener('keydown', fsEscHandler);
 }
 
@@ -3646,16 +3642,11 @@ function bindUi() {
 
   // 附件弹窗全屏：docPreview 内层框（docFsBtn）+ 磨砂悬浮退出按钮
   const docBox = document.querySelector('#docPreview > div');
-  const docFs = $('docFsBtn'), fsExit = $('fsExit');
+  const docFs = $('docFsBtn');
   if (docFs && docBox) docFs.addEventListener('click', () => {
     if (docBox.classList.contains('att-fullscreen')) exitFullscreen();
     else enterFullscreen(docBox);
   });
-  if (fsExit) fsExit.addEventListener('click', exitFullscreen);
-  // 全局兜底：若磨砂 ✕ 残留显示但已无全屏框（_fsEl 为空），点击页面任意处即隐藏，绝不让它遮挡任何窗口按钮
-  document.addEventListener('click', () => {
-    if (!_fsEl && fsExit && fsExit.style.display === 'flex') fsExit.style.display = 'none';
-  }, true);
 
   // Ctrl+V 粘贴接管：非编辑态只 stopPropagation 拦住库的 keyCommand 快捷键（window keydown），
   // 不 preventDefault（否则浏览器粘贴流程被取消、paste 事件不再触发 → 粘贴完全失效）。

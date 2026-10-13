@@ -679,8 +679,6 @@ body {
 .att-fullscreen { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; max-width: none !important; max-height: none !important; border-radius: 0 !important; z-index: 9995 !important; box-shadow: none !important; }
 .att-fullscreen .attp-body, .att-fullscreen #docPreviewBody { flex: 1 1 auto !important; height: auto !important; }
 .att-fullscreen .attp-box { border-radius: 0 !important; }
-#fsExit:hover { background: rgba(220,53,69,.75) !important; transform: scale(1.06); }
-#fsExit { transition: background .15s ease, transform .15s ease; }
 /* xlsx 网格编辑器 */
 .xlsx-wrap { display: flex; flex-direction: column; height: 100%; }
 .xlsx-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #e8eaed; background: #fafbfc; flex-wrap: wrap; }
