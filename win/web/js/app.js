@@ -769,17 +769,11 @@ function initMindMap() {
       if (act.textContent !== txt + dirtyMark) act.textContent = txt + dirtyMark;
     } catch (e) {}
   }, 200);
-  // 双击编辑框飘到左上角修复：节点未完成布局时库用 (0,0) 定位输入框，
-  // 发现 left/top 为 0 即调用库自带 updateTextEditNode 按真实屏幕坐标刷新（不打断编辑）
-  setInterval(() => {
-    try {
-      const te = mind && mind.renderer && mind.renderer.textEdit;
-      if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
-      if (parseFloat(te.textEditNode.style.left) === 0 || parseFloat(te.textEditNode.style.top) === 0) {
-        if (te.updateTextEditNode) te.updateTextEditNode();
-      }
-    } catch (e) {}
-  }, 200);
+  // 双击编辑框修复（详见 syncEditBoxStyle）：
+  // 1) 飘到左上角：节点未完成布局时库用 (0,0) 定位输入框，发现 left/top 为 0 即刷新；
+  // 2) 字体/尺寸变形：库只设 minWidth，编辑框 block div 会自行撑宽，逐帧把编辑框
+  //    width/minWidth 钉死为节点渲染宽度，并同步字体样式（200ms 兜底，主触发在双击后）。
+  setInterval(() => { try { syncEditBoxStyle(); } catch (e) {} }, 200);
   // 监听节点编辑结束
   try { mind.on('node_text_change', () => renderTabStrip()); } catch (e) {}
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
@@ -3567,7 +3561,10 @@ function initNodeEdit() {
           const dd = n && n.getData ? (n.getData() || {}) : {};
           if (dd.mathLatex || /katex/.test(dd.text || '')) return; // 公式节点：不进入文本编辑
         } catch (e) {}
-        return origShow(opts);
+        const res = origShow(opts);
+        // 双击进入编辑后立即同步编辑框尺寸/字体（防 block div 撑宽导致文字变形）
+        try { setTimeout(syncEditBoxStyle, 30); setTimeout(syncEditBoxStyle, 120); } catch (e2) {}
+        return res;
       };
     }
   } catch (e) {}
@@ -4406,6 +4403,47 @@ if (typeof window !== 'undefined' && location.search.indexOf('autotest=export') 
       document.title = 'EXPORT_TEST_OK';
     } catch (e) { document.title = 'EXPORT_TEST_ERR:' + String(e && e.message || e).slice(0, 200); }
   }, 2500);
+}
+// ================= 双击编辑框样式同步 =================
+// 库只给编辑框设 minWidth，编辑框是 block div 会自行撑宽（实测 231px vs 节点 127px），
+// 导致双击编辑时文字区域与节点框不匹配（视觉"字体变形"）。把编辑框 width/minWidth 一起
+// 钉死为节点渲染宽度并同步字体样式，使编辑态文字与渲染态完全一致。
+function syncEditBoxStyle() {
+  try {
+    const te = mind && mind.renderer && mind.renderer.textEdit;
+    if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
+    if (parseFloat(te.textEditNode.style.left) === 0 || parseFloat(te.textEditNode.style.top) === 0) {
+      if (te.updateTextEditNode) te.updateTextEditNode();
+    }
+    const n = te.currentNode;
+    const el = te.textEditNode;
+    let wantW = 0;
+    let nodeDiv = null;
+    if (n && n._textData && n._textData.node && n._textData.node.node) {
+      const fo = n._textData.node.node.querySelector('foreignObject');
+      nodeDiv = fo ? fo.querySelector('div') : null;
+      if (nodeDiv) {
+        const r = nodeDiv.getBoundingClientRect();
+        if (r.width > 20) wantW = r.width;
+      }
+    }
+    if (!wantW) {
+      const mw = parseFloat(el.style.minWidth);
+      if (mw && mw > 20) wantW = mw - 10;
+    }
+    if (wantW > 20) {
+      const wpx = wantW + 'px';
+      if (el.style.width !== wpx) el.style.width = wpx;
+      if (el.style.minWidth !== wpx) el.style.minWidth = wpx;
+    }
+    if (nodeDiv) {
+      const cs = getComputedStyle(nodeDiv);
+      if (el.style.fontSize !== cs.fontSize) el.style.fontSize = cs.fontSize;
+      if (el.style.fontWeight !== cs.fontWeight) el.style.fontWeight = cs.fontWeight;
+      if (el.style.fontFamily !== cs.fontFamily) el.style.fontFamily = cs.fontFamily;
+      if (el.style.lineHeight !== cs.lineHeight) el.style.lineHeight = cs.lineHeight;
+    }
+  } catch (e) {}
 }
 // ================= 收放漂移兜底 =================
 // 库在节点折叠/展开的增量渲染中会逐轮把 foreignObject 宽度放大、文本定位偏移，
