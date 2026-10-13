@@ -786,6 +786,7 @@ function initMindMap() {
   mind.on('scale', () => updateZoom());
   window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
   mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); try { redrawSummaries(); } catch (e) {} });
+  try { initSummaryWatcher(); } catch (e) {}
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
@@ -2776,15 +2777,36 @@ function smmCollect() {
   })(root);
   return out;
 }
+function smmNodeRect(cn) {
+  try {
+    const g = cn.group && cn.group.node;
+    if (!g) return null;
+    const b = g.getBoundingClientRect();
+    let x = b.x, y = b.y;
+    const svgEl = document.querySelector('#mindMapContainer svg');
+    if (svgEl) {
+      const ctm = svgEl.getScreenCTM();
+      if (ctm) {
+        const p1 = svgEl.createSVGPoint();
+        p1.x = b.x; p1.y = b.y;
+        const s = p1.matrixTransform(ctm.inverse());
+        x = s.x; y = s.y;
+      }
+    }
+    return { x, y, w: b.width, h: b.height };
+  } catch (e) { return null; }
+}
 function redrawSummaries() {
   try {
     const svgEl = document.querySelector('#mindMapContainer svg');
     if (!svgEl) return;
-    let g = svgEl.querySelector('#smmSummaryLayer');
+    // 叠加层挂到 smm-container（随库缩放/平移 transform 一起移动）
+    let host = svgEl.querySelector('.smm-container') || svgEl;
+    let g = host.querySelector('#smmSummaryLayer');
     if (!g) {
       g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.setAttribute('id', 'smmSummaryLayer');
-      svgEl.appendChild(g);
+      host.appendChild(g);
     }
     g.innerHTML = '';
     smmCollect().forEach(({ rnode, sum }) => {
@@ -2796,14 +2818,10 @@ function redrawSummaries() {
       if (e < 0 || s >= kids.length || e < s) return;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       for (let i = s; i <= e; i++) {
-        const cn = kids[i];
-        if (!cn) continue;
-        const cx = cn.left != null ? cn.left : cn.x;
-        const cy = cn.top != null ? cn.top : cn.y;
-        if (cx == null || cy == null) continue;
-        const w = cn.width || 0, h = cn.height || 0;
-        minX = Math.min(minX, cx); minY = Math.min(minY, cy);
-        maxX = Math.max(maxX, cx + w); maxY = Math.max(maxY, cy + h);
+        const rc = smmNodeRect(kids[i]);
+        if (!rc) continue;
+        minX = Math.min(minX, rc.x); minY = Math.min(minY, rc.y);
+        maxX = Math.max(maxX, rc.x + rc.w); maxY = Math.max(maxY, rc.y + rc.h);
       }
       if (minX === Infinity) return;
       const pad = 20, rr = 16;
@@ -2905,6 +2923,29 @@ function createSummary() {
     if (idxs.length < 2) { toast('请选择至少两个同级节点'); return; }
     showSummaryDialog(parent, null, { s: idxs[0], e: idxs[idxs.length - 1] });
   } catch (e) { toast('操作失败'); }
+}
+// 概括跟随兜底：监听 svg 内 transform/结构变化（拖拽、缩放、平移、折叠等），防抖后重算括弧
+function initSummaryWatcher() {
+  if (window.__smmWatcher) return;
+  try {
+    const container = document.getElementById('mindMapContainer');
+    if (!container) return;
+    const svg = container.querySelector('svg');
+    if (!svg) return;
+    let t = null;
+    const obs = new MutationObserver(() => {
+      if (container.querySelector('svg') !== svg) {
+        window.__smmWatcher = false;
+        try { initSummaryWatcher(); } catch (e) {}
+        return;
+      }
+      clearTimeout(t);
+      t = setTimeout(() => { try { redrawSummaries(); } catch (e) {} }, 80);
+    });
+    obs.observe(svg, { attributes: true, attributeFilter: ['transform', 'viewBox'], subtree: true, childList: true });
+    obs.observe(container, { childList: true });
+    window.__smmWatcher = true;
+  } catch (e) {}
 }
 // ============ 概括功能结束 ============
 
