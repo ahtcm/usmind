@@ -2747,6 +2747,64 @@ function walkTree(node, fn) {
   (node.children || []).forEach(c => walkTree(c, fn));
 }
 
+// ============ 概括行功能 ============
+// 概括 = 在选中同级节点之后插入一个特殊样式的真实节点，随树保存/移动/收起
+function createSummary() {
+  try {
+    const act = (mind && mind.renderer && mind.renderer.activeNodeList) || [];
+    if (act.length < 2) { toast('请按住 Ctrl 选中多个同级节点后再点「概括」'); return; }
+    if (act.some(n => n.isRoot)) { toast('不能概括根节点'); return; }
+    const parent = act[0].parent;
+    if (!parent) { toast('操作失败'); return; }
+    if (!act.every(n => n.parent === parent)) { toast('请选择同一父节点下的多个节点'); return; }
+    const sorted = act.slice().sort((a, b) => {
+      const ia = parent.children.indexOf(a), ib = parent.children.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    showSummaryInputDialog(parent, sorted[sorted.length - 1]);
+  } catch (e) { toast('操作失败'); }
+}
+function showSummaryInputDialog(parent, lastNode) {
+  try {
+    const old = document.getElementById('smmSumDlg');
+    if (old) old.remove();
+    const dlg = document.createElement('div');
+    dlg.id = 'smmSumDlg';
+    dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9000;background:rgba(24,29,44,0.97);border:1px solid rgba(108,140,255,0.45);border-radius:14px;padding:18px 20px;min-width:320px;box-shadow:0 14px 44px rgba(0,0,0,0.55);font-family:inherit;backdrop-filter:blur(10px);';
+    dlg.innerHTML = '<div style="font-size:14px;font-weight:700;color:#e8edf7;margin-bottom:12px;">添加概括</div>'
+      + '<input id="smmSumInput" type="text" placeholder="输入概括文字" style="width:100%;box-sizing:border-box;background:#0f1420;border:1px solid #2a3550;border-radius:8px;color:#e8edf7;padding:8px 10px;font-size:13px;outline:none;margin-bottom:14px;">'
+      + '<div style="display:flex;gap:10px;align-items:center;justify-content:flex-end;">'
+      + '<button id="smmSumCancel" style="background:rgba(255,255,255,0.06);color:#c6d2ea;border:1px solid #2a3550;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer;">取消</button>'
+      + '<button id="smmSumOk" style="background:linear-gradient(135deg,#4f7cff,#6C8CFF);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;cursor:pointer;font-weight:600;">确定</button>'
+      + '</div>';
+    document.body.appendChild(dlg);
+    const input = dlg.querySelector('#smmSumInput');
+    setTimeout(() => input.focus(), 50);
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') dlg.querySelector('#smmSumOk').click();
+      if (ev.key === 'Escape') dlg.remove();
+    });
+    dlg.querySelector('#smmSumCancel').addEventListener('click', () => dlg.remove());
+    dlg.querySelector('#smmSumOk').addEventListener('click', () => {
+      const val = input.value.trim();
+      dlg.remove();
+      insertSummaryNode(parent, lastNode, val || '概括');
+    });
+  } catch (e) { toast('操作失败'); }
+}
+function insertSummaryNode(parent, lastNode, title) {
+  try {
+    const styled = '<span style="color:#8fa3c8;font-style:italic;">〔概括〕</span><span style="color:#aab6cf;">' + escHtml(title) + '</span>';
+    // 目标改为唯一选中 parent，确保 INSERT_CHILD_NODE 只在其下创建一个子节点
+    try { mind.renderer.clearActiveNodeList(); } catch (e) { try { mind.renderer.activeNodeList = []; } catch (e2) {} }
+    try { mind.renderer.addNodeToActiveList(parent); } catch (e3) { try { mind.renderer.activeNodeList = [parent]; } catch (e4) {} }
+    mind.execCommand('INSERT_CHILD_NODE', parent, [], { text: styled });
+    markDirty();
+    toast('概括已添加');
+  } catch (e) { toast('操作失败'); }
+}
+// ============ 概括行功能结束 ============
+
 function patchTreeMediaSrc(root) {
   walkTree(root, n => {
     const t = n && n.data && n.data.text;
@@ -3700,6 +3758,7 @@ function bindUi() {
   $('btnCollapseAll').addEventListener('click', () => {
     try { mind.execCommand('UNEXPAND_ALL'); setTimeout(() => mind.view.fit(), 100); } catch (e) {}
   });
+  try { $('btnSummary').addEventListener('click', createSummary); } catch (e) {}
 
   // 添加附件（与在线版一致：在当前选中节点下新建子节点，图片/音视频节点内嵌预览）
   $('btnAttach').addEventListener('click', async () => {
