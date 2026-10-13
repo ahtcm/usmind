@@ -3652,6 +3652,10 @@ function bindUi() {
     else enterFullscreen(docBox);
   });
   if (fsExit) fsExit.addEventListener('click', exitFullscreen);
+  // 全局兜底：若磨砂 ✕ 残留显示但已无全屏框（_fsEl 为空），点击页面任意处即隐藏，绝不让它遮挡任何窗口按钮
+  document.addEventListener('click', () => {
+    if (!_fsEl && fsExit && fsExit.style.display === 'flex') fsExit.style.display = 'none';
+  }, true);
 
   // Ctrl+V 粘贴接管：非编辑态只 stopPropagation 拦住库的 keyCommand 快捷键（window keydown），
   // 不 preventDefault（否则浏览器粘贴流程被取消、paste 事件不再触发 → 粘贴完全失效）。

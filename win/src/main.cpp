@@ -299,7 +299,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             GetClientRect(hWnd, &rc);
             int w = rc.right;
             if (x >= w - BTN_W * 3 && x < w - BTN_W * 2) SendMessageW(hWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-            else if (x >= w - BTN_W * 2 && x < w - BTN_W) SendMessageW(hWnd, WM_SYSCOMMAND, IsZoomed(hWnd) ? SC_RESTORE : SC_MAXIMIZE, 0);
+            else if (x >= w - BTN_W * 2 && x < w - BTN_W) {
+              // 最大化/还原：ShowWindow 直调比 WM_SYSCOMMAND 更可靠（不受系统菜单状态影响）
+              if (IsZoomed(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+              else ShowWindow(hWnd, SW_MAXIMIZE);
+            }
             else if (x >= w - BTN_W) PostMessageW(hWnd, WM_CLOSE, 0, 0);
         }
         return 0;
