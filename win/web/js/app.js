@@ -785,8 +785,7 @@ function initMindMap() {
   try { mind.on('node_mouseleave', () => renderTabStrip()); } catch (e) {}
   mind.on('scale', () => updateZoom());
   window.addEventListener('resize', () => { try { applyCanvasBg(); } catch (e) {} });
-  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); try { redrawSummaries(); } catch (e) {} });
-  try { initSummaryWatcher(); } catch (e) {}
+  mind.on('node_tree_render_end', () => { updateStatus(); renderTabStrip(); try { fixAttachNodeTexts(); } catch (e) {} scheduleMathInject(); });
   // Ctrl+滚轮缩放后也刷新数字（scale 事件可能不触发）
   $('mindMapContainer').addEventListener('wheel', () => { setTimeout(updateZoom, 80); }, { passive: true });
   updateStatus();
@@ -2748,207 +2747,6 @@ function walkTree(node, fn) {
   (node.children || []).forEach(c => walkTree(c, fn));
 }
 
-// ============ 概括（概要括弧）功能 ============
-// 数据结构：数据节点的 data.summaries = [{ id, title, range:[start,end] }]
-// 渲染：库 SVG 根内叠加 <g id="smmSummaryLayer">，node_tree_render_end 后重算
-let curSummary = null;
-
-function smmRoot() {
-  try {
-    if (mind && mind.renderer) {
-      if (mind.renderer.root) return mind.renderer.root;
-      if (mind.renderer.mindMap && mind.renderer.mindMap.root) return mind.renderer.mindMap.root;
-    }
-  } catch (e) {}
-  return null;
-}
-function smmGetData(n) {
-  try { return n.getData ? (n.getData() || {}) : (n.data || {}); } catch (e) { return {}; }
-}
-function smmCollect() {
-  const root = smmRoot();
-  if (!root) return [];
-  const out = [];
-  (function walk(n) {
-    if (!n) return;
-    const d = smmGetData(n);
-    if (Array.isArray(d.summaries) && d.summaries.length) d.summaries.forEach(s => out.push({ rnode: n, sum: s }));
-    (n.children || []).forEach(c => { if (c && c.nodeData) walk(c); });
-  })(root);
-  return out;
-}
-function smmNodeRect(cn) {
-  try {
-    const g = cn.group && cn.group.node;
-    if (!g) return null;
-    const b = g.getBoundingClientRect();
-    let x = b.x, y = b.y;
-    const svgEl = document.querySelector('#mindMapContainer svg');
-    if (svgEl) {
-      const ctm = svgEl.getScreenCTM();
-      if (ctm) {
-        const p1 = svgEl.createSVGPoint();
-        p1.x = b.x; p1.y = b.y;
-        const s = p1.matrixTransform(ctm.inverse());
-        x = s.x; y = s.y;
-      }
-    }
-    return { x, y, w: b.width, h: b.height };
-  } catch (e) { return null; }
-}
-function redrawSummaries() {
-  try {
-    const svgEl = document.querySelector('#mindMapContainer svg');
-    if (!svgEl) return;
-    // 叠加层挂到 smm-container（随库缩放/平移 transform 一起移动）
-    let host = svgEl.querySelector('.smm-container') || svgEl;
-    let g = host.querySelector('#smmSummaryLayer');
-    if (!g) {
-      g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      g.setAttribute('id', 'smmSummaryLayer');
-      host.appendChild(g);
-    }
-    g.innerHTML = '';
-    smmCollect().forEach(({ rnode, sum }) => {
-      const kids = (rnode.children || []).filter(c => c && c.nodeData);
-      let s = Array.isArray(sum.range) ? (sum.range[0] | 0) : 0;
-      let e = Array.isArray(sum.range) ? (sum.range[1] == null ? kids.length - 1 : (sum.range[1] | 0)) : kids.length - 1;
-      s = Math.max(0, Math.min(s, kids.length - 1));
-      e = Math.min(e, kids.length - 1);
-      if (e < 0 || s >= kids.length || e < s) return;
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (let i = s; i <= e; i++) {
-        const rc = smmNodeRect(kids[i]);
-        if (!rc) continue;
-        minX = Math.min(minX, rc.x); minY = Math.min(minY, rc.y);
-        maxX = Math.max(maxX, rc.x + rc.w); maxY = Math.max(maxY, rc.y + rc.h);
-      }
-      if (minX === Infinity) return;
-      const pad = 20, rr = 16;
-      const x = minX - pad, y = minY - pad, w = maxX - minX + pad * 2, h = maxY - minY + pad * 2;
-      const NS = 'http://www.w3.org/2000/svg';
-      const isCur = !!(curSummary && curSummary.sum && curSummary.sum.id === sum.id);
-      const rect = document.createElementNS(NS, 'rect');
-      rect.setAttribute('x', x); rect.setAttribute('y', y);
-      rect.setAttribute('width', w); rect.setAttribute('height', h);
-      rect.setAttribute('rx', rr); rect.setAttribute('ry', rr);
-      rect.setAttribute('fill', isCur ? 'rgba(108,140,255,0.16)' : 'rgba(108,140,255,0.06)');
-      rect.setAttribute('stroke', isCur ? '#7FA3FF' : '#6C8CFF');
-      rect.setAttribute('stroke-width', '1.8');
-      rect.setAttribute('stroke-dasharray', '8 5');
-      rect.style.cursor = 'pointer';
-      rect.addEventListener('click', ev => {
-        ev.stopPropagation();
-        if (ev.shiftKey || ev.ctrlKey || ev.metaKey) {
-          const d = smmGetData(rnode);
-          if (Array.isArray(d.summaries)) d.summaries = d.summaries.filter(x => x !== sum);
-          try { mind.render(); } catch (e) {}
-          markDirty(); toast('概括已删除');
-        } else {
-          curSummary = { rnode, sum };
-          showSummaryDialog(rnode, sum);
-        }
-      });
-      g.appendChild(rect);
-      const t = document.createElementNS(NS, 'text');
-      const ty = y > 16 ? y - 10 : y + h + 22;
-      t.setAttribute('x', x + 2); t.setAttribute('y', ty);
-      t.setAttribute('fill', isCur ? '#A9C4FF' : '#7FA3FF');
-      t.setAttribute('font-size', '13');
-      t.textContent = sum.title || '概括';
-      g.appendChild(t);
-    });
-  } catch (e) {}
-}
-function showSummaryDialog(rnode, sum, newRange) {
-  try {
-    const old = document.getElementById('smmSummaryDlg');
-    if (old) old.remove();
-    const dlg = document.createElement('div');
-    dlg.id = 'smmSummaryDlg';
-    dlg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9000;background:rgba(24,29,44,0.97);border:1px solid rgba(108,140,255,0.45);border-radius:14px;padding:18px 20px;min-width:320px;box-shadow:0 14px 44px rgba(0,0,0,0.55);font-family:inherit;backdrop-filter:blur(10px);';
-    const isEdit = !!sum;
-    dlg.innerHTML = '<div style="font-size:14px;font-weight:700;color:#e8edf7;margin-bottom:12px;">' + (isEdit ? '编辑概括' : '添加概括') + '</div>'
-      + '<input id="smmSumInput" type="text" placeholder="输入概括文字" style="width:100%;box-sizing:border-box;background:#0f1420;border:1px solid #2a3550;border-radius:8px;color:#e8edf7;padding:8px 10px;font-size:13px;outline:none;margin-bottom:14px;">'
-      + '<div style="display:flex;gap:10px;align-items:center;">'
-      + (isEdit ? '<button id="smmSumDel" style="margin-right:auto;background:rgba(255,90,90,0.14);color:#ff9a9a;border:1px solid rgba(255,90,90,0.4);border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;">删除</button>' : '')
-      + '<button id="smmSumCancel" style="background:rgba(255,255,255,0.06);color:#c6d2ea;border:1px solid #2a3550;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer;">取消</button>'
-      + '<button id="smmSumOk" style="background:linear-gradient(135deg,#4f7cff,#6C8CFF);color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;cursor:pointer;font-weight:600;">确定</button>'
-      + '</div>';
-    document.body.appendChild(dlg);
-    const input = dlg.querySelector('#smmSumInput');
-    input.value = isEdit ? (sum.title || '') : '';
-    setTimeout(() => input.focus(), 50);
-    input.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') { dlg.querySelector('#smmSumOk').click(); }
-      if (ev.key === 'Escape') { dlg.remove(); }
-    });
-    dlg.querySelector('#smmSumCancel').addEventListener('click', () => dlg.remove());
-    dlg.querySelector('#smmSumOk').addEventListener('click', () => {
-      const val = input.value.trim();
-      dlg.remove();
-      const d = smmGetData(rnode);
-      if (isEdit) {
-        sum.title = val || '概括';
-      } else {
-        d.summaries = Array.isArray(d.summaries) ? d.summaries : [];
-        d.summaries.push({ id: 'sm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), title: val || '概括', range: [newRange.s, newRange.e] });
-      }
-      try { mind.render(); } catch (e) {}
-      markDirty();
-      toast(isEdit ? '概括已更新' : '概括已添加');
-    });
-    if (isEdit) {
-      dlg.querySelector('#smmSumDel').addEventListener('click', () => {
-        dlg.remove();
-        const d = smmGetData(rnode);
-        if (Array.isArray(d.summaries)) d.summaries = d.summaries.filter(x => x !== sum);
-        try { mind.render(); } catch (e) {}
-        markDirty();
-        toast('概括已删除');
-      });
-    }
-  } catch (e) { toast('操作失败'); }
-}
-function createSummary() {
-  try {
-    const act = (mind && mind.renderer && mind.renderer.activeNodeList) || [];
-    if (act.length < 2) { toast('请按住 Ctrl 选中多个同级节点后再点「概括」'); return; }
-    if (act.some(n => n.isRoot)) { toast('不能概括根节点'); return; }
-    const parent = act[0].parent;
-    if (!parent) { toast('操作失败'); return; }
-    if (!act.every(n => n.parent === parent)) { toast('请选择同一父节点下的多个节点'); return; }
-    const kids = (parent.children || []).filter(c => c && c.nodeData);
-    const idxs = act.map(n => kids.indexOf(n)).filter(i => i >= 0).sort((a, b) => a - b);
-    if (idxs.length < 2) { toast('请选择至少两个同级节点'); return; }
-    showSummaryDialog(parent, null, { s: idxs[0], e: idxs[idxs.length - 1] });
-  } catch (e) { toast('操作失败'); }
-}
-// 概括跟随兜底：监听 svg 内 transform/结构变化（拖拽、缩放、平移、折叠等），防抖后重算括弧
-function initSummaryWatcher() {
-  if (window.__smmWatcher) return;
-  try {
-    const container = document.getElementById('mindMapContainer');
-    if (!container) return;
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-    let t = null;
-    const obs = new MutationObserver(() => {
-      if (container.querySelector('svg') !== svg) {
-        window.__smmWatcher = false;
-        try { initSummaryWatcher(); } catch (e) {}
-        return;
-      }
-      clearTimeout(t);
-      t = setTimeout(() => { try { redrawSummaries(); } catch (e) {} }, 80);
-    });
-    obs.observe(svg, { attributes: true, attributeFilter: ['transform', 'viewBox'], subtree: true, childList: true });
-    obs.observe(container, { childList: true });
-    window.__smmWatcher = true;
-  } catch (e) {}
-}
-// ============ 概括功能结束 ============
-
 function patchTreeMediaSrc(root) {
   walkTree(root, n => {
     const t = n && n.data && n.data.text;
@@ -3785,7 +3583,7 @@ function initNodeEdit() {
     });
   } catch (e) {}
   // 点击空白 → 隐藏样式条/右键菜单
-  try { mind.on('draw_click', () => { $('styleBar').style.display = 'none'; styleNode = null; hideCtxMenu(); curSummary = null; try { redrawSummaries(); } catch (e) {} }); } catch (e) {}
+  try { mind.on('draw_click', () => { $('styleBar').style.display = 'none'; styleNode = null; hideCtxMenu(); }); } catch (e) {}
   // 双击公式节点 → 公式编辑弹窗（并隐藏库默认文本编辑框）
   try {
     mind.on('node_dblclick', (a, b) => {
@@ -3902,7 +3700,6 @@ function bindUi() {
   $('btnCollapseAll').addEventListener('click', () => {
     try { mind.execCommand('UNEXPAND_ALL'); setTimeout(() => mind.view.fit(), 100); } catch (e) {}
   });
-  try { $('btnSummary').addEventListener('click', createSummary); } catch (e) {}
 
   // 添加附件（与在线版一致：在当前选中节点下新建子节点，图片/音视频节点内嵌预览）
   $('btnAttach').addEventListener('click', async () => {
