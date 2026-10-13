@@ -1760,8 +1760,22 @@ async function buildSelfContainedPayload() {
           if (rel !== s.raw) dd.text = dd.text.split(s.full).join('src="' + rel + '"');
         }
       }
+      // markdown 附件：扫描正文中引用的 attachments/ 媒体，一并打入自包含包
+      if (dd.attachUrl || dd.attachmentUrl) {
+        const an = dd.attachmentName || dd.attachName || '';
+        const aext = (an.split('.').pop() || '').toLowerCase();
+        if (aext === 'md' || aext === 'markdown') {
+          try {
+            const txt = await loadAttachmentText({ url: dd.attachmentUrl || dd.attachUrl, name: an });
+            const refs = txt.match(/attachments\/[A-Za-z0-9_.\-]+/g) || [];
+            for (const ref of refs) {
+              if (!seen.has(ref)) { seen.add(ref); mediaRels.push(ref); }
+            }
+          } catch (eM) {}
+        }
+      }
     }
-    (n.children || []).forEach(walk);
+    if (n.children) { for (const c of n.children) await walk(c); }
   }
   for (const t of tabs) {
     if (!t || !t.data) continue;
@@ -1850,7 +1864,7 @@ async function importSelfContained(b64, path, name) {
         if (wr && wr.ok) replaceMap[k] = rel;
       } catch (eM) {}
     }
-    const walk = (n) => {
+    const walk = async (n) => {
       if (!n) return;
       const dd = n.data;
       if (dd) {
@@ -1861,6 +1875,7 @@ async function importSelfContained(b64, path, name) {
           });
         }
         const u = dd.attachUrl || dd.attachmentUrl;
+        const zipOldRel = (u && u.indexOf('media/') === 0) ? u : null;
         if (u && u.indexOf('media/') === 0) {
           const rel = replaceMap[u];
           if (rel) { dd.attachUrl = rel; delete dd.attachmentUrl; }
@@ -1869,10 +1884,33 @@ async function importSelfContained(b64, path, name) {
           const rel = replaceMap[dd.image];
           if (rel) dd.image = resolveMediaUrl(rel);
         }
+        // markdown 附件：正文引用的媒体 rel 与导入写回的 rel 不一致，替换后重写附件
+        if (dd.attachUrl || dd.attachmentUrl) {
+          const an = dd.attachmentName || dd.attachName || '';
+          const aext = (an.split('.').pop() || '').toLowerCase();
+          if (aext === 'md' || aext === 'markdown' && zipOldRel) {
+            try {
+              let txt = '';
+              const f = zip.file(zipOldRel);
+              if (f) txt = await f.async('string');
+              if (txt) {
+                const newTxt = txt.replace(/attachments\/([A-Za-z0-9_.\-]+)/g, (m0, nm) => {
+                  const rel2 = replaceMap['media/' + nm];
+                  return rel2 ? 'attachments/' + rel2.split('/').pop() : m0;
+                });
+                if (newTxt !== txt) {
+                  const nrel = 'attachments/md_' + ts + '_' + (an.replace(/[\\/:*?"<>|]/g, '_') || 'doc.md');
+                  const wr = await callNative('writeAttachment', nrel, utf8Encode(newTxt));
+                  if (wr && wr.ok) { dd.attachUrl = nrel; delete dd.attachmentUrl; }
+                }
+              }
+            } catch (eM) {}
+          }
+        }
       }
-      (n.children || []).forEach(walk);
+      if (n.children) { for (const c of n.children) await walk(c); }
     };
-    walk(manifest.data.root);
+    await walk(manifest.data.root);
     const parsed = {
       root: manifest.data.root,
       theme: manifest.theme || DEFAULT_THEME,
@@ -2449,6 +2487,72 @@ async function openTextPreview(node, att, startEditable) {
       scrollbarStyle: 'null'
     });
     cm.setSize('100%', '50vh');
+    // ---- 富媒体工具栏（仅编辑态显示）：插入公式 / 图片 / 视频 / 音频 ----
+    const mediaTool = document.createElement('div');
+    mediaTool.style.cssText = 'display:none;gap:6px;padding:6px 8px;background:#262a38;border-bottom:1px solid #333;flex-wrap:wrap;align-items:center';
+    const mkToolBtn = (txt, title) => {
+      const b = document.createElement('button');
+      b.textContent = txt; b.title = title || '';
+      b.style.cssText = 'padding:3px 10px;background:#3a4156;color:#dbe2f0;border:0;border-radius:6px;cursor:pointer;font-size:12px';
+      return b;
+    };
+    const mdInsFile = document.createElement('input');
+    mdInsFile.type = 'file';
+    mdInsFile.multiple = true;
+    mdInsFile.accept = 'image/*,video/*,audio/*';
+    mdInsFile.style.display = 'none';
+    async function mdInsertMedia(file, kind) {
+      try {
+        const ab = await file.arrayBuffer();
+        const b64 = arrayBufferToBase64(ab);
+        const ext0 = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const ext = ext0 || (kind === 'img' ? 'png' : kind === 'video' ? 'mp4' : 'mp3');
+        const rel = 'attachments/md_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+        const r = await callNative('writeAttachment', rel, b64);
+        if (!r || !r.ok) { toast('媒体写入失败', 'error'); return; }
+        const url = 'https://media.local/' + rel.split('/').map(encodeURIComponent).join('/');
+        if (kind === 'img') cm.replaceSelection('![](' + url + ')');
+        else if (kind === 'video') cm.replaceSelection('\n<video src="' + url + '" controls style="max-width:100%"></video>\n');
+        else cm.replaceSelection('\n<audio src="' + url + '" controls></audio>\n');
+      } catch (e) { toast('插入媒体失败：' + e.message, 'error'); }
+    }
+    const btnFormula = mkToolBtn('∑ 公式', '插入 LaTeX 公式（$$...$$）');
+    btnFormula.addEventListener('click', () => {
+      const sel = cm.getSelection();
+      const tex = window.prompt('输入 LaTeX 公式内容', sel || '');
+      if (tex === null) return;
+      cm.replaceSelection('$$' + tex + '$$');
+      markDirty();
+    });
+    const btnImg = mkToolBtn('图片', '插入图片');
+    btnImg.addEventListener('click', () => { mdInsFile.accept = 'image/*'; mdInsFile.click(); });
+    const btnVid = mkToolBtn('视频', '插入视频');
+    btnVid.addEventListener('click', () => { mdInsFile.accept = 'video/*'; mdInsFile.click(); });
+    const btnAud = mkToolBtn('音频', '插入音频');
+    btnAud.addEventListener('click', () => { mdInsFile.accept = 'audio/*'; mdInsFile.click(); });
+    mdInsFile.addEventListener('change', () => {
+      const files = Array.from(mdInsFile.files || []);
+      const kind = mdInsFile.accept.indexOf('image') === 0 ? 'img' : mdInsFile.accept.indexOf('video') === 0 ? 'video' : 'audio';
+      (async () => { for (const f of files) await mdInsertMedia(f, kind); markDirty(); })();
+      mdInsFile.value = '';
+    });
+    mediaTool.appendChild(btnFormula); mediaTool.appendChild(btnImg);
+    mediaTool.appendChild(btnVid); mediaTool.appendChild(btnAud);
+    cmWrap.insertBefore(mediaTool, cmWrap.firstChild);
+    // 粘贴富媒体：编辑态下图片/视频/音频文件直接写入附件目录并插入引用代码
+    cmWrap.addEventListener('paste', (e) => {
+      if (cm.getOption('readOnly')) return;
+      const cd = e.clipboardData;
+      if (!cd || !cd.files || cd.files.length === 0) return;
+      const media = Array.from(cd.files).filter(f => {
+        const t = (f.type || '').toLowerCase();
+        return t.indexOf('image/') === 0 || t.indexOf('video/') === 0 || t.indexOf('audio/') === 0;
+      });
+      if (media.length === 0) return;
+      e.preventDefault();
+      const kd = (m) => (m.type || '').indexOf('image/') === 0 ? 'img' : (m.type || '').indexOf('video/') === 0 ? 'video' : 'audio';
+      (async () => { for (const m of media) await mdInsertMedia(m, kd(m)); markDirty(); })();
+    });
     // 操作按钮（编辑/取消编辑/保存）放到弹窗头部右上角（标题右侧、× 左侧），与 markdown 预览弹窗一致
     const bar = document.createElement('div');
     bar.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:auto';
@@ -2484,17 +2588,20 @@ async function openTextPreview(node, att, startEditable) {
       cm.setOption('readOnly', false);
       editBtn.style.display = 'none';
       cancelEdit.style.display = ''; saveBtn.style.display = '';
+      mediaTool.style.display = 'flex';
       cm.focus();
     }
     editBtn.addEventListener('click', () => {
       cm.setOption('readOnly', false);
       editBtn.style.display = 'none';
       cancelEdit.style.display = ''; saveBtn.style.display = '';
+      mediaTool.style.display = 'flex';
       cm.focus();
     });
     cancelEdit.addEventListener('click', () => {
       cm.setOption('readOnly', 'nocursor');
       editBtn.style.display = '';
+      mediaTool.style.display = 'none';
       cancelEdit.style.display = 'none'; saveBtn.style.display = 'none';
     });
     saveBtn.addEventListener('click', () => {
@@ -3093,6 +3200,13 @@ async function openMarkdownPreview(node, att) {
     body.innerHTML = '<div class="md-layout">'
       + '<div class="md-toc"><div class="md-toc-title">目录</div><div class="md-toc-list"></div></div>'
       + '<div class="md-content"><div class="doc-md">' + html + '</div></div></div>';
+    // 富媒体引用解析：attachments/ 相对路径 → media.local 虚拟主机 URL（图片/视频/音频）
+    try {
+      body.querySelectorAll('.doc-md img,.doc-md video,.doc-md audio').forEach(el => {
+        const s = el.getAttribute('src');
+        if (s && s.indexOf('attachments/') === 0) el.setAttribute('src', resolveMediaUrl(s));
+      });
+    } catch (eM) {}
     try {
       const content = body.querySelector('.md-content');
       const tocList = body.querySelector('.md-toc-list');
