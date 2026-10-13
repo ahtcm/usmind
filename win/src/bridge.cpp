@@ -34,7 +34,8 @@ static const wchar_t* const kMethods[] = {
     L"saveBinary",      // 21 （base64→写二进制文件，自包含 zip 保存用）
     L"saveSelfContained", // 22 （自包含 v3 保存：manifest + 媒体rel列表，二进制直拷）
     L"openSelfContained",  // 23 （自包含 v3 打开：拆 manifest + 媒体写回附件目录）
-    L"restoreMainWindow"   // 24 （启动特效结束：小窗恢复为主窗口大小）
+    L"restoreMainWindow",  // 24 （启动特效结束：小窗恢复为主窗口大小）
+    L"toggleMaximize"      // 25 （窗口最大化/还原切换，前端全屏按钮用）
 };
 static const int kMethodCount = sizeof(kMethods) / sizeof(kMethods[0]);
 
@@ -558,6 +559,12 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
     case 24: { // restoreMainWindow（启动特效结束：小窗恢复为主窗口大小）
         extern void restoreMainWindow();
         restoreMainWindow();
+        if (result) *result = MakeBoolResult(true);
+        break;
+    }
+    case 25: { // toggleMaximize（窗口最大化/还原切换）
+        extern void toggleMaximize();
+        toggleMaximize();
         if (result) *result = MakeBoolResult(true);
         break;
     }

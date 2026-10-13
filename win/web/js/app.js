@@ -3810,6 +3810,8 @@ function bindUi() {
   $('imgViewer').addEventListener('click', () => { $('imgViewer').style.display = 'none'; });
   $('imgViewerClose').addEventListener('click', (e) => { e.stopPropagation(); $('imgViewer').style.display = 'none'; });
   $('btnSettings').addEventListener('click', () => openPanel('settingsPanel'));
+  const btnFs = $('btnFullscreen');
+  if (btnFs) btnFs.addEventListener('click', () => { try { callNative('toggleMaximize').catch(() => {}); } catch (e) {} });
   $('overlay').addEventListener('click', closeAllPanels);
   document.querySelectorAll('.panel-close').forEach(b => b.addEventListener('click', () => closePanel(b.dataset.close)));
   $('btnPickHistoryDir').addEventListener('click', pickProjectDir);

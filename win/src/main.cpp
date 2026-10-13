@@ -485,3 +485,10 @@ void restoreMainWindow() {
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
     SetWindowPos(g_hMainWnd, NULL, x, y, ww, wh, SWP_SHOWWINDOW);
 }
+
+// 窗口最大化/还原切换（前端"全屏"按钮调用，与标题栏按钮同一逻辑）
+void toggleMaximize() {
+    if (!g_hMainWnd) return;
+    if (IsZoomed(g_hMainWnd)) ShowWindow(g_hMainWnd, SW_RESTORE);
+    else ShowWindow(g_hMainWnd, SW_MAXIMIZE);
+}
