@@ -4417,27 +4417,28 @@ function syncEditBoxStyle() {
     }
     const n = te.currentNode;
     const el = te.textEditNode;
-    let wantW = 0;
+    // 强制同步字体：渲染态 div 的 computed 值是 CSS 值（不含 transform 缩放），
+    // 编辑框是 fixed HTML 元素，需乘 mind.view.scale 才能与渲染态视觉大小一致。
     if (n && n._textData && n._textData.node && n._textData.node.node) {
       const fo = n._textData.node.node.querySelector('foreignObject');
       const div = fo ? fo.querySelector('div') : null;
       if (div) {
-        const r = div.getBoundingClientRect();
-        if (r.width > 20) wantW = r.width;
+        const cs = getComputedStyle(div);
+        const scale = (mind.view && mind.view.scale) || 1;
+        const rf = parseFloat(cs.fontSize);
+        if (rf > 4) {
+          const wantFs = (rf * scale) + 'px';
+          if (el.style.fontSize !== wantFs) el.style.fontSize = wantFs;
+        }
+        if (el.style.fontWeight !== cs.fontWeight) el.style.fontWeight = cs.fontWeight;
+        if (el.style.fontFamily !== cs.fontFamily) el.style.fontFamily = cs.fontFamily;
+        const rlh = parseFloat(cs.lineHeight);
+        if (rlh > 4) {
+          const wantLh = (rlh * scale) + 'px';
+          if (el.style.lineHeight !== wantLh) el.style.lineHeight = wantLh;
+        }
       }
     }
-    if (!wantW) {
-      const mw = parseFloat(el.style.minWidth);
-      if (mw && mw > 20) wantW = mw - 10;
-    }
-    if (wantW > 20) {
-      const wpx = wantW + 'px';
-      if (el.style.width !== wpx) el.style.width = wpx;
-      if (el.style.minWidth !== wpx) el.style.minWidth = wpx;
-    }
-    // 注意：fontSize/fontWeight/fontFamily/lineHeight 一律不覆盖——库 domText 已按
-    // 节点字号×缩放比正确设置编辑框字号，用 computed CSS 值（未乘缩放）覆盖会导致
-    // 缩放≠1 时编辑态文字与渲染态大小不一致（"双击后文字变大/变小"）。
   } catch (e) {}
 }
 // ================= 收放漂移兜底 =================
