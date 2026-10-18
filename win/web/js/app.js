@@ -4418,12 +4418,11 @@ function syncEditBoxStyle() {
     const n = te.currentNode;
     const el = te.textEditNode;
     let wantW = 0;
-    let nodeDiv = null;
     if (n && n._textData && n._textData.node && n._textData.node.node) {
       const fo = n._textData.node.node.querySelector('foreignObject');
-      nodeDiv = fo ? fo.querySelector('div') : null;
-      if (nodeDiv) {
-        const r = nodeDiv.getBoundingClientRect();
+      const div = fo ? fo.querySelector('div') : null;
+      if (div) {
+        const r = div.getBoundingClientRect();
         if (r.width > 20) wantW = r.width;
       }
     }
@@ -4436,13 +4435,9 @@ function syncEditBoxStyle() {
       if (el.style.width !== wpx) el.style.width = wpx;
       if (el.style.minWidth !== wpx) el.style.minWidth = wpx;
     }
-    if (nodeDiv) {
-      const cs = getComputedStyle(nodeDiv);
-      if (el.style.fontSize !== cs.fontSize) el.style.fontSize = cs.fontSize;
-      if (el.style.fontWeight !== cs.fontWeight) el.style.fontWeight = cs.fontWeight;
-      if (el.style.fontFamily !== cs.fontFamily) el.style.fontFamily = cs.fontFamily;
-      if (el.style.lineHeight !== cs.lineHeight) el.style.lineHeight = cs.lineHeight;
-    }
+    // 注意：fontSize/fontWeight/fontFamily/lineHeight 一律不覆盖——库 domText 已按
+    // 节点字号×缩放比正确设置编辑框字号，用 computed CSS 值（未乘缩放）覆盖会导致
+    // 缩放≠1 时编辑态文字与渲染态大小不一致（"双击后文字变大/变小"）。
   } catch (e) {}
 }
 // ================= 收放漂移兜底 =================
