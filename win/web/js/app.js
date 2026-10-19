@@ -3988,6 +3988,25 @@ function bindUi() {
       else if (k === ',') { e.preventDefault(); openPanel('settingsPanel'); }
     }
     if (e.key === 'Escape') closeAllPanels();
+    // Delete/Backspace：非编辑态删除选中节点（根节点除外）；编辑态让浏览器默认删文字
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      let editing = false;
+      try { editing = !!(mind && mind.textEdit && mind.textEdit.showTextEdit); } catch (e0) {}
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) editing = true;
+      if (!editing) {
+        let node = null;
+        try { const l = mind.renderer.activeNodeList; if (l && l.length) node = l[0]; } catch (e1) {}
+        if (!node) { try { node = mind.renderer.currentNode; } catch (e1) {} }
+        if (node) {
+          e.preventDefault();
+          if (!isRootNode(node)) {
+            try { mind.renderer.currentNode = node; } catch (e2) {}
+            try { mind.execCommand('REMOVE_NODE'); } catch (e3) {}
+          }
+        }
+      }
+    }
     // 诊断浮层：Ctrl+Shift+D 显示渲染树各节点真实坐标（排查附件左移/框文分离）
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
       e.preventDefault();
