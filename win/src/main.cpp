@@ -172,8 +172,11 @@ public:
 
         // WebView2 背景透明，配合 DWM 原生抗锯齿圆角
         {
+            // IID_ICoreWebView2Controller2 = {6C482C2C-56E9-4FCD-9E3A-6FA65B0FE5B1}
+            static const IID IID_IController2 =
+                { 0x6C482C2C, 0x56E9, 0x4FCD, { 0x9E, 0x3A, 0x6F, 0xA6, 0x5B, 0x0F, 0xE5, 0xB1 } };
             ICoreWebView2Controller2* ctrl2 = nullptr;
-            if (SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&ctrl2)))) {
+            if (SUCCEEDED(controller->QueryInterface(IID_IController2, (void**)&ctrl2))) {
                 COREWEBVIEW2_COLOR tc = { 0, 0, 0, 0 }; // A=0 全透明
                 ctrl2->put_DefaultBackgroundColor(tc);
                 ctrl2->Release();
