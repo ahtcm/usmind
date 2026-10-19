@@ -4453,8 +4453,8 @@ function syncEditBoxStyle() {
     if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
     const n = te.currentNode;
     const el = te.textEditNode;
-    if (te.updateTextEditNode) { try { te.updateTextEditNode(); } catch (eU) {} }
-    // 无条件用节点渲染矩形定位编辑框，避免库定位到 (0,0) 左上角
+    el.style.position = 'fixed';
+    // 用节点渲染矩形定位编辑框
     try {
       const shape = n.shapeNode || n.node;
       if (shape) {
