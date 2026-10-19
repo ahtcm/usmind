@@ -102,7 +102,6 @@ function snapshotActiveTab() {
     // 深拷贝快照；统一为"直接根节点"格式（库 setData 期望 {data,children}，不接受 {root:...}）
     const gd = mind.getData();
     tabs[activeTab].data = gd && gd.root ? cloneMindData(gd.root, new Map()) : cloneMindData(gd, new Map());
-    tabs[activeTab].name = doc.name;
     tabs[activeTab].path = doc.path;
     tabs[activeTab].theme = doc.theme;
     tabs[activeTab].layout = doc.layout;
