@@ -222,8 +222,8 @@ static void DrawTitleBar(HWND hWnd, HDC hdc) {
     int w = rc.right;
     int h = TITLEBAR_H;
 
-    // 背景：白色透明（与画布融合）
-    COLORREF bg = RGB(0xff, 0xff, 0xff);
+    // 背景：与 WebView 内容区主题底色一致，避免标题栏与内容区之间出现色差线
+    COLORREF bg = RGB(0xf5, 0xf7, 0xfa);
     HBRUSH brbg = CreateSolidBrush(bg);
     RECT full = { 0, 0, w, h };
     FillRect(hdc, &full, brbg);
