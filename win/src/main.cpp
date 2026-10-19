@@ -170,10 +170,10 @@ public:
             VariantClear(&hv);
         }
 
-        // 初始布局
+        // 初始布局：WebView2 全屏
         RECT rc;
         GetClientRect(g_hMainWnd, &rc);
-        RECT bounds = { 0, TITLEBAR_H, rc.right, rc.bottom };
+        RECT bounds = { 0, 0, rc.right, rc.bottom };
         controller->put_Bounds(bounds);
 
         // 打开初始文件：命令行文件 或 上次文件
@@ -222,11 +222,8 @@ static void DrawTitleBar(HWND hWnd, HDC hdc) {
     int w = rc.right;
     int h = TITLEBAR_H;
 
-    // 背景：与 WebView 内容区主题底色一致，避免标题栏与内容区之间出现色差线
-    COLORREF bg = RGB(0xf5, 0xf7, 0xfa);
-    HBRUSH brbg = CreateSolidBrush(bg);
-    RECT full = { 0, 0, w, h };
-    FillRect(hdc, &full, brbg);
+    // 背景透明（透出 WebView2 主题底色），只画图标、标题和按钮
+    HBRUSH brbg = CreateSolidBrush(RGB(0xf5, 0xf7, 0xfa));
     DeleteObject(brbg);
 
     // 图标
@@ -367,7 +364,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (g_ctrl) {
             RECT rc;
             GetClientRect(hWnd, &rc);
-            RECT bounds = { 0, TITLEBAR_H, rc.right, rc.bottom };
+            // WebView2 全屏渲染，标题栏透明叠加在上面，实现无缝连接
+            RECT bounds = { 0, 0, rc.right, rc.bottom };
             g_ctrl->put_Bounds(bounds);
         }
         return 0;
