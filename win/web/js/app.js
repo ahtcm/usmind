@@ -255,8 +255,15 @@ function switchToTab(i) {
 function newTab() {
   snapshotActiveTab();
   suppressDirtyUntil = Date.now() + 2000;
+  // 生成递增文件名：未命名导图、未命名导图 2、未命名导图 3...
+  let maxN = 1;
+  tabs.forEach(t => {
+    const m = (t.name || '').match(/^未命名导图(?:\s+(\d+))?$/);
+    if (m) { const n = m[1] ? parseInt(m[1], 10) : 1; if (n >= maxN) maxN = n + 1; }
+  });
+  const nm = maxN <= 1 ? '未命名导图' : ('未命名导图 ' + maxN);
   const t = {
-    name: '未命名导图', path: '',
+    name: nm, path: '',
     data: defaultData().root, theme: userDefaultTheme, layout: 'logicalStructure',
   };
   tabs.push(t);
