@@ -4449,11 +4449,26 @@ function syncEditBoxStyle() {
   try {
     const te = mind && mind.renderer && mind.renderer.textEdit;
     if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
-    if (parseFloat(te.textEditNode.style.left) === 0 || parseFloat(te.textEditNode.style.top) === 0) {
-      if (te.updateTextEditNode) te.updateTextEditNode();
-    }
     const n = te.currentNode;
     const el = te.textEditNode;
+    const curL = parseFloat(el.style.left), curT = parseFloat(el.style.top);
+    if (curL === 0 || curT === 0) {
+      if (te.updateTextEditNode) { try { te.updateTextEditNode(); } catch (eU) {} }
+      // 库定位仍为 (0,0) 时（foreignObject 矩形未就绪），用同一数据源手动重算
+      let rect = null;
+      try {
+        if (n._textData && n._textData.node && n._textData.node.node) {
+          rect = n._textData.node.node.getBoundingClientRect();
+        }
+      } catch (eA) {}
+      if ((!rect || rect.width <= 4) && n.shapeNode) {
+        try { rect = n.shapeNode.getBoundingClientRect(); } catch (eB) {}
+      }
+      if (rect && rect.width > 4 && rect.height > 4) {
+        el.style.left = rect.left + 'px';
+        el.style.top = rect.top + 'px';
+      }
+    }
     // 强制同步字体：渲染态 div 的 computed 值是 CSS 值（不含 transform 缩放），
     // 编辑框是 fixed HTML 元素，需乘 mind.view.scale 才能与渲染态视觉大小一致。
     if (n && n._textData && n._textData.node && n._textData.node.node) {
