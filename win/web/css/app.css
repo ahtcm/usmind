@@ -62,6 +62,10 @@ body {
 }
 .icon-btn:hover { background: rgba(108,140,255,.25); color: #1a2340; }
 .icon-btn:active { transform: scale(.94); }
+#topBar .win-sep { width: 1px; height: 16px; background: rgba(0,0,0,.12); margin: 0 3px; }
+#topBar .win-win-btn { width: 28px; height: 28px; border-radius: 6px; }
+#topBar .win-win-btn.win-close:hover { background: rgba(232,78,78,.9); color: #fff; }
+#topBar { cursor: default; }
 
 /* 下拉菜单 */
 .dropdown { position: relative; }

@@ -35,7 +35,10 @@ static const wchar_t* const kMethods[] = {
     L"saveSelfContained", // 22 （自包含 v3 保存：manifest + 媒体rel列表，二进制直拷）
     L"openSelfContained",  // 23 （自包含 v3 打开：拆 manifest + 媒体写回附件目录）
     L"restoreMainWindow",  // 24 （启动特效结束：小窗恢复为主窗口大小）
-    L"toggleMaximize"      // 25 （窗口最大化/还原切换，前端全屏按钮用）
+    L"toggleMaximize",     // 25 （窗口最大化/还原切换，前端全屏按钮用）
+    L"minimizeWindow",     // 26 （窗口最小化）
+    L"closeWindow",        // 27 （窗口关闭）
+    L"startDragWindow"     // 28 （从 topBar 空白区拖动窗口）
 };
 static const int kMethodCount = sizeof(kMethods) / sizeof(kMethods[0]);
 
@@ -565,6 +568,24 @@ void UsmindBridge::DoInvoke(int method, DISPPARAMS* p, VARIANT* result) {
     case 25: { // toggleMaximize（窗口最大化/还原切换）
         extern void toggleMaximize();
         toggleMaximize();
+        if (result) *result = MakeBoolResult(true);
+        break;
+    }
+    case 26: { // minimizeWindow（窗口最小化）
+        if (g_hMainWnd) ShowWindow(g_hMainWnd, SW_MINIMIZE);
+        if (result) *result = MakeBoolResult(true);
+        break;
+    }
+    case 27: { // closeWindow（窗口关闭）
+        if (g_hMainWnd) PostMessage(g_hMainWnd, WM_CLOSE, 0, 0);
+        if (result) *result = MakeBoolResult(true);
+        break;
+    }
+    case 28: { // startDragWindow（从 topBar 空白区开始拖动窗口）
+        if (g_hMainWnd) {
+            ReleaseCapture();
+            SendMessage(g_hMainWnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+        }
         if (result) *result = MakeBoolResult(true);
         break;
     }

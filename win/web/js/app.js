@@ -3924,6 +3924,18 @@ function bindUi() {
   $('btnSettings').addEventListener('click', () => openPanel('settingsPanel'));
   const btnFs = $('btnFullscreen');
   if (btnFs) btnFs.addEventListener('click', () => { try { callNative('toggleMaximize').catch(() => {}); } catch (e) {} });
+  const btnMin = $('btnWinMin');
+  if (btnMin) btnMin.addEventListener('click', () => { try { callNative('minimizeWindow').catch(() => {}); } catch (e) {} });
+  const btnClose = $('btnWinClose');
+  if (btnClose) btnClose.addEventListener('click', () => { try { callNative('closeWindow').catch(() => {}); } catch (e) {} });
+  // topBar 空白区拖动窗口（按钮/输入框/下拉菜单区域不触发）
+  const tb = $('topBar');
+  if (tb) tb.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const t = e.target;
+    if (t.closest('button, input, a, .dropdown-menu, select, textarea')) return;
+    try { callNative('startDragWindow').catch(() => {}); } catch (err) {}
+  });
   $('overlay').addEventListener('click', closeAllPanels);
   document.querySelectorAll('.panel-close').forEach(b => b.addEventListener('click', () => closePanel(b.dataset.close)));
   $('btnPickHistoryDir').addEventListener('click', pickProjectDir);
