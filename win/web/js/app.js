@@ -598,7 +598,7 @@ async function openPath(path) {
         restoreAllTabs(mf.tabs);
         tabs[activeTab].path = path;
         doc.path = path;
-        doc.name = mf.name || stripUsmindExt(r3.name || path) || doc.name;
+        doc.name = stripUsmindExt(path) || mf.name || doc.name;
         booting = false;
         updateTitle();
         toast('已打开：' + doc.name);
@@ -1798,8 +1798,11 @@ async function saveNow(silent) {
     if (r && r.ok) {
       doc.path = r.path || doc.path;
       if (r.path) { const nm = stripUsmindExt(r.path); if (nm) doc.name = nm; }
+      // 同步 active tab 名字与文件名一致
+      if (tabs[activeTab]) tabs[activeTab].name = doc.name;
       dirty = false;
       updateTitle();
+      renderTabStrip();
       if (!silent) toast('已保存（自包含）');
       callNative('notifyDocumentState', doc.name);
       callNative('saveSettings', JSON.stringify({ lastFile: doc.path }));
