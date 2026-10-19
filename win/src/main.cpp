@@ -170,14 +170,13 @@ public:
             VariantClear(&hv);
         }
 
-        // WebView2 背景透明，配合 DWM 原生抗锯齿圆角
+        // WebView2 背景不透明白色（Win10 上透明会导致窗口全黑/不可见）
         {
-            // IID_ICoreWebView2Controller2 = {6C482C2C-56E9-4FCD-9E3A-6FA65B0FE5B1}
             static const IID IID_IController2 =
                 { 0x6C482C2C, 0x56E9, 0x4FCD, { 0x9E, 0x3A, 0x6F, 0xA6, 0x5B, 0x0F, 0xE5, 0xB1 } };
             ICoreWebView2Controller2* ctrl2 = nullptr;
             if (SUCCEEDED(controller->QueryInterface(IID_IController2, (void**)&ctrl2))) {
-                COREWEBVIEW2_COLOR tc = { 0, 0, 0, 0 }; // A=0 全透明
+                COREWEBVIEW2_COLOR tc = { 255, 255, 255, 255 }; // 不透明白
                 ctrl2->put_DefaultBackgroundColor(tc);
                 ctrl2->Release();
             }
@@ -471,11 +470,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     if (sw < ww) ww = sw - 40;
     if (sh < wh) wh = sh - 60;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
-    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED, L"UsmindMainWnd", L"USMIND 思维导图",
+    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
     if (!g_hMainWnd) return 1;
-    // 分层窗口：启用 per-pixel 合成，让 WebView2 透明区域真正透出桌面（CSS 圆角抗锯齿）
-    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 
     // Win11 圆角（Win10 忽略）
     {
