@@ -3991,19 +3991,26 @@ function bindUi() {
     // Delete/Backspace：非编辑态删除选中节点（根节点除外）；编辑态让浏览器默认删文字
     if (e.key === 'Delete' || e.key === 'Backspace') {
       let editing = false;
-      try { editing = !!(mind && mind.textEdit && mind.textEdit.showTextEdit); } catch (e0) {}
+      try {
+        const te = mind && mind.renderer && mind.renderer.textEdit;
+        if (te) {
+          // 编辑框可见且当前焦点在编辑框内 = 正在编辑文字
+          if (te.textEditNode && te.textEditNode.style.display !== 'none' &&
+              (document.activeElement === te.textEditNode || te.textEditNode.contains(document.activeElement))) {
+            editing = true;
+          }
+        }
+      } catch (e0) {}
       const ae = document.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) editing = true;
       if (!editing) {
         let node = null;
         try { const l = mind.renderer.activeNodeList; if (l && l.length) node = l[0]; } catch (e1) {}
         if (!node) { try { node = mind.renderer.currentNode; } catch (e1) {} }
-        if (node) {
+        if (node && !isRootNode(node)) {
           e.preventDefault();
-          if (!isRootNode(node)) {
-            try { mind.renderer.currentNode = node; } catch (e2) {}
-            try { mind.execCommand('REMOVE_NODE'); } catch (e3) {}
-          }
+          try { mind.renderer.currentNode = node; } catch (e2) {}
+          try { mind.execCommand('REMOVE_NODE'); } catch (e3) {}
         }
       }
     }
