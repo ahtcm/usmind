@@ -4446,21 +4446,20 @@ function syncEditBoxStyle() {
     if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
     const n = te.currentNode;
     const el = te.textEditNode;
-    if (parseFloat(el.style.left) === 0 || parseFloat(el.style.top) === 0) {
-      if (te.updateTextEditNode) te.updateTextEditNode();
-      // updateTextEditNode 仍定位失败时，用节点渲染矩形手动定位编辑框
-      try {
-        const shape = n.shapeNode || n.node;
-        if (shape) {
-          const r = shape.getBoundingClientRect();
-          if (r.width > 4 && r.height > 4) {
-            el.style.left = r.left + 'px';
-            el.style.top = r.top + 'px';
-            if (!el.style.width || parseFloat(el.style.width) < 10) el.style.width = r.width + 'px';
-          }
+    if (te.updateTextEditNode) { try { te.updateTextEditNode(); } catch (eU) {} }
+    // 无条件用节点渲染矩形定位编辑框，避免库定位到 (0,0) 左上角
+    try {
+      const shape = n.shapeNode || n.node;
+      if (shape) {
+        const r = shape.getBoundingClientRect();
+        if (r.width > 4 && r.height > 4) {
+          el.style.left = r.left + 'px';
+          el.style.top = r.top + 'px';
+          el.style.width = r.width + 'px';
+          el.style.minWidth = r.width + 'px';
         }
-      } catch (eL) {}
-    }
+      }
+    } catch (eL) {}
     // 强制同步字体：渲染态 div 的 computed 值是 CSS 值（不含 transform 缩放），
     // 编辑框是 fixed HTML 元素，需乘 mind.view.scale 才能与渲染态视觉大小一致。
     if (n && n._textData && n._textData.node && n._textData.node.node) {
