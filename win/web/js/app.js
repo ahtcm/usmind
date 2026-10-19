@@ -131,14 +131,8 @@ function renderTabStrip() {
   const strip = document.getElementById('tabStrip');
   strip.innerHTML = '';
   tabs.forEach((t, i) => {
-    // 活跃标签实时取画布根节点文字（t.data 可能是旧快照，避免节点改名后标签不跟随）
-    let labelText = rootText(t);
-    if (i === activeTab && mind) {
-      try {
-        const rd = mind.getData();
-        if (rd && rd.root && rd.root.data && rd.root.data.text) labelText = stripHtml(rd.root.data.text) || labelText;
-      } catch (e) {}
-    }
+    // 标签显示文件名（与 topBar/保存文件名一致），不跟随中心节点文字
+    let labelText = t.name || rootText(t);
     const el = document.createElement('div');
     el.className = 'tab-item' + (i === activeTab ? ' active' : '');
     // el.title = labelText; // 不再显示 tag hover 原生提示
@@ -178,20 +172,12 @@ function renderTabStrip() {
     el.addEventListener('click', () => switchToTab(i));
     el.addEventListener('dblclick', (e) => {
       e.stopPropagation();
-      const cur = rootText(t);
-      showInputDialog('重命名中心主题', cur, (newName) => {
+      const cur = t.name || rootText(t);
+      showInputDialog('重命名导图文件', cur, (newName) => {
         if (newName && newName.trim()) {
-          if (!t.data) t.data = { root: { data: { text: newName.trim() }, children: [] } };
-          if (!t.data.root) t.data.root = { data: {}, children: [] };
-          if (!t.data.root.data) t.data.root.data = {};
-          t.data.root.data.text = newName.trim();
-          if (i === activeTab && mind) {
-            try {
-              const rd = mind.getData();
-              const rootN = rd && rd.root ? rd.root : rd;
-              if (rootN && rootN.data) { rootN.data.text = newName.trim(); mind.setData(cloneMindData(rootN, new Map())); mind.render(); }
-            } catch (err) {}
-          }
+          const nm = newName.trim();
+          t.name = nm;
+          if (i === activeTab) { doc.name = nm; updateTitle(); }
           t.dirty = true;
           renderTabStrip();
         }
