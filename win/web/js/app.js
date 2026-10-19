@@ -3988,22 +3988,20 @@ function bindUi() {
       else if (k === ',') { e.preventDefault(); openPanel('settingsPanel'); }
     }
     if (e.key === 'Escape') closeAllPanels();
-    // Delete/Backspace：非编辑态删除选中节点（根节点除外）；编辑态让浏览器默认删文字
+    // Delete：非编辑态删除选中节点（根节点除外）；Backspace 不删节点（避免误删）
+    // 编辑态（编辑框/输入框聚焦）两种键都交给浏览器默认删文字
     if (e.key === 'Delete' || e.key === 'Backspace') {
       let editing = false;
       try {
         const te = mind && mind.renderer && mind.renderer.textEdit;
-        if (te) {
-          // 编辑框可见且当前焦点在编辑框内 = 正在编辑文字
-          if (te.textEditNode && te.textEditNode.style.display !== 'none' &&
-              (document.activeElement === te.textEditNode || te.textEditNode.contains(document.activeElement))) {
-            editing = true;
-          }
+        if (te && te.textEditNode && te.textEditNode.style.display !== 'none' &&
+            (document.activeElement === te.textEditNode || te.textEditNode.contains(document.activeElement))) {
+          editing = true;
         }
       } catch (e0) {}
       const ae = document.activeElement;
       if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) editing = true;
-      if (!editing) {
+      if (!editing && e.key === 'Delete') {
         let node = null;
         try { const l = mind.renderer.activeNodeList; if (l && l.length) node = l[0]; } catch (e1) {}
         if (!node) { try { node = mind.renderer.currentNode; } catch (e1) {} }
@@ -4451,22 +4449,11 @@ function syncEditBoxStyle() {
   try {
     const te = mind && mind.renderer && mind.renderer.textEdit;
     if (!te || !te.showTextEdit || !te.currentNode || !te.textEditNode) return;
+    if (parseFloat(te.textEditNode.style.left) === 0 || parseFloat(te.textEditNode.style.top) === 0) {
+      if (te.updateTextEditNode) te.updateTextEditNode();
+    }
     const n = te.currentNode;
     const el = te.textEditNode;
-    el.style.position = 'fixed';
-    // 用节点渲染矩形定位编辑框
-    try {
-      const shape = n.shapeNode || n.node;
-      if (shape) {
-        const r = shape.getBoundingClientRect();
-        if (r.width > 4 && r.height > 4) {
-          el.style.left = r.left + 'px';
-          el.style.top = r.top + 'px';
-          el.style.width = r.width + 'px';
-          el.style.minWidth = r.width + 'px';
-        }
-      }
-    } catch (eL) {}
     // 强制同步字体：渲染态 div 的 computed 值是 CSS 值（不含 transform 缩放），
     // 编辑框是 fixed HTML 元素，需乘 mind.view.scale 才能与渲染态视觉大小一致。
     if (n && n._textData && n._textData.node && n._textData.node.node) {
