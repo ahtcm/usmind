@@ -396,6 +396,11 @@ function updateTitle() {
     else if (doc.path) { st.textContent = '已保存'; st.className = 'save-state saved'; }
     else { st.textContent = ''; st.className = 'save-state'; }  }
 }
+// 从文件路径/全名提取主名（去 .usmind 扩展名）
+function stripUsmindExt(p) {
+  if (!p) return p;
+  return p.replace(/^.*[\\/]/, '').replace(/\.usmind$/i, '');
+}
 // 双击标题改名（改后即文件名）
 function renameDocTitle() {
   const dt = $('docTitle');
@@ -600,7 +605,7 @@ async function openPath(path) {
         restoreAllTabs(mf.tabs);
         tabs[activeTab].path = path;
         doc.path = path;
-        doc.name = mf.name || r3.name || doc.name;
+        doc.name = mf.name || stripUsmindExt(r3.name || path) || doc.name;
         booting = false;
         updateTitle();
         toast('已打开：' + doc.name);
@@ -619,7 +624,7 @@ async function openPath(path) {
         restoreAllTabs(parsed.multiTabs);
         tabs[activeTab].path = r.path || path;
         doc.path = tabs[activeTab].path;
-        doc.name = r.name || parsed.name || doc.name;
+        doc.name = stripUsmindExt(r.path || path) || parsed.name || doc.name;
         booting = false;
         updateTitle();
         toast('已恢复 ' + parsed.multiTabs.length + ' 个标签');
@@ -670,7 +675,7 @@ async function openWithDialog() {
         restoreAllTabs(parsed.multiTabs);
         tabs[activeTab].path = r.path;
         doc.path = r.path;
-        doc.name = r.name || parsed.name || doc.name;
+        doc.name = stripUsmindExt(r.path) || parsed.name || doc.name;
         booting = false;
         updateTitle();
         toast('已恢复 ' + parsed.multiTabs.length + ' 个标签');
@@ -1799,7 +1804,7 @@ async function saveNow(silent) {
     const r = await callNative('saveSelfContained', JSON.stringify(manifest), JSON.stringify(p.mediaRels), 0, doc.name, doc.path);
     if (r && r.ok) {
       doc.path = r.path || doc.path;
-      doc.name = r.name || doc.name;
+      if (r.path) { const nm = stripUsmindExt(r.path); if (nm) doc.name = nm; }
       dirty = false;
       updateTitle();
       if (!silent) toast('已保存（自包含）');
