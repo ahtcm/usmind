@@ -3561,12 +3561,17 @@ function initNodeEdit() {
           const dd = n && n.getData ? (n.getData() || {}) : {};
           if (dd.mathLatex || /katex/.test(dd.text || '')) return; // 公式节点：不进入文本编辑
         } catch (e) {}
+        window.__nodeTextEditing = true; // 进入节点文字编辑
         const res = origShow(opts);
         // 双击进入编辑后立即同步编辑框尺寸/字体（防 block div 撑宽导致文字变形）
         try { setTimeout(syncEditBoxStyle, 30); setTimeout(syncEditBoxStyle, 120); } catch (e2) {}
         return res;
       };
     }
+  } catch (e) {}
+  // 退出节点文字编辑
+  try {
+    mind.on('hide_text_edit', () => { window.__nodeTextEditing = false; });
   } catch (e) {}
   // 右键菜单（平时隐藏样式条，仅点"节点样式"才显示）
   try {
@@ -3989,11 +3994,12 @@ function bindUi() {
     }
     if (e.key === 'Escape') closeAllPanels();
     // Delete：非编辑态删除选中节点（根节点除外）；Backspace 不删节点（避免误删）
-    // 编辑态（编辑框/输入框聚焦）两种键都交给浏览器默认删文字
+    // 编辑态（节点文字编辑框/输入框聚焦）两种键都交给浏览器默认删文字
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      let editing = false;
+      let editing = !!window.__nodeTextEditing;
       try {
         const te = mind && mind.renderer && mind.renderer.textEdit;
+        if (te && te.showTextEdit) editing = true;
         if (te && te.textEditNode && te.textEditNode.style.display !== 'none' &&
             (document.activeElement === te.textEditNode || te.textEditNode.contains(document.activeElement))) {
           editing = true;
