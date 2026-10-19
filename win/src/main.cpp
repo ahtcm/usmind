@@ -381,6 +381,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             RECT bounds = { 0, 0, rc.right, rc.bottom };
             g_ctrl->put_Bounds(bounds);
         }
+        // 窗口圆角（Win10/11 通用）：小半径 8px 锯齿不可见；Win11 叠加 DWM 原生圆角
+        {
+            RECT rc;
+            GetClientRect(hWnd, &rc);
+            BOOL zoomed = IsZoomed(hWnd);
+            int radius = zoomed ? 0 : 8;
+            HRGN rgn = CreateRoundRectRgn(0, 0, rc.right + 1, rc.bottom + 1, radius * 2, radius * 2);
+            SetWindowRgn(hWnd, rgn, TRUE);
+        }
         return 0;
     }
 
