@@ -298,13 +298,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             RECT rc;
             GetClientRect(hWnd, &rc);
             int w = rc.right;
-            if (x >= w - BTN_W * 3 && x < w - BTN_W * 2) SendMessageW(hWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
-            else if (x >= w - BTN_W * 2 && x < w - BTN_W) {
-              // 最大化/还原：ShowWindow 直调比 WM_SYSCOMMAND 更可靠（不受系统菜单状态影响）
-              if (IsZoomed(hWnd)) ShowWindow(hWnd, SW_RESTORE);
-              else ShowWindow(hWnd, SW_MAXIMIZE);
+            if (x >= w - BTN_W * 3 && x < w - BTN_W * 2) {
+                SendMessageW(hWnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
             }
-            else if (x >= w - BTN_W) PostMessageW(hWnd, WM_CLOSE, 0, 0);
+            else if (x >= w - BTN_W * 2 && x < w - BTN_W) {
+                // 最大化/还原：ShowWindow 直调比 WM_SYSCOMMAND 更可靠（不受系统菜单状态影响）
+                if (IsZoomed(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+                else ShowWindow(hWnd, SW_MAXIMIZE);
+            }
+            else if (x >= w - BTN_W) {
+                PostMessageW(hWnd, WM_CLOSE, 0, 0);
+            }
+            else {
+                // 标题栏空白区：交给 DefWindowProc 的 HTCAPTION 拖拽循环
+                // （支持拖到顶部最大化、拖到左右边缘分屏 snap）
+                ReleaseCapture();
+                SendMessageW(hWnd, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(x, y));
+            }
         }
         return 0;
     }
@@ -367,6 +377,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
         MINMAXINFO* mmi = (MINMAXINFO*)lp;
         mmi->ptMinTrackSize.x = 900;
         mmi->ptMinTrackSize.y = 600;
+        // WS_POPUP 窗口最大化默认盖满整个屏幕（含任务栏），这里按显示器工作区调整
+        HMONITOR hmon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi = { sizeof(mi) };
+        if (GetMonitorInfoW(hmon, &mi)) {
+            mmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+            mmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+            mmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+            mmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+        }
         return 0;
     }
 
