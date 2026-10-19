@@ -27,6 +27,8 @@ body {
   font-size: 14px;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 #app { position: relative; height: 100vh; overflow: hidden; }

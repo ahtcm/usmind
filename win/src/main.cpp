@@ -170,6 +170,16 @@ public:
             VariantClear(&hv);
         }
 
+        // WebView2 背景透明，配合 DWM 原生抗锯齿圆角
+        {
+            ICoreWebView2Controller2* ctrl2 = nullptr;
+            if (SUCCEEDED(controller->QueryInterface(IID_PPV_ARGS(&ctrl2)))) {
+                COREWEBVIEW2_COLOR tc = { 0, 0, 0, 0 }; // A=0 全透明
+                ctrl2->put_DefaultBackgroundColor(tc);
+                ctrl2->Release();
+            }
+        }
+
         // 初始布局：WebView2 全屏
         RECT rc;
         GetClientRect(g_hMainWnd, &rc);
@@ -367,15 +377,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             // WebView2 全屏渲染，标题栏透明叠加在上面，实现无缝连接
             RECT bounds = { 0, 0, rc.right, rc.bottom };
             g_ctrl->put_Bounds(bounds);
-        }
-        // 窗口圆角（非最大化时）；最大化时直角铺满
-        {
-            RECT rc;
-            GetClientRect(hWnd, &rc);
-            BOOL zoomed = IsZoomed(hWnd);
-            int radius = zoomed ? 0 : 22;
-            HRGN rgn = CreateRoundRectRgn(0, 0, rc.right + 1, rc.bottom + 1, radius, radius);
-            SetWindowRgn(hWnd, rgn, TRUE); // 接管 rgn 所有权，不需 DeleteObject
         }
         return 0;
     }
