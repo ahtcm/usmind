@@ -368,6 +368,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             RECT bounds = { 0, 0, rc.right, rc.bottom };
             g_ctrl->put_Bounds(bounds);
         }
+        // 窗口圆角（非最大化时）；最大化时直角铺满
+        {
+            RECT rc;
+            GetClientRect(hWnd, &rc);
+            BOOL zoomed = IsZoomed(hWnd);
+            int radius = zoomed ? 0 : 12;
+            HRGN rgn = CreateRoundRectRgn(0, 0, rc.right + 1, rc.bottom + 1, radius, radius);
+            SetWindowRgn(hWnd, rgn, TRUE); // 接管 rgn 所有权，不需 DeleteObject
+        }
         return 0;
     }
 
