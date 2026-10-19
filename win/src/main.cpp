@@ -377,18 +377,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (g_ctrl) {
             RECT rc;
             GetClientRect(hWnd, &rc);
-            // WebView2 全屏渲染，标题栏透明叠加在上面，实现无缝连接
             RECT bounds = { 0, 0, rc.right, rc.bottom };
             g_ctrl->put_Bounds(bounds);
-        }
-        // 窗口圆角（Win10/11 通用）：小半径 8px 锯齿不可见；Win11 叠加 DWM 原生圆角
-        {
-            RECT rc;
-            GetClientRect(hWnd, &rc);
-            BOOL zoomed = IsZoomed(hWnd);
-            int radius = zoomed ? 0 : 8;
-            HRGN rgn = CreateRoundRectRgn(0, 0, rc.right + 1, rc.bottom + 1, radius * 2, radius * 2);
-            SetWindowRgn(hWnd, rgn, TRUE);
         }
         return 0;
     }
@@ -481,11 +471,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR cmdLine, int nCmdShow) {
     if (sw < ww) ww = sw - 40;
     if (sh < wh) wh = sh - 60;
     int x = (sw - ww) / 2, y = (sh - wh) / 2;
-    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW, L"UsmindMainWnd", L"USMIND 思维导图",
+    g_hMainWnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_LAYERED, L"UsmindMainWnd", L"USMIND 思维导图",
                                  WS_POPUP, x, y, ww, wh, NULL, NULL, hInst, NULL);
     if (!g_hMainWnd) return 1;
+    // 分层窗口：启用 per-pixel 合成，让 WebView2 透明区域真正透出桌面（CSS 圆角抗锯齿）
+    SetLayeredWindowAttributes(g_hMainWnd, 0, 255, LWA_ALPHA);
 
-    // Win11 圆角
+    // Win11 圆角（Win10 忽略）
     {
         const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         int pref = 2; // DWMWCP_ROUND

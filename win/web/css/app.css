@@ -27,7 +27,7 @@ body {
   font-size: 14px;
   user-select: none;
   -webkit-font-smoothing: antialiased;
-  border-radius: 10px;
+  border-radius: 16px;
   overflow: hidden;
 }
 
