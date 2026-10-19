@@ -373,7 +373,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             RECT rc;
             GetClientRect(hWnd, &rc);
             BOOL zoomed = IsZoomed(hWnd);
-            int radius = zoomed ? 0 : 12;
+            int radius = zoomed ? 0 : 22;
             HRGN rgn = CreateRoundRectRgn(0, 0, rc.right + 1, rc.bottom + 1, radius, radius);
             SetWindowRgn(hWnd, rgn, TRUE); // 接管 rgn 所有权，不需 DeleteObject
         }
